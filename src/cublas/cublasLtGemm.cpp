@@ -205,7 +205,7 @@ cublasLtGemm::cublasLtGemm(cxxopts::ParseResult result) : genericGemm(result) {
   initialization = result["initialization"].as<string>();
 }
 
-void cublasLtGemm::prepareArray() {
+string cublasLtGemm::prepareArray() {
   alpha = convertScalar(scalar, alpha);
   beta = convertScalar(scalar, beta);
   this->allocHost();
@@ -238,6 +238,13 @@ void cublasLtGemm::prepareArray() {
   } else {
     runThreaded(&cublasLtGemm::noTuning);
   }
+  std::ostringstream ossHeader;
+  ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
+  if (batched) {
+    ossHeader << "batch_count,";
+  }
+  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us," << endl;
+  return ossHeader.str();
 }
 
 void cublasLtGemm::runThreaded(void (cublasLtGemm::*func)(cublasltgemmInst *)) {
@@ -399,23 +406,19 @@ double cublasLtGemm::test() {
 }
 
 std::string cublasLtGemm::getResultString() {
-  std::ostringstream ossHeader;
   std::ostringstream ossValues;
   ossValues << std::setprecision(7);
-  ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
   ossValues << opToString(transA) << ',' << opToString(transB) << ',' << m
             << ',' << n << ',' << k << ',' << lda << ',' << ldb << ',' << ldc
             << ',';
   if (batched) {
-    ossHeader << "batch_count,";
     ossValues << batchct << ',';
   }
-  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us," << endl;
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
   ossValues << endl;
-  return ossHeader.str() + ossValues.str();
+  return ossValues.str();
 }
 
 std::tuple<double, double, double> cublasLtGemm::calculateFOM(

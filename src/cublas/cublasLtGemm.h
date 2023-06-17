@@ -86,7 +86,7 @@ class cublasLtGemm : public genericGemm {
                   std::string dStr);
   void validateParameters();
   void parseDevIters(std::string);
-  void prepareArray();
+  std::string prepareArray();
   void allocHost();
   void allocDev(cublasltgemmInst *);
   void fillHost();

@@ -38,7 +38,7 @@ class genericGemm {
   // virtual void setTypes();
   int setLd(std::string ld, std::string OP, int x, int y);
 
-  virtual void prepareArray() = 0;
+  virtual std::string prepareArray() = 0;
 
   virtual double test() = 0;
 

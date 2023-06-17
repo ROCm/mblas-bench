@@ -112,7 +112,7 @@ class cublasGemm : public genericGemm {
                   std::string aStr, std::string bStr, std::string cStr);
   void parseDevIters(std::string);
   cublasOperation_t setOp(std::string);
-  void prepareArray();
+  std::string prepareArray();
   void allocHost();
   void allocDev(cublasgemmInst *);
   void fillHost();

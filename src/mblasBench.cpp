@@ -21,6 +21,7 @@
 using std::cerr;
 using std::cout;
 using std::endl;
+using std::flush;
 using std::string;
 
 std::string sToLower(std::string data) {
@@ -175,13 +176,13 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  gemm->prepareArray();
-
+  string header = gemm->prepareArray();
+  cout << header << flush;
   gemm->test();
   cout << std::fixed;
 
   string results = gemm->getResultString();
-  cout << results;
+  cout << results << flush;
 
   gemm->freeMem();
   delete gemm;
