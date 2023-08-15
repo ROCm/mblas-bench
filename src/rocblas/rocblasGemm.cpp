@@ -1,6 +1,6 @@
-#include "hipblasGemm.h"
+#include "rocblasGemm.h"
 
-#include <hipblas/hipblas.h>
+#include <rocblas/rocblas.h>
 #include <hip/hip_runtime.h>
 
 #include <bitset>
@@ -11,10 +11,10 @@
 #include <string>
 #include <thread>
 
-#include "hipblasConvert.h"
-#include "hipblasCreateAllocate.h"
-#include "hipblasDtypeUtils.h"
-#include "hipError.h"
+#include "rocblasConvert.h"
+#include "rocblasCreateAllocate.h"
+#include "rocblasDtypeUtils.h"
+#include "rocblasError.h"
 #include "third_party/cxxopts.hpp"
 
 using std::cerr;
@@ -26,38 +26,38 @@ using std::thread;
 using std::vector;
 
 // clang-format off
-std::vector<gemmPrecType> hipblasGemm::gemmExSupported = {
-    // Compute type                 Scale Type    A/B Type      C Type
-    {HIPBLAS_COMPUTE_16F,           HIP_R_16F,    HIP_R_16F,    HIP_R_16F   },
-    {HIPBLAS_COMPUTE_32F,           HIP_R_32F,    HIP_R_16F,    HIP_R_16F   },
-    {HIPBLAS_COMPUTE_32F,           HIP_R_32F,    HIP_R_16F,    HIP_R_32F   },
-    {HIPBLAS_COMPUTE_32F,           HIP_R_32F,    HIP_R_16BF,   HIP_R_16BF  },
-    {HIPBLAS_COMPUTE_32F,           HIP_R_32F,    HIP_R_16BF,   HIP_R_32F   },
-    {HIPBLAS_COMPUTE_32F,           HIP_R_32F,    HIP_R_32F,    HIP_R_32F   },
-    {HIPBLAS_COMPUTE_64F,           HIP_R_64F,    HIP_R_64F,    HIP_R_64F   },
-    {HIPBLAS_COMPUTE_32I,           HIP_R_32I,    HIP_R_8I,     HIP_R_32I   }, 
-    {HIPBLAS_COMPUTE_32F,           HIP_R_32F,    HIP_C_32F,    HIP_C_32F   },
-    {HIPBLAS_COMPUTE_64F,           HIP_R_64F,    HIP_C_64F,    HIP_C_64F   },
+std::vector<gemmPrecType> rocblasGemm::gemmExSupported = {
+    // Compute type             Scale Type                A/B Type                  C Type
+    {rocblas_datatype_f64_r,    rocblas_datatype_f64_r,   rocblas_datatype_f64_r,   rocblas_datatype_f64_r  },
+    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f32_r,   rocblas_datatype_f32_r  },
+    {rocblas_datatype_f16_r,    rocblas_datatype_f16_r,   rocblas_datatype_f16_r,   rocblas_datatype_f16_r  },
+    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f16_r,   rocblas_datatype_f16_r  },
+    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f16_r,   rocblas_datatype_f32_r  },
+    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_bf16_r,  rocblas_datatype_bf16_r },
+    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_bf16_r,  rocblas_datatype_f32_r  },
+    {rocblas_datatype_i32_r,    rocblas_datatype_i32_r,   rocblas_datatype_i8_r,    rocblas_datatype_i32_r  }, 
+    {rocblas_datatype_f32_c,    rocblas_datatype_f32_c,   rocblas_datatype_f32_c,   rocblas_datatype_f32_c  },
+    {rocblas_datatype_f64_c,    rocblas_datatype_f64_c,   rocblas_datatype_f64_c,   rocblas_datatype_f64_c  },
 };
 // clang-format on
 
-std::vector<TgemmPrecType> hipblasGemm::TgemmExSupported = {};
+std::vector<TgemmPrecType> rocblasGemm::TgemmExSupported = {};
 
-void hipblasGemm::initPrecMap() {}
+void rocblasGemm::initPrecMap() {}
 
-void hipblasGemm::parseDevIters(std::string deviceStr) {
+void rocblasGemm::parseDevIters(std::string deviceStr) {
   // Parse device
   std::stringstream ss(deviceStr);
   while (ss.good()) {
     string deviceSStr;
     getline(ss, deviceSStr, ',');
     int devInt = stoi(deviceSStr);
-    hipblasgemmInst val = hipblasgemmInst(devInt);
+    rocblasgemmInst val = rocblasgemmInst(devInt);
     matPtrs.push_back(val);
   }
 }
 
-void hipblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
+void rocblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
                              string bStr, string cStr) {
   compute = selectCompute(computeTStr, precision);
   scalar = selectScalar(scalarTStr, precision, compute);
@@ -85,9 +85,9 @@ void hipblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
   if (function.find("GemmEx")) {
     /*
       Possible functions:
-        hipblasGemmEx
-        hipblasGemmExBatched
-        hipblasGemmExStridedBatched
+        rocblasGemmEx
+        rocblasGemmExBatched
+        rocblasGemmExStridedBatched
     */
     gemmPrecType selType = {compute, scalar, a_type, c_type};
     auto result =
@@ -118,9 +118,9 @@ void hipblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
   }
 }
 
-hipblasGemm::hipblasGemm(cxxopts::ParseResult result) : genericGemm(result) {
-  // hipblasCreate(&handle);
-  // checkHipblas(hipblasCreate(&handle));
+rocblasGemm::rocblasGemm(cxxopts::ParseResult result) : genericGemm(result) {
+  // rocblas_create_handle(&handle);
+  // checkRocblas(rocblas_create_handle(&handle));
   initPrecMap();
   // Grab precision from command line
   precision = precisionStringToDType(result["precision"].as<string>());
@@ -150,7 +150,7 @@ hipblasGemm::hipblasGemm(cxxopts::ParseResult result) : genericGemm(result) {
   // std::cout << *((float *)beta) << std::endl;
 }
 
-string hipblasGemm::prepareArray() {
+string rocblasGemm::prepareArray() {
   // std::cout << "Pre Convert: " << *((float *)alpha) << std::endl;
   // alpha = convertScalar(scalar, alpha);
   // std::cout << "Post Convert: " << __half2float(*(__half *)alpha) <<
@@ -178,18 +178,18 @@ string hipblasGemm::prepareArray() {
   //  this->copyHostToDev(&instance);
   //}
 
-  runThreaded(&hipblasGemm::allocDev);
-  runThreaded(&hipblasGemm::copyHostToDev);
-  std::ostringstream ossHeader;
+  runThreaded(&rocblasGemm::allocDev);
+  runThreaded(&rocblasGemm::copyHostToDev);
+  std::ostringsrocam ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
   if (batched) {
     ossHeader << "batch_count,";
   }
-  ossHeader << "hipBLAS-Gflops,hipBLAS-GB/s,hipBLAS-us," << endl;
+  ossHeader << "rocBLAS-Gflops,rocBLAS-GB/s,rocBLAS-us," << endl;
   return ossHeader.str();
 }
 
-void hipblasGemm::runThreaded(void (hipblasGemm::*func)(hipblasgemmInst *)) {
+void rocblasGemm::runThreaded(void (rocblasGemm::*func)(rocblasgemmInst *)) {
   vector<thread> threads;
   for (auto &instance : matPtrs) {
     threads.push_back(thread(func, this, &instance));
@@ -199,7 +199,7 @@ void hipblasGemm::runThreaded(void (hipblasGemm::*func)(hipblasgemmInst *)) {
   }
 }
 
-void hipblasGemm::allocHost() {
+void rocblasGemm::allocHost() {
   // auto resultA = std::async(allocateHostArr, a_type, m, k, batchct);
   // auto resultB = std::async(allocateHostArr, b_type, k, n, batchct);
   // auto resultC = std::async(allocateHostArr, c_type, n, m, batchct);
@@ -211,7 +211,7 @@ void hipblasGemm::allocHost() {
   hostC = allocateHostArr(c_type, m, n, batchct);
 }
 
-void hipblasGemm::allocDev(hipblasgemmInst *mat) {
+void rocblasGemm::allocDev(rocblasgemmInst *mat) {
   hipSetDevice(mat->devIDX);
   mat->devA = allocateDevArr(a_type, m, k, batchct);
   mat->devB = allocateDevArr(b_type, k, n, batchct);
@@ -220,7 +220,7 @@ void hipblasGemm::allocDev(hipblasgemmInst *mat) {
   hipMalloc(&mat->devWork, mat->wSZ);
 }
 
-void hipblasGemm::fillHost() {
+void rocblasGemm::fillHost() {
   // Some random functions treat the matrix as a vectors, some require a matrix
   // vector<thread> threads;
   // threads.push_back(thread(initHostH, a_type, initialization, hostA, m, k,
@@ -243,7 +243,7 @@ void hipblasGemm::fillHost() {
                          batchct, stride_c, controlC, constantC);
 }
 
-void hipblasGemm::copyHostToDev(hipblasgemmInst *mat) {
+void rocblasGemm::copyHostToDev(rocblasgemmInst *mat) {
   hipSetDevice(mat->devIDX);
   copyAndConvert(a_type, hostA, mat->devA, m, k, batchct);
   copyAndConvert(b_type, hostB, mat->devB, k, n, batchct);
@@ -272,7 +272,7 @@ void hipblasGemm::copyHostToDev(hipblasgemmInst *mat) {
   }
 }
 
-void hipblasGemm::freeMem() {
+void rocblasGemm::freeMem() {
   free(alpha);
   free(beta);
   free(hostA);
@@ -294,104 +294,104 @@ void hipblasGemm::freeMem() {
   }
 }
 
-double hipblasGemm::test() {
+double rocblasGemm::test() {
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : matPtrs) {
     // Tgemm
-    if ((function == "hipblasDgemm" && precision == HIP_R_64F) ||
-        (function == "gemm" && precision == HIP_R_64F)) {
-      std::function<decltype(hipblasDgemm)> dgemm_var = hipblasDgemm;
+    if ((function == "rocblas_dgemm" && precision == rocblas_datatype_f64_r) ||
+        (function == "gemm" && precision == rocblas_datatype_f64_r)) {
+      std::function<decltype(rocblas_dgemm)> dgemm_var = rocblas_dgemm;
       threads.push_back(
-          thread(&hipblasGemm::testTgemm<double>, this, dgemm_var, &mat));
-    } else if ((function == "hipblasSgemm" && precision == HIP_R_32F) ||
-               (function == "gemm" && precision == HIP_R_32F)) {
-      std::function<decltype(hipblasSgemm)> sgemm_var = hipblasSgemm;
+          thread(&rocblasGemm::testTgemm<double>, this, dgemm_var, &mat));
+    } else if ((function == "rocblas_sgemm" && precision == rocblas_datatype_f32_r) ||
+               (function == "gemm" && precision == rocblas_datatype_f32_r)) {
+      std::function<decltype(rocblas_sgemm)> sgemm_var = rocblas_sgemm;
       threads.push_back(
-          thread(&hipblasGemm::testTgemm<float>, this, sgemm_var, &mat));
-    } else if ((function == "hipblasHgemm" && precision == HIP_R_16F) ||
-               (function == "gemm" && precision == HIP_R_16F)) {
-      std::function<decltype(hipblasHgemm)> hgemm_var = hipblasHgemm;
+          thread(&rocblasGemm::testTgemm<float>, this, sgemm_var, &mat));
+    } else if ((function == "rocblas_hgemm" && precision == rocblas_datatype_f16_r) ||
+               (function == "gemm" && precision == rocblas_datatype_f16_r)) {
+      std::function<decltype(rocblas_hgemm)> hgemm_var = rocblas_hgemm;
       threads.push_back(
-          thread(&hipblasGemm::testTgemm<__half>, this, hgemm_var, &mat));
-    } else if ((function == "hipblasZgemm" && precision == HIP_C_64F) ||
-               (function == "gemm" && precision == HIP_C_64F)) {
-      std::function<decltype(hipblasZgemm)> zgemm_var = hipblasZgemm;
-      threads.push_back(thread(&hipblasGemm::testTgemm<hipDoubleComplex>, this,
+          thread(&rocblasGemm::testTgemm<__half>, this, hgemm_var, &mat));
+    } else if ((function == "rocblas_zgemm" && precision == rocblas_datatype_f64_c) ||
+               (function == "gemm" && precision == rocblas_datatype_f64_c)) {
+      std::function<decltype(rocblas_zgemm)> zgemm_var = rocblas_zgemm;
+      threads.push_back(thread(&rocblasGemm::testTgemm<hipDoubleComplex>, this,
                                zgemm_var, &mat));
-    } else if ((function == "hipblasCgemm" && precision == HIP_C_32F) ||
-               (function == "gemm" && precision == HIP_C_32F)) {
-      std::function<decltype(hipblasCgemm)> cgemm_var = hipblasCgemm;
+    } else if ((function == "rocblas_cgemm" && precision == rocblas_datatype_f32_c) ||
+               (function == "gemm" && precision == rocblas_datatype_f32_c)) {
+      std::function<decltype(rocblas_cgemm)> cgemm_var = rocblas_cgemm;
       threads.push_back(
-          thread(&hipblasGemm::testTgemm<hipComplex>, this, cgemm_var, &mat));
+          thread(&rocblasGemm::testTgemm<hipComplex>, this, cgemm_var, &mat));
     }
     // TgemmBatched
-    else if (function == "hipblasDgemmBatched" && precision == HIP_R_64F) {
-      std::function<decltype(hipblasDgemmBatched)> dgemm_var =
-          hipblasDgemmBatched;
+    else if (function == "rocblas_dgemm_batched" && precision == rocblas_datatype_f64_r) {
+      std::function<decltype(rocblas_dgemm_batched)> dgemm_var =
+          rocblas_dgemm_batched;
       threads.push_back(
-          thread(&hipblasGemm::testTgemmBatched<double>, this, dgemm_var, &mat));
-    } else if (function == "hipblasSgemmBatched" && precision == HIP_R_32F) {
-      std::function<decltype(hipblasSgemmBatched)> sgemm_var =
-          hipblasSgemmBatched;
+          thread(&rocblasGemm::testTgemmBatched<double>, this, dgemm_var, &mat));
+    } else if (function == "rocblas_sgemm_batched" && precision == rocblas_datatype_f32_r) {
+      std::function<decltype(rocblas_sgemm_batched)> sgemm_var =
+          rocblas_sgemm_batched;
       threads.push_back(
-          thread(&hipblasGemm::testTgemmBatched<float>, this, sgemm_var, &mat));
-    } else if (function == "hipblasHgemmBatched" && precision == HIP_R_16F) {
-      std::function<decltype(hipblasHgemmBatched)> hgemm_var =
-          hipblasHgemmBatched;
+          thread(&rocblasGemm::testTgemmBatched<float>, this, sgemm_var, &mat));
+    } else if (function == "rocblas_hgemm_batched" && precision == rocblas_datatype_f16_r) {
+      std::function<decltype(rocblas_hgemm_batched)> hgemm_var =
+          rocblas_hgemm_batched;
       threads.push_back(
-          thread(&hipblasGemm::testTgemmBatched<__half>, this, hgemm_var, &mat));
-    } else if (function == "hipblasZgemmBatched" && precision == HIP_C_64F) {
-      std::function<decltype(hipblasZgemmBatched)> zgemm_var =
-          hipblasZgemmBatched;
-      threads.push_back(thread(&hipblasGemm::testTgemmBatched<hipDoubleComplex>,
+          thread(&rocblasGemm::testTgemmBatched<__half>, this, hgemm_var, &mat));
+    } else if (function == "rocblas_zgemm_batched" && precision == rocblas_datatype_f64_c) {
+      std::function<decltype(rocblas_zgemm_batched)> zgemm_var =
+          rocblas_zgemm_batched;
+      threads.push_back(thread(&rocblasGemm::testTgemmBatched<hipDoubleComplex>,
                                this, zgemm_var, &mat));
-    } else if (function == "hipblasCgemmBatched" && precision == HIP_C_32F) {
-      std::function<decltype(hipblasCgemmBatched)> cgemm_var =
-          hipblasCgemmBatched;
-      threads.push_back(thread(&hipblasGemm::testTgemmBatched<hipComplex>, this,
+    } else if (function == "rocblas_cgemm_batched" && precision == rocblas_datatype_f32_c) {
+      std::function<decltype(rocblas_cgemm_batched)> cgemm_var =
+          rocblas_cgemm_batched;
+      threads.push_back(thread(&rocblasGemm::testTgemmBatched<hipComplex>, this,
                                cgemm_var, &mat));
     }
     // TgemmStridedBatched
-    else if (function == "hipblasDgemmStridedBatched" &&
-             precision == HIP_R_64F) {
-      std::function<decltype(hipblasDgemmStridedBatched)> dgemm_var =
-          hipblasDgemmStridedBatched;
-      threads.push_back(thread(&hipblasGemm::testTgemmStridedBatched<double>,
+    else if (function == "rocblas_dgemm_strided_batched" &&
+             precision == rocblas_datatype_f64_r) {
+      std::function<decltype(rocblas_dgemm_strided_batched)> dgemm_var =
+          rocblas_dgemm_strided_batched;
+      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<double>,
                                this, dgemm_var, &mat));
-    } else if (function == "hipblasSgemmStridedBatched" &&
-               precision == HIP_R_32F) {
-      std::function<decltype(hipblasSgemmStridedBatched)> sgemm_var =
-          hipblasSgemmStridedBatched;
-      threads.push_back(thread(&hipblasGemm::testTgemmStridedBatched<float>,
+    } else if (function == "rocblas_sgemm_strided_batched" &&
+               precision == rocblas_datatype_f32_r) {
+      std::function<decltype(rocblas_sgemm_strided_batched)> sgemm_var =
+          rocblas_sgemm_strided_batched;
+      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<float>,
                                this, sgemm_var, &mat));
-    } else if (function == "hipblasHgemmStridedBatched" &&
-               precision == HIP_R_16F) {
-      std::function<decltype(hipblasHgemmStridedBatched)> hgemm_var =
-          hipblasHgemmStridedBatched;
-      threads.push_back(thread(&hipblasGemm::testTgemmStridedBatched<__half>,
+    } else if (function == "rocblas_hgemm_strided_batched" &&
+               precision == rocblas_datatype_f16_r) {
+      std::function<decltype(rocblas_hgemm_strided_batched)> hgemm_var =
+          rocblas_hgemm_strided_batched;
+      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<__half>,
                                this, hgemm_var, &mat));
-    } else if (function == "hipblasZgemmStridedBatched" &&
-               precision == HIP_C_64F) {
-      std::function<decltype(hipblasZgemmStridedBatched)> zgemm_var =
-          hipblasZgemmStridedBatched;
+    } else if (function == "rocblas_zgemm_strided_batched" &&
+               precision == rocblas_datatype_f64_c) {
+      std::function<decltype(rocblas_zgemm_strided_batched)> zgemm_var =
+          rocblas_zgemm_strided_batched;
       threads.push_back(
-          thread(&hipblasGemm::testTgemmStridedBatched<hipDoubleComplex>, this,
+          thread(&rocblasGemm::testTgemmStridedBatched<hipDoubleComplex>, this,
                  zgemm_var, &mat));
-    } else if (function == "hipblasCgemmStridedBatched" &&
-               precision == HIP_C_32F) {
-      std::function<decltype(hipblasCgemmStridedBatched)> cgemm_var =
-          hipblasCgemmStridedBatched;
-      threads.push_back(thread(&hipblasGemm::testTgemmStridedBatched<hipComplex>,
+    } else if (function == "rocblas_cgemm_strided_batched" &&
+               precision == rocblas_datatype_f32_c) {
+      std::function<decltype(rocblas_cgemm_strided_batched)> cgemm_var =
+          rocblas_cgemm_strided_batched;
+      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<hipComplex>,
                                this, cgemm_var, &mat));
     }
     // gemmEx
-    else if (strided && function == "hipblasGemmExStridedBatched") {
+    else if (strided && function == "rocblas_gemm_strided_batched_ex") {
       // Call the Gemm strided batched deployment script
-    } else if (batched && function == "hipblasGemmExBatched") {
+    } else if (batched && function == "rocblas_gemm_batched_ex") {
       // Call the Gemm batched code
-    } else if (function == "hipblasGemmEx" || function == "gemm_ex") {
-      threads.push_back(thread(&hipblasGemm::testGemmEx, this, &mat));
+    } else if (function == "rocblas_gemm_ex" || function == "gemm_ex") {
+      threads.push_back(thread(&rocblasGemm::testGemmEx, this, &mat));
     }
   }
   // Wait on running jobs
@@ -402,14 +402,14 @@ double hipblasGemm::test() {
   // Sum all gflops
   gflop_per_second = std::accumulate(
       begin(matPtrs), end(matPtrs), 0.0,
-      [](double i, const hipblasgemmInst &o) { return o.gflops + i; });
+      [](double i, const rocblasgemmInst &o) { return o.gflops + i; });
 
   gbyte_per_second = std::accumulate(
       begin(matPtrs), end(matPtrs), 0.0,
-      [](double i, const hipblasgemmInst &o) { return o.gbytes + i; });
+      [](double i, const rocblasgemmInst &o) { return o.gbytes + i; });
 
   iter_time_us = std::accumulate(begin(matPtrs), end(matPtrs), 0.0,
-                                 [](double i, const hipblasgemmInst &o) {
+                                 [](double i, const rocblasgemmInst &o) {
                                    return o.time_us + i;
                                  }) /
                  matPtrs.size();
@@ -417,7 +417,7 @@ double hipblasGemm::test() {
   return gflop_per_second;
 }
 
-std::string hipblasGemm::getResultString() {
+std::string rocblasGemm::getResultString() {
   std::ostringstream ossValues;
   ossValues << std::setprecision(7);
   ossValues << opToString(transA) << ',' << opToString(transB) << ',' << m
@@ -433,7 +433,7 @@ std::string hipblasGemm::getResultString() {
   return ossValues.str();
 }
 
-std::tuple<double, double, double> hipblasGemm::calculateFOM(
+std::tuple<double, double, double> rocblasGemm::calculateFOM(
     double totalTime_ms) {
   double avgTime_ms = totalTime_ms / iters;
   double avgTime_s = avgTime_ms / 1000.0f;
@@ -467,20 +467,20 @@ std::tuple<double, double, double> hipblasGemm::calculateFOM(
 }
 
 template <typename T>
-void hipblasGemm::testTgemm(
-    std::function<hipblasStatus_t(
-        hipblasHandle_t, hipblasOperation_t, hipblasOperation_t, int, int, int,
+void rocblasGemm::testTgemm(
+    std::function<rocblas_status(
+        rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
         const T *, const T *, int, const T *, int, const T *, T *, int)>
         func,
-    hipblasgemmInst *mat) {
-  hipblasStatus_t stat;
-  hipblasHandle_t handle;
+    rocblasgemmInst *mat) {
+  rocblas_status stat;
+  rocblas_handle handle;
   hipStream_t stream;
   checkHip(hipSetDevice(mat->devIDX));
-  checkHipblas(hipblasCreate(&handle));
+  checkRocblas(rocblas_create_handle(&handle));
   checkHip(hipStreamCreate(&stream));
-  checkHipblas(hipblasSetStream(handle, stream));
-  // checkHipblas(hipblasSetWorkspace(handle, mat->devWork, mat->wSZ));
+  checkRocblas(rocblas_set_stream(handle, stream));
+  // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
 
   T *alphaP = static_cast<T *>(alpha);
   T *betaP = static_cast<T *>(beta);
@@ -494,7 +494,7 @@ void hipblasGemm::testTgemm(
                 betaP, devCP, ldc);
 
     // Check for errors during the gemm run
-    checkHipblas(stat);
+    checkRocblas(stat);
     checkHip(hipGetLastError());
   }
   hipStreamSynchronize(stream);
@@ -515,7 +515,7 @@ void hipblasGemm::testTgemm(
   hipEventSynchronize(stop);
 
   // Check for errors during the performance test
-  checkHipblas(stat);
+  checkRocblas(stat);
   checkHip(hipGetLastError());
 
   // Calculate and report GFlops
@@ -526,21 +526,21 @@ void hipblasGemm::testTgemm(
 }
 
 template <typename T>
-void hipblasGemm::testTgemmBatched(
-    std::function<hipblasStatus_t(hipblasContext *, hipblasOperation_t,
-                                 hipblasOperation_t, int, int, int, T const *,
+void rocblasGemm::testTgemmBatched(
+    std::function<rocblas_status(rocblas_handle, rocblas_operation,
+                                 rocblas_operation, int, int, int, T const *,
                                  T const *const *, int, T const *const *, int,
                                  T const *, T *const *, int, int)>
         func,
-    hipblasgemmInst *mat) {
-  hipblasStatus_t stat;
-  hipblasHandle_t handle;
+    rocblasgemmInst *mat) {
+  rocblas_status stat;
+  rocblas_handle handle;
   hipStream_t stream;
   checkHip(hipSetDevice(mat->devIDX));
-  checkHipblas(hipblasCreate(&handle));
+  checkRocblas(rocblas_create_handle(&handle));
   checkHip(hipStreamCreate(&stream));
-  checkHipblas(hipblasSetStream(handle, stream));
-  // checkHipblas(hipblasSetWorkspace(handle, mat->devWork, mat->wSZ));
+  checkRocblas(rocblas_set_stream(handle, stream));
+  // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
 
   T *alphaP = static_cast<T *>(alpha);
   T *betaP = static_cast<T *>(beta);
@@ -554,7 +554,7 @@ void hipblasGemm::testTgemmBatched(
                 betaP, devCP, ldc, batchct);
 
     // Check for errors during the gemm run
-    checkHipblas(stat);
+    checkRocblas(stat);
     checkHip(hipGetLastError());
   }
   hipStreamSynchronize(stream);
@@ -575,7 +575,7 @@ void hipblasGemm::testTgemmBatched(
   hipEventSynchronize(stop);
 
   // Check for errors during the performance test
-  checkHipblas(stat);
+  checkRocblas(stat);
   checkHip(hipGetLastError());
 
   // Calculate and report GFlops
@@ -586,21 +586,21 @@ void hipblasGemm::testTgemmBatched(
 }
 
 template <typename T>
-void hipblasGemm::testTgemmStridedBatched(
-    std::function<hipblasStatus_t(
-        hipblasContext *, hipblasOperation_t, hipblasOperation_t, int, int, int,
+void rocblasGemm::testTgemmStridedBatched(
+    std::function<rocblas_status(
+        rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
         T const *, T const *, int, long long, T const *, int, long long,
         T const *, T *, int, long long, int)>
         func,
-    hipblasgemmInst *mat) {
-  hipblasStatus_t stat;
-  hipblasHandle_t handle;
+    rocblasgemmInst *mat) {
+  rocblas_status stat;
+  rocblas_handle handle;
   hipStream_t stream;
   checkHip(hipSetDevice(mat->devIDX));
-  checkHipblas(hipblasCreate(&handle));
+  checkRocblas(rocblas_create_handle(&handle));
   checkHip(hipStreamCreate(&stream));
-  checkHipblas(hipblasSetStream(handle, stream));
-  // checkHipblas(hipblasSetWorkspace(handle, mat->devWork, mat->wSZ));
+  checkRocblas(rocblas_set_stream(handle, stream));
+  // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
 
   T *alphaP = static_cast<T *>(alpha);
   T *betaP = static_cast<T *>(beta);
@@ -614,7 +614,7 @@ void hipblasGemm::testTgemmStridedBatched(
                 devBP, ldb, stride_b, betaP, devCP, ldc, stride_c, batchct);
 
     // Check for errors during the gemm run
-    checkHipblas(stat);
+    checkRocblas(stat);
     checkHip(hipGetLastError());
   }
   hipStreamSynchronize(stream);
@@ -635,7 +635,7 @@ void hipblasGemm::testTgemmStridedBatched(
   hipEventSynchronize(stop);
 
   // Check for errors during the performance test
-  checkHipblas(stat);
+  checkRocblas(stat);
   checkHip(hipGetLastError());
 
   // Calculate and report GFlops
@@ -645,24 +645,25 @@ void hipblasGemm::testTgemmStridedBatched(
       calculateFOM(static_cast<double>(elapsedTime_ms));
 }
 
-void hipblasGemm::testGemmEx(hipblasgemmInst *mat) {
-  hipblasStatus_t stat;
-  hipblasHandle_t handle;
+void rocblasGemm::testGemmEx(rocblasgemmInst *mat) {
+  rocblas_status stat;
+  rocblas_handle handle;
   hipStream_t stream;
   checkHip(hipSetDevice(mat->devIDX));
-  checkHipblas(hipblasCreate(&handle));
+  checkRocblas(rocblas_create_handle(&handle));
   checkHip(hipStreamCreate(&stream));
-  checkHipblas(hipblasSetStream(handle, stream));
-  checkHipblas(hipblasSetWorkspace(handle, mat->devWork, mat->wSZ));
-  // cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH); // HIP_UNSUPPORTED
+  checkRocblas(rocblas_set_stream(handle, stream));
+  checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
+  // rocblas_set_math_mode(handle, CUBLAS_TF32_TENSOR_OP_MATH);
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
-    stat = hipblasGemmEx_v2(handle, transA, transB, m, n, k, alpha, mat->devA,
-                            a_type, lda, mat->devB, b_type, ldb, beta, mat->devC,
-                            c_type, ldc, compute, HIPBLAS_GEMM_DEFAULT);
+    stat = rocblas_gemm_ex(handle, transA, transB, m, n, k, alpha, mat->devA,
+                           a_type, lda, mat->devB, b_type, ldb, beta, mat->devC,
+                           c_type, ldc, mat->devC, c_type, ldc, compute,
+                           rocblas_gemm_algo_standard, 0, 0);
 
     // Check for errors during the gemm run
-    checkHipblas(stat);
+    checkRocblas(stat);
     checkHip(hipGetLastError());
   }
   hipStreamSynchronize(stream);
@@ -676,15 +677,15 @@ void hipblasGemm::testGemmEx(hipblasgemmInst *mat) {
   */
   hipEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
-    stat = hipblasGemmEx_v2(handle, transA, transB, m, n, k, alpha, mat->devA,
-                         a_type, lda, mat->devB, b_type, ldb, beta, mat->devC,
-                         c_type, ldc, compute, HIPBLAS_GEMM_DEFAULT);
-  }
+    stat = rocblas_gemm_ex(handle, transA, transB, m, n, k, alpha, mat->devA,
+                           a_type, lda, mat->devB, b_type, ldb, beta, mat->devC,
+                           c_type, ldc, compute, HIPBLAS_GEMM_DEFAULT);
+  }  
   hipEventRecord(stop, stream);
   hipEventSynchronize(stop);
 
   // Check for errors during the performance test
-  checkHipblas(stat);
+  checkRocblas(stat);
   checkHip(hipGetLastError());
 
   // Calculate and report GFlops

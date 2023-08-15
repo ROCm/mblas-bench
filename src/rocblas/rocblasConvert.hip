@@ -1,12 +1,12 @@
-#include "hipblasConvert.h"
+#include "rocblasConvert.h"
 
 #include <bitset>
 // #include <cuda_fp8.h>
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
-#include "hipblasCreateAllocate.h"
-#include "hipError.h"
+#include "rocblasCreateAllocate.h"
+#include "rocblasError.h"
 
 __global__ void floatToBfloat16(float *input, size_t num_elements,
                                 hip_bfloat16 *output)
@@ -48,12 +48,12 @@ __global__ void floatToFp16(float *input, size_t num_elements, __half *output)
 //   }
 // }
 
-void copyAndConvert(hipDataType precision, void *hostA, void *devA, int x, int y, int batchsz)
+void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, int y, int batchsz)
 {
 
   int hostsz = typeCallHost<sizeofCUDT>(precision);
   int devsz = typeCallDev<sizeofCUDT>(precision);
-  if (precision == HIP_C_16F || precision == HIP_R_16F)
+  if (precision == rocblas_datatype_f16_c || precision == rocblas_datatype_f16_r)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -65,7 +65,7 @@ void copyAndConvert(hipDataType precision, void *hostA, void *devA, int x, int y
     floatToFp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
     hipFree(tmpA);
   }
-  else if (precision == HIP_C_16BF || precision == HIP_R_16BF)
+  else if (precision == rocblas_datatype_bf16_c || precision == rocblas_datatype_bf16_r)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -117,10 +117,10 @@ void copyAndConvert(hipDataType precision, void *hostA, void *devA, int x, int y
   }
 }
 
-void *convertScalar(hipDataType precision, void *scalar)
+void *convertScalar(rocblas_datatype precision, void *scalar)
 {
 
-  if (precision == HIP_R_16F)
+  if (precision == rocblas_datatype_f16_r)
   {
     float scalarVal = *static_cast<float *>(scalar);
     free(scalar);
@@ -128,7 +128,7 @@ void *convertScalar(hipDataType precision, void *scalar)
     *hscalar = __float2half(scalarVal);
     return (void *)hscalar;
   }
-  else if (precision == HIP_C_16F)
+  else if (precision == rocblas_datatype_f16_c)
   {
     // Implement me...
     return NULL;

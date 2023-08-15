@@ -1,21 +1,22 @@
 #pragma once
-#include <cublas_v2.h>
-#include <cuda_bf16.h>
-#include <cuda_fp16.h>
-#include <cuda_fp8.h>
-#include <cuda_runtime.h>
+#include <hip/hipblas.h>
+#include <hip/hip_bfloat16.h>
+#include <hip/hip_fp16.h>
+// #include <cuda_fp8.h>
+#include <hip/hip_runtime.h>
 
-#include <cuda/std/complex>
+// #include <cuda/std/complex>
+#include <hip/hip_complex.h>
 #include <random>
 #include <sstream>
 #include <string>
 
-// int sizeof_cudt_host(cudaDataType_t type);
-void *allocateHostArr(cudaDataType_t type, long x, long y, int batch = 1);
-void *allocateDevArr(cudaDataType_t type, long x, long y, int batch = 1);
-void *allocateHDevArr(cudaDataType_t type, long x, long y, int batch = 1);
+// int sizeof_cudt_host(rocblas_datatype type);
+void *allocateHostArr(rocblas_datatype type, long x, long y, int batch = 1);
+void *allocateDevArr(rocblas_datatype type, long x, long y, int batch = 1);
+void *allocateHDevArr(rocblas_datatype type, long x, long y, int batch = 1);
 
-void initHostH(cudaDataType_t precision, std::string initialization, void *ptr,
+void initHostH(rocblas_datatype precision, std::string initialization, void *ptr,
                int rows_A, int cols_A, int ld, int batch, long long int stride,
                float constant = 0.f, bool alternating = false);
 
@@ -47,11 +48,11 @@ struct allocSetScalar {
 // void *allocSetScalarFunc(std::string, std::string, cuda::std::complex<T>);
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(cudaDataType_t type, Args... args) ->
+auto typeCallHost(rocblas_datatype type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(cudaDataType_t type, Args... args) ->
+auto typeCallDev(rocblas_datatype type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <typename T>
@@ -70,12 +71,28 @@ void *allocSetScalarFunc(std::string sval, std::string sval2, T dummy) {
   return ptr;
 }
 
-template <typename T>
+template <>
 void *allocSetScalarFunc(std::string sval, std::string sval2,
-                         cuda::std::complex<T> dummy) {
+                         hipComplex dummy) {
   // Complex numbers, do something about sval2
-  void *ptr = (void *)malloc(sizeof(cuda::std::complex<T>));
-  cuda::std::complex<T> *data = (cuda::std::complex<T> *)ptr;
+  void *ptr = (void *)malloc(sizeof(hipComplex));
+  hipComplex *data = (hipComplex *)ptr;
+  T val;
+  std::istringstream iss(sval.c_str());
+  iss >> val;
+  data->real(val);
+  std::istringstream iss2(sval2.c_str());
+  iss2 >> val;
+  data->imag(val);
+  return ptr;
+}
+
+template <>
+void *allocSetScalarFunc(std::string sval, std::string sval2,
+                         hipDoubleComplex dummy) {
+  // Complex numbers, do something about sval2
+  void *ptr = (void *)malloc(sizeof(hipComplex));
+  hipDoubleComplex *data = (hipDoubleComplex *)ptr;
   T val;
   std::istringstream iss(sval.c_str());
   iss >> val;
@@ -132,84 +149,64 @@ void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
                            long long int stride, bool isSin);
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(cudaDataType_t type, Args... args) ->
+auto typeCallHost(rocblas_datatype type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
-    case CUDA_R_64F:
+    case rocblas_datatype_f64_r:
       return tFunc<double>()(args...);
-    case CUDA_C_64F:
-      return tFunc<cuda::std::complex<double>>()(args...);
-    case CUDA_R_32F:
+    case rocblas_datatype_f64_c:
+      return tFunc<hipDoubleComplex>()(args...);
+    case rocblas_datatype_f32_r:
       return tFunc<float>()(args...);
-    case CUDA_C_32F:
-      return tFunc<cuda::std::complex<float>>()(args...);
-    case CUDA_R_16BF:
+    case rocblas_datatype_f32_c:
+      return tFunc<hipComplex>()(args...);
+    case rocblas_datatype_bf16_r:
       return tFunc<float>()(args...);
-    case CUDA_C_16BF:
-      return tFunc<cuda::std::complex<float>>()(args...);
-    case CUDA_R_16F:
+    case rocblas_datatype_bf16_c:
+      return tFunc<hipComplex>()(args...);
+    case rocblas_datatype_f16_r:
       return tFunc<float>()(args...);
-    case CUDA_C_16F:
-      return tFunc<cuda::std::complex<float>>()(args...);
-    case CUDA_R_8F_E4M3:
-      return tFunc<float>()(args...);
-    case CUDA_R_8F_E5M2:
-      return tFunc<float>()(args...);
-    case CUDA_R_8I:
+    case rocblas_datatype_f16_c:
+      return tFunc<hipComplex>()(args...);
+    case rocblas_datatype_i8_r:
       return tFunc<__int8_t>()(args...);
-    case CUDA_C_8I:
-      return tFunc<cuda::std::complex<__int8_t>>()(args...);
-    case CUDA_R_8U:
+    case rocblas_datatype_u8_r:
       return tFunc<__uint8_t>()(args...);
-    case CUDA_C_8U:
-      return tFunc<cuda::std::complex<__uint8_t>>()(args...);
-    case CUDA_R_32I:
+    case rocblas_datatype_i32_r:
       return tFunc<__int32_t>()(args...);
-    case CUDA_C_32I:
-      return tFunc<cuda::std::complex<__int32_t>>()(args...);
     default:
       return tFunc<double>()(args...);
   }
 }
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(cudaDataType_t type, Args... args) ->
+auto typeCallDev(rocblas_datatype type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
-    case CUDA_R_64F:
+    case rocblas_datatype_f64_r:
       return tFunc<double>()(args...);
-    case CUDA_C_64F:
-      return tFunc<cuda::std::complex<double>>()(args...);
-    case CUDA_R_32F:
+    case rocblas_datatype_f64_c:
+      return tFunc<hipDoubleComplex>()(args...);
+    case rocblas_datatype_f32_r:
       return tFunc<float>()(args...);
-    case CUDA_C_32F:
-      return tFunc<cuda::std::complex<float>>()(args...);
-    case CUDA_R_16BF:
-      return tFunc<__nv_bfloat16>()(args...);
-    case CUDA_C_16BF:
-      return tFunc<cuda::std::complex<__nv_bfloat16>>()(args...);
-    case CUDA_R_16F:
+    case rocblas_datatype_f32_c:
+      return tFunc<hipComplex>()(args...);
+    case rocblas_datatype_bf16_r:
+      return tFunc<hip_bfloat16>()(args...);
+    // case rocblas_datatype_bf16_c:
+    //   return tFunc<hipComplex>()(args...);
+    case rocblas_datatype_f16_r:
       return tFunc<__half>()(args...);
-    case CUDA_C_16F:
-      return tFunc<cuda::std::complex<__half>>()(args...);
-    case CUDA_R_8F_E4M3:
-      return tFunc<__nv_fp8_e4m3>()(args...);
-    case CUDA_R_8F_E5M2:
-      return tFunc<__nv_fp8_e5m2>()(args...);
-    case CUDA_R_8I:
+    // case rocblas_datatype_f16_c:
+    //   return tFunc<hipComplex>()(args...);
+    case rocblas_datatype_i8_r:
       return tFunc<__int8_t>()(args...);
-    case CUDA_C_8I:
-      return tFunc<cuda::std::complex<__int8_t>>()(args...);
-    case CUDA_R_8U:
+    case rocblas_datatype_u8_r:
       return tFunc<__uint8_t>()(args...);
-    case CUDA_C_8U:
-      return tFunc<cuda::std::complex<__uint8_t>>()(args...);
-    case CUDA_R_32I:
+    case rocblas_datatype_i32_r:
       return tFunc<__int32_t>()(args...);
-    case CUDA_C_32I:
-      return tFunc<cuda::std::complex<__int32_t>>()(args...);
     default:
       return tFunc<double>()(args...);
   }
@@ -219,19 +216,19 @@ template <typename T>
 inline T randIntGen(std::uniform_int_distribution<int> &idist,
                     std::mt19937 &gen, T &dummy);
 
-template <typename T>
-inline cuda::std::complex<T> randIntGen(
-    std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
-    cuda::std::complex<T> &dummy);
+// template <typename T>
+// inline cuda::std::complex<T> randIntGen(
+//     std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
+//     cuda::std::complex<T> &dummy);
 
 template <typename T>
 inline T randIntGenN(std::uniform_int_distribution<int> &idist,
                      std::mt19937 &gen, T &dummy);
 
-template <typename T>
-inline cuda::std::complex<T> randIntGenN(
-    std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
-    cuda::std::complex<T> &dummy);
+// template <typename T>
+// inline cuda::std::complex<T> randIntGenN(
+//     std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
+//     cuda::std::complex<T> &dummy);
 
 // void dummy2() {
 //  // This function forces the compiler to generate the needed templated

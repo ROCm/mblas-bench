@@ -40,27 +40,27 @@ using std::string;
 //  return NULL;
 //}
 
-void *allocateHostArr(hipDataType type, long x, long y, int batch) {
+void *allocateHostArr(rocblas_datatype type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
   void *data = (void *)malloc(x * y * batch * typesize);
   return data;
 }
 
-void *allocateDevArr(hipDataType type, long x, long y, int batch) {
+void *allocateDevArr(rocblas_datatype type, long x, long y, int batch) {
   int typesize = typeCallDev<sizeofCUDT>(type);
   void *data;
   checkHip(hipMalloc(&data, x * y * batch * typesize));
   return data;
 }
 
-void *allocateHDevArr(hipDataType_t type, long x, long y, int batch) {
+void *allocateHDevArr(rocblas_datatype type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
   void *data;
   checkHip(hipMalloc(&data, x * y * batch * typesize));
   return data;
 }
 
-// void *allocateScalar(hipDataType type) {
+// void *allocateScalar(rocblas_datatype type) {
 //  int typesize = typeCallDev<sizeofCUDT>(type);
 //  void *scalar = (void *)
 //}
@@ -69,14 +69,14 @@ void dummy() {
   // This function forces the compiler to generate the needed templated variants
   // of each function. It is never called
   void *h_A;
-  typeCallHost<sizeofCUDTP>(HIP_R_64F);
-  typeCallHost<allocSetScalar>(HIP_R_64F, "1", "0");
-  typeCallDev<batchedPtrMagic>(HIP_R_64F, (void **)NULL, (void **)NULL,
+  typeCallHost<sizeofCUDTP>(rocblas_datatype_f64_r);
+  typeCallHost<allocSetScalar>(rocblas_datatype_f64_r, "1", "0");
+  typeCallDev<batchedPtrMagic>(rocblas_datatype_f64_r, (void **)NULL, (void **)NULL,
                                (void *)NULL, 10, 10, 10);
   // template void *allocSetScalar<double>::operator()(string);
 }
 
-void initHostH(hipDataType precision, std::string initialization, void *ptr,
+void initHostH(rocblas_datatype precision, std::string initialization, void *ptr,
                int rows_A, int cols_A, int ld, int batch, long long int stride,
                float constant, bool alternating) {
   typeCallHost<initHost>(precision, initialization, ptr, rows_A, cols_A, ld,

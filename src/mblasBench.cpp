@@ -1,6 +1,6 @@
 #include <assert.h>
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
+// #include <rocblas/rocblas.h>
+// #include <hip/hip_runtime.h>
 #include <cxxabi.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,8 +8,8 @@
 #include <cctype>
 #include <iostream>
 
-#include "cublas/cublasGemm.h"
-#include "cublas/cublasLtGemm.h"
+#include "rocblas/rocblasGemm.h"
+// #include "rocblas/hipblasLtGemm.h"
 #include "genericGemm.h"
 
 // #include "fp16_conversion.h"
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
   //             << ", " << prop.memoryClockRate / 1000 << " MHZ" << std::endl;
   // }
   // parse input arguments
-  cxxopts::Options options("cublas_bench", "Benchmark Cublas");
+  cxxopts::Options options("hipblas_bench", "Benchmark Hipblas");
   string supPrec = "h,s,d,c,z,f16_r,f32_r,f64_r,bf16_r,f32_c,f64_c,i8_r,i32_r";
   auto opp_adder = options.add_options();
   opp_adder("m,sizem", "Specific matrix size",
@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
             " Cold Iterations to run before entering the timing loop ",
             cxxopts::value<int>()->default_value("2"));
   opp_adder("driver", "Backend to run the GEMM test with",
-            cxxopts::value<string>()->default_value("cublas"));
+            cxxopts::value<string>()->default_value("rocblas"));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
@@ -165,12 +165,13 @@ int main(int argc, char **argv) {
   string driver = sToLower(result["driver"].as<string>());
   string function = sToLower(result["function"].as<string>());
 
-  if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
-    // Since regular cublas has no matmul, we can safely assume the user means
-    // cublaslt
-    gemm = new cublasLtGemm(result);
-  } else if (driver == "cublas-bench" || driver == "cublas") {
-    gemm = new cublasGemm(result);
+  // if (driver == "hipblaslt" || (driver == "rocblas" && function == "matmul")) {
+  //   // Since regular rocblas has no matmul, we can safely assume the user means
+  //   // hipblaslt
+  //   gemm = new cublasLtGemm(result);
+  // } else 
+  if (driver == "rocblas-bench" || driver == "rocblas") {
+    gemm = new rocblasGemm(result);
   } else {
     cerr << "Driver \"" << driver << "\" not supported" << endl;
     return 1;

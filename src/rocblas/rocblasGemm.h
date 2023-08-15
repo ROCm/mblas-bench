@@ -1,6 +1,6 @@
 #pragma once
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
+#include <rocblas/rocblas.h>
+#include <hip/hip_runtime.h>
 #include <cxxabi.h>
 #include <third_party/barrier.h>
 
@@ -10,24 +10,24 @@
 #include "genericGemm.h"
 
 struct gemmPrecType {
-  cublasComputeType_t compute;
-  cublasDataType_t scalar;
-  cublasDataType_t ab_type;
-  cublasDataType_t c_type;
+  rocblas_datatype compute;
+  rocblas_datatype scalar;
+  rocblas_datatype ab_type;
+  rocblas_datatype c_type;
   bool operator==(const gemmPrecType rhs) const {
     return rhs.compute == compute && rhs.scalar == scalar &&
            rhs.ab_type == rhs.ab_type && rhs.c_type == c_type;
   }
 };
 struct TgemmPrecType {
-  cublasDataType_t ab_type;
-  cublasDataType_t c_type;
+  rocblas_datatype ab_type;
+  rocblas_datatype c_type;
   bool operator==(const TgemmPrecType rhs) const {
     return rhs.ab_type == rhs.ab_type && rhs.c_type == c_type;
   }
 };
 
-struct cublasgemmInst {
+struct rocblasgemmInst {
   int devIDX;
   double gflops = 0;
   double gbytes = 0;
@@ -50,10 +50,10 @@ struct cublasgemmInst {
   void **ptrHostC;
   void *devWork;
   long wSZ;
-  cublasgemmInst(int devID) { devIDX = devID; }
+  rocblasgemmInst(int devID) { devIDX = devID; }
 };
 
-class cublasGemm : public genericGemm {
+class rocblasGemm : public genericGemm {
  private:
   void *hostA;
   void *hostB;
@@ -79,45 +79,45 @@ class cublasGemm : public genericGemm {
   void *alpha;
   void *beta;
 
-  cublasOperation_t transA;
-  cublasOperation_t transB;
+  rocblas_operation transA;
+  rocblas_operation transB;
 
-  // cublasStatus_t stat;
-  // cublasHandle_t handle;
-  cudaDataType_t precision;
-  cublasComputeType_t compute;
-  cudaDataType_t scalar;
-  cudaDataType_t a_type;
-  cudaDataType_t b_type;
-  cudaDataType_t c_type;
+  // rocblas_status stat;
+  // rocblas_handle handle;
+  rocblas_datatype precision;
+  rocblas_datatype compute;
+  rocblas_datatype scalar;
+  rocblas_datatype a_type;
+  rocblas_datatype b_type;
+  rocblas_datatype c_type;
 
   int workspaceSz = 128 * 1024 * 1024;
 
-  // std::map<std::string, cudaDataType_t> precDType;
-  // std::map<std::string, cublasComputeType_t> computeDType;
-  // std::map<cudaDataType_t, cublasComputeType_t> precToCompute;
+  // std::map<std::string, rocblas_datatype> precDType;
+  // std::map<std::string, rocblas_datatype> computeDType;
+  // std::map<rocblas_datatype, rocblas_datatype> precToCompute;
   // static gemmPrecType gemmExSupported[];
 
   static std::vector<gemmPrecType> gemmExSupported;
   static std::vector<TgemmPrecType> TgemmExSupported;
-  std::vector<cublasgemmInst> matPtrs;
-  std::vector<std::vector<cudaEvent_t *> *> eventPtr;
+  std::vector<rocblasgemmInst> matPtrs;
+  std::vector<std::vector<hipEvent_t *> *> eventPtr;
 
  public:
-  cublasGemm(cxxopts::ParseResult result);
+  rocblasGemm(cxxopts::ParseResult result);
   void initPrecMap();
-  // cudaDataType_t precisionStringToDType(std::string stringPrecision);
+  // rocblas_datatype precisionStringToDType(std::string stringPrecision);
   // void parseMType(std::string a, std::string b, std::string c);
   void parseMType(std::string computeTStr, std::string scalarTStr,
                   std::string aStr, std::string bStr, std::string cStr);
   void parseDevIters(std::string);
-  cublasOperation_t setOp(std::string);
+  rocblas_operation setOp(std::string);
   std::string prepareArray();
   void allocHost();
-  void allocDev(cublasgemmInst *);
+  void allocDev(rocblasgemmInst *);
   void fillHost();
-  void copyHostToDev(cublasgemmInst *);
-  void runThreaded(void (cublasGemm::*func)(cublasgemmInst *));
+  void copyHostToDev(rocblasgemmInst *);
+  void runThreaded(void (rocblasGemm::*func)(rocblasgemmInst *));
   std::tuple<double, double, double> calculateFOM(double totalTime_ms);
 
   virtual void freeMem();
@@ -129,40 +129,31 @@ class cublasGemm : public genericGemm {
 
   // Parameter names are included in function definitions for refrence only
   template <typename T>
-  void testTgemm(std::function<cublasStatus_t(
-                     cublasHandle_t handle, cublasOperation_t transa,
-                     cublasOperation_t transb, int m, int n, int k,
+  void testTgemm(std::function<rocblas_status(
+                     rocblas_handle handle, rocblas_operation transa,
+                     rocblas_operation transb, int m, int n, int k,
                      const T *alpha, const T *A, int lda, const T *B, int ldb,
                      const T *beta, T *C, int ldc)>
                      func,
-                 cublasgemmInst *mat);
+                 rocblasgemmInst *mat);
 
   template <typename T>
   void testTgemmBatched(
-      std::function<cublasStatus_t(cublasContext *, cublasOperation_t,
-                                   cublasOperation_t, int, int, int, T const *,
-                                   T const *const *, int, T const *const *, int,
-                                   T const *, T *const *, int, int)>
+      std::function<rocblas_status(rocblas_handle, rocblas_operation,
+                                    rocblas_operation, int, int, int, T const *,
+                                    T const *const *, int, T const *const *, int,
+                                    T const *, T *const *, int, int)>
           func,
-      cublasgemmInst *mat);
+      rocblasgemmInst *mat);
 
   template <typename T>
   void testTgemmStridedBatched(
-      std::function<cublasStatus_t(
-          cublasContext *, cublasOperation_t, cublasOperation_t, int, int, int,
+      std::function<rocblas_status(
+          rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
           T const *, T const *, int, long long, T const *, int, long long,
           T const *, T *, int, long long, int)>
           func,
-      cublasgemmInst *mat);
+      rocblasgemmInst *mat);
 
-  template <typename T>
-  void testTGemmEx(
-      std::function<cublasStatus_t(
-          cublasContext *, cublasOperation_t, cublasOperation_t, int, int, int,
-          T const *, void const *, cudaDataType_t, int, void const *,
-          cudaDataType_t, int, T const *, void *, cudaDataType_t, int)>
-          func,
-      cublasgemmInst *mat);
-
-  void testGemmEx(cublasgemmInst *mat);
+  void testGemmEx(rocblasgemmInst *mat);
 };
