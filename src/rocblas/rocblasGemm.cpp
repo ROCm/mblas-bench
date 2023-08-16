@@ -180,7 +180,7 @@ string rocblasGemm::prepareArray() {
 
   runThreaded(&rocblasGemm::allocDev);
   runThreaded(&rocblasGemm::copyHostToDev);
-  std::ostringsrocam ossHeader;
+  std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
   if (batched) {
     ossHeader << "batch_count,";
@@ -679,7 +679,8 @@ void rocblasGemm::testGemmEx(rocblasgemmInst *mat) {
   for (int rep = 0; rep < iters; rep++) {
     stat = rocblas_gemm_ex(handle, transA, transB, m, n, k, alpha, mat->devA,
                            a_type, lda, mat->devB, b_type, ldb, beta, mat->devC,
-                           c_type, ldc, compute, HIPBLAS_GEMM_DEFAULT);
+                           c_type, ldc, mat->devC, c_type, ldc, compute,
+                           rocblas_gemm_algo_standard, 0, 0);
   }  
   hipEventRecord(stop, stream);
   hipEventSynchronize(stop);

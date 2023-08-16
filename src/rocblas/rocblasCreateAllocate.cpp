@@ -1,6 +1,6 @@
 #include "hipblasCreateAllocate.h"
 
-#include <hip/hipblas.h>
+#include <rocblas/rocblas.h>
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 // #include <cuda_fp8.h>

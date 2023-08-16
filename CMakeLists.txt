@@ -17,7 +17,7 @@ list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
 find_package(hip)
 find_package(rocblas)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 add_executable(
     mblas_bench
     src/mblasBench.cpp
@@ -28,6 +28,10 @@ add_executable(
     src/rocblas/rocblasError.cpp
     src/third_party/barrier.h
     src/third_party/cxxopts.hpp
+)
+target_include_directories(
+    mblas_bench
+    PRIVATE src/ src/third_party
 )
 
 target_link_libraries(mblas_bench PRIVATE

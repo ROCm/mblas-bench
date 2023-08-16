@@ -1,5 +1,5 @@
 #pragma once
-#include <hip/hipblas.h>
+#include <rocblas/rocblas.h>
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 // #include <cuda_fp8.h>
@@ -77,13 +77,13 @@ void *allocSetScalarFunc(std::string sval, std::string sval2,
   // Complex numbers, do something about sval2
   void *ptr = (void *)malloc(sizeof(hipComplex));
   hipComplex *data = (hipComplex *)ptr;
-  T val;
+  float val;
   std::istringstream iss(sval.c_str());
   iss >> val;
-  data->real(val);
+  data->x = val;
   std::istringstream iss2(sval2.c_str());
   iss2 >> val;
-  data->imag(val);
+  data->y = val;
   return ptr;
 }
 
@@ -93,13 +93,13 @@ void *allocSetScalarFunc(std::string sval, std::string sval2,
   // Complex numbers, do something about sval2
   void *ptr = (void *)malloc(sizeof(hipComplex));
   hipDoubleComplex *data = (hipDoubleComplex *)ptr;
-  T val;
+  double val;
   std::istringstream iss(sval.c_str());
   iss >> val;
-  data->real(val);
+  data->x = val;
   std::istringstream iss2(sval2.c_str());
   iss2 >> val;
-  data->imag(val);
+  data->y = val;
   return ptr;
 }
 
@@ -130,7 +130,7 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
   // checkCuda(cudaMalloc(&dptr, batchct * sizeof(T *)));
   // hptr = reinterpret_cast<void **>(host);
   // checkCuda(
-  cudaMemcpy(dptr, hptr, batchct * sizeof(T *), cudaMemcpyHostToDevice);
+  hipMemcpy(dptr, hptr, batchct * sizeof(T *), hipMemcpyHostToDevice);
 }
 
 template <typename T>
