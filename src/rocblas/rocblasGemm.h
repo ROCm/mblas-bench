@@ -2,7 +2,7 @@
 #include <rocblas/rocblas.h>
 #include <hip/hip_runtime.h>
 #include <cxxabi.h>
-#include <third_party/barrier.h>
+#include "third_party/barrier.h"
 
 #include <iostream>
 #include <string>
