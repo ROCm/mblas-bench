@@ -14,8 +14,9 @@ set(GPU_TARGETS "gfx90a" CACHE STRING "GPU targets to compile for")
 # Search for rocm in common locations
 list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
 # Find hip packages
-find_package(hip)
-find_package(rocblas)
+find_package(hip REQUIRED)
+find_package(rocblas REQUIRED)
+find_package(Threads REQUIRED) 
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 add_executable(
@@ -23,16 +24,21 @@ add_executable(
     src/mblasBench.cpp
     src/genericGemm.cpp
     src/rocblas/rocblasGemm.cpp
+    src/rocblas/rocblasConvert.hip
     src/rocblas/rocblasCreateAllocate.cpp
     src/rocblas/rocblasDtypeUtils.cpp
     src/rocblas/rocblasError.cpp
     src/third_party/barrier.h
     src/third_party/cxxopts.hpp
 )
-target_include_directories(
-    mblas_bench
-    PRIVATE src/ src/third_party
+target_include_directories(mblas_bench PRIVATE
+    src/
+    src/third_party
 )
 
 target_link_libraries(mblas_bench PRIVATE
-	hip::device hip::host)
+	hip::device
+    hip::host
+    roc::rocblas
+    Threads::Threads
+)

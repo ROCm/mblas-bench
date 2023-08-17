@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-const char *rocblasGetErrorString(hipblasStatus_t status) {
+const char *rocblasGetErrorString(rocblas_status status) {
   switch (status) {
     case rocblas_status_success:
       return "rocblas_status_success";

@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
   //             << ", " << prop.memoryClockRate / 1000 << " MHZ" << std::endl;
   // }
   // parse input arguments
-  cxxopts::Options options("hipblas_bench", "Benchmark Hipblas");
+  cxxopts::Options options("rocblas_bench", "Benchmark rocBLAS");
   string supPrec = "h,s,d,c,z,f16_r,f32_r,f64_r,bf16_r,f32_c,f64_c,i8_r,i32_r";
   auto opp_adder = options.add_options();
   opp_adder("m,sizem", "Specific matrix size",
