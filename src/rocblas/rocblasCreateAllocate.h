@@ -71,37 +71,37 @@ void *allocSetScalarFunc(std::string sval, std::string sval2, T dummy) {
   return ptr;
 }
 
-template <>
-void *allocSetScalarFunc(std::string sval, std::string sval2,
-                         hipComplex dummy) {
-  // Complex numbers, do something about sval2
-  void *ptr = (void *)malloc(sizeof(hipComplex));
-  hipComplex *data = (hipComplex *)ptr;
-  float val;
-  std::istringstream iss(sval.c_str());
-  iss >> val;
-  data->x = val;
-  std::istringstream iss2(sval2.c_str());
-  iss2 >> val;
-  data->y = val;
-  return ptr;
-}
+// template <>
+// void *allocSetScalarFunc(std::string sval, std::string sval2,
+//                          hipComplex dummy) {
+//   // Complex numbers, do something about sval2
+//   void *ptr = (void *)malloc(sizeof(hipComplex));
+//   hipComplex *data = (hipComplex *)ptr;
+//   float val;
+//   std::istringstream iss(sval.c_str());
+//   iss >> val;
+//   data->x = val;
+//   std::istringstream iss2(sval2.c_str());
+//   iss2 >> val;
+//   data->y = val;
+//   return ptr;
+// }
 
-template <>
-void *allocSetScalarFunc(std::string sval, std::string sval2,
-                         hipDoubleComplex dummy) {
-  // Complex numbers, do something about sval2
-  void *ptr = (void *)malloc(sizeof(hipComplex));
-  hipDoubleComplex *data = (hipDoubleComplex *)ptr;
-  double val;
-  std::istringstream iss(sval.c_str());
-  iss >> val;
-  data->x = val;
-  std::istringstream iss2(sval2.c_str());
-  iss2 >> val;
-  data->y = val;
-  return ptr;
-}
+// template <>
+// void *allocSetScalarFunc(std::string sval, std::string sval2,
+//                          hipDoubleComplex dummy) {
+//   // Complex numbers, do something about sval2
+//   void *ptr = (void *)malloc(sizeof(hipComplex));
+//   hipDoubleComplex *data = (hipDoubleComplex *)ptr;
+//   double val;
+//   std::istringstream iss(sval.c_str());
+//   iss >> val;
+//   data->x = val;
+//   std::istringstream iss2(sval2.c_str());
+//   iss2 >> val;
+//   data->y = val;
+//   return ptr;
+// }
 
 template <typename T>
 int sizeofCUDT<T>::operator()() {
@@ -155,20 +155,20 @@ auto typeCallHost(rocblas_datatype type, Args... args) ->
   switch (type) {
     case rocblas_datatype_f64_r:
       return tFunc<double>()(args...);
-    case rocblas_datatype_f64_c:
-      return tFunc<hipDoubleComplex>()(args...);
+    // case rocblas_datatype_f64_c:
+    //   return tFunc<hipDoubleComplex>()(args...);
     case rocblas_datatype_f32_r:
       return tFunc<float>()(args...);
-    case rocblas_datatype_f32_c:
-      return tFunc<hipComplex>()(args...);
+    // case rocblas_datatype_f32_c:
+    //   return tFunc<hipComplex>()(args...);
     case rocblas_datatype_bf16_r:
       return tFunc<float>()(args...);
-    case rocblas_datatype_bf16_c:
-      return tFunc<hipComplex>()(args...);
+    // case rocblas_datatype_bf16_c:
+    //   return tFunc<hipComplex>()(args...);
     case rocblas_datatype_f16_r:
       return tFunc<float>()(args...);
-    case rocblas_datatype_f16_c:
-      return tFunc<hipComplex>()(args...);
+    // case rocblas_datatype_f16_c:
+    //   return tFunc<hipComplex>()(args...);
     case rocblas_datatype_i8_r:
       return tFunc<__int8_t>()(args...);
     case rocblas_datatype_u8_r:
@@ -187,12 +187,12 @@ auto typeCallDev(rocblas_datatype type, Args... args) ->
   switch (type) {
     case rocblas_datatype_f64_r:
       return tFunc<double>()(args...);
-    case rocblas_datatype_f64_c:
-      return tFunc<hipDoubleComplex>()(args...);
+    // case rocblas_datatype_f64_c:
+    //   return tFunc<hipDoubleComplex>()(args...);
     case rocblas_datatype_f32_r:
       return tFunc<float>()(args...);
-    case rocblas_datatype_f32_c:
-      return tFunc<hipComplex>()(args...);
+    // case rocblas_datatype_f32_c:
+    //   return tFunc<hipComplex>()(args...);
     case rocblas_datatype_bf16_r:
       return tFunc<hip_bfloat16>()(args...);
     // case rocblas_datatype_bf16_c:

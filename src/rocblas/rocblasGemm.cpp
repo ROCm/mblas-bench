@@ -298,95 +298,97 @@ double rocblasGemm::test() {
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : matPtrs) {
-    // Tgemm
-    if ((function == "rocblas_dgemm" && precision == rocblas_datatype_f64_r) ||
-        (function == "gemm" && precision == rocblas_datatype_f64_r)) {
-      std::function<decltype(rocblas_dgemm)> dgemm_var = rocblas_dgemm;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemm<double>, this, dgemm_var, &mat));
-    } else if ((function == "rocblas_sgemm" && precision == rocblas_datatype_f32_r) ||
-               (function == "gemm" && precision == rocblas_datatype_f32_r)) {
-      std::function<decltype(rocblas_sgemm)> sgemm_var = rocblas_sgemm;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemm<float>, this, sgemm_var, &mat));
-    } else if ((function == "rocblas_hgemm" && precision == rocblas_datatype_f16_r) ||
-               (function == "gemm" && precision == rocblas_datatype_f16_r)) {
-      std::function<decltype(rocblas_hgemm)> hgemm_var = rocblas_hgemm;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemm<__half>, this, hgemm_var, &mat));
-    } else if ((function == "rocblas_zgemm" && precision == rocblas_datatype_f64_c) ||
-               (function == "gemm" && precision == rocblas_datatype_f64_c)) {
-      std::function<decltype(rocblas_zgemm)> zgemm_var = rocblas_zgemm;
-      threads.push_back(thread(&rocblasGemm::testTgemm<hipDoubleComplex>, this,
-                               zgemm_var, &mat));
-    } else if ((function == "rocblas_cgemm" && precision == rocblas_datatype_f32_c) ||
-               (function == "gemm" && precision == rocblas_datatype_f32_c)) {
-      std::function<decltype(rocblas_cgemm)> cgemm_var = rocblas_cgemm;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemm<hipComplex>, this, cgemm_var, &mat));
-    }
-    // TgemmBatched
-    else if (function == "rocblas_dgemm_batched" && precision == rocblas_datatype_f64_r) {
-      std::function<decltype(rocblas_dgemm_batched)> dgemm_var =
-          rocblas_dgemm_batched;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemmBatched<double>, this, dgemm_var, &mat));
-    } else if (function == "rocblas_sgemm_batched" && precision == rocblas_datatype_f32_r) {
-      std::function<decltype(rocblas_sgemm_batched)> sgemm_var =
-          rocblas_sgemm_batched;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemmBatched<float>, this, sgemm_var, &mat));
-    } else if (function == "rocblas_hgemm_batched" && precision == rocblas_datatype_f16_r) {
-      std::function<decltype(rocblas_hgemm_batched)> hgemm_var =
-          rocblas_hgemm_batched;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemmBatched<__half>, this, hgemm_var, &mat));
-    } else if (function == "rocblas_zgemm_batched" && precision == rocblas_datatype_f64_c) {
-      std::function<decltype(rocblas_zgemm_batched)> zgemm_var =
-          rocblas_zgemm_batched;
-      threads.push_back(thread(&rocblasGemm::testTgemmBatched<hipDoubleComplex>,
-                               this, zgemm_var, &mat));
-    } else if (function == "rocblas_cgemm_batched" && precision == rocblas_datatype_f32_c) {
-      std::function<decltype(rocblas_cgemm_batched)> cgemm_var =
-          rocblas_cgemm_batched;
-      threads.push_back(thread(&rocblasGemm::testTgemmBatched<hipComplex>, this,
-                               cgemm_var, &mat));
-    }
-    // TgemmStridedBatched
-    else if (function == "rocblas_dgemm_strided_batched" &&
-             precision == rocblas_datatype_f64_r) {
-      std::function<decltype(rocblas_dgemm_strided_batched)> dgemm_var =
-          rocblas_dgemm_strided_batched;
-      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<double>,
-                               this, dgemm_var, &mat));
-    } else if (function == "rocblas_sgemm_strided_batched" &&
-               precision == rocblas_datatype_f32_r) {
-      std::function<decltype(rocblas_sgemm_strided_batched)> sgemm_var =
-          rocblas_sgemm_strided_batched;
-      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<float>,
-                               this, sgemm_var, &mat));
-    } else if (function == "rocblas_hgemm_strided_batched" &&
-               precision == rocblas_datatype_f16_r) {
-      std::function<decltype(rocblas_hgemm_strided_batched)> hgemm_var =
-          rocblas_hgemm_strided_batched;
-      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<__half>,
-                               this, hgemm_var, &mat));
-    } else if (function == "rocblas_zgemm_strided_batched" &&
-               precision == rocblas_datatype_f64_c) {
-      std::function<decltype(rocblas_zgemm_strided_batched)> zgemm_var =
-          rocblas_zgemm_strided_batched;
-      threads.push_back(
-          thread(&rocblasGemm::testTgemmStridedBatched<hipDoubleComplex>, this,
-                 zgemm_var, &mat));
-    } else if (function == "rocblas_cgemm_strided_batched" &&
-               precision == rocblas_datatype_f32_c) {
-      std::function<decltype(rocblas_cgemm_strided_batched)> cgemm_var =
-          rocblas_cgemm_strided_batched;
-      threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<hipComplex>,
-                               this, cgemm_var, &mat));
-    }
+    // // Tgemm
+    // if ((function == "rocblas_dgemm" && precision == rocblas_datatype_f64_r) ||
+    //     (function == "gemm" && precision == rocblas_datatype_f64_r)) {
+    //   std::function<decltype(rocblas_dgemm)> dgemm_var = rocblas_dgemm;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemm<double>, this, dgemm_var, &mat));
+    // } else if ((function == "rocblas_sgemm" && precision == rocblas_datatype_f32_r) ||
+    //            (function == "gemm" && precision == rocblas_datatype_f32_r)) {
+    //   std::function<decltype(rocblas_sgemm)> sgemm_var = rocblas_sgemm;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemm<float>, this, sgemm_var, &mat));
+    // } else if ((function == "rocblas_hgemm" && precision == rocblas_datatype_f16_r) ||
+    //            (function == "gemm" && precision == rocblas_datatype_f16_r)) {
+    //   std::function<decltype(rocblas_hgemm)> hgemm_var = rocblas_hgemm;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemm<__half>, this, hgemm_var, &mat));
+    // } else if ((function == "rocblas_zgemm" && precision == rocblas_datatype_f64_c) ||
+    //            (function == "gemm" && precision == rocblas_datatype_f64_c)) {
+    //   std::function<decltype(rocblas_zgemm)> zgemm_var = rocblas_zgemm;
+    //   threads.push_back(thread(&rocblasGemm::testTgemm<hipDoubleComplex>, this,
+    //                            zgemm_var, &mat));
+    // } else if ((function == "rocblas_cgemm" && precision == rocblas_datatype_f32_c) ||
+    //            (function == "gemm" && precision == rocblas_datatype_f32_c)) {
+    //   std::function<decltype(rocblas_cgemm)> cgemm_var = rocblas_cgemm;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemm<hipComplex>, this, cgemm_var, &mat));
+    // }
+    // // TgemmBatched
+    // else if (function == "rocblas_dgemm_batched" && precision == rocblas_datatype_f64_r) {
+    //   std::function<decltype(rocblas_dgemm_batched)> dgemm_var =
+    //       rocblas_dgemm_batched;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemmBatched<double>, this, dgemm_var, &mat));
+    // } else if (function == "rocblas_sgemm_batched" && precision == rocblas_datatype_f32_r) {
+    //   std::function<decltype(rocblas_sgemm_batched)> sgemm_var =
+    //       rocblas_sgemm_batched;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemmBatched<float>, this, sgemm_var, &mat));
+    // } else if (function == "rocblas_hgemm_batched" && precision == rocblas_datatype_f16_r) {
+    //   std::function<decltype(rocblas_hgemm_batched)> hgemm_var =
+    //       rocblas_hgemm_batched;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemmBatched<__half>, this, hgemm_var, &mat));
+    // } else if (function == "rocblas_zgemm_batched" && precision == rocblas_datatype_f64_c) {
+    //   std::function<decltype(rocblas_zgemm_batched)> zgemm_var =
+    //       rocblas_zgemm_batched;
+    //   threads.push_back(thread(&rocblasGemm::testTgemmBatched<hipDoubleComplex>,
+    //                            this, zgemm_var, &mat));
+    // } else if (function == "rocblas_cgemm_batched" && precision == rocblas_datatype_f32_c) {
+    //   std::function<decltype(rocblas_cgemm_batched)> cgemm_var =
+    //       rocblas_cgemm_batched;
+    //   threads.push_back(thread(&rocblasGemm::testTgemmBatched<hipComplex>, this,
+    //                            cgemm_var, &mat));
+    // }
+    // // TgemmStridedBatched
+    // else if (function == "rocblas_dgemm_strided_batched" &&
+    //          precision == rocblas_datatype_f64_r) {
+    //   std::function<decltype(rocblas_dgemm_strided_batched)> dgemm_var =
+    //       rocblas_dgemm_strided_batched;
+    //   threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<double>,
+    //                            this, dgemm_var, &mat));
+    // } else if (function == "rocblas_sgemm_strided_batched" &&
+    //            precision == rocblas_datatype_f32_r) {
+    //   std::function<decltype(rocblas_sgemm_strided_batched)> sgemm_var =
+    //       rocblas_sgemm_strided_batched;
+    //   threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<float>,
+    //                            this, sgemm_var, &mat));
+    // } else if (function == "rocblas_hgemm_strided_batched" &&
+    //            precision == rocblas_datatype_f16_r) {
+    //   std::function<decltype(rocblas_hgemm_strided_batched)> hgemm_var =
+    //       rocblas_hgemm_strided_batched;
+    //   threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<__half>,
+    //                            this, hgemm_var, &mat));
+    // } else if (function == "rocblas_zgemm_strided_batched" &&
+    //            precision == rocblas_datatype_f64_c) {
+    //   std::function<decltype(rocblas_zgemm_strided_batched)> zgemm_var =
+    //       rocblas_zgemm_strided_batched;
+    //   threads.push_back(
+    //       thread(&rocblasGemm::testTgemmStridedBatched<hipDoubleComplex>, this,
+    //              zgemm_var, &mat));
+    // } else if (function == "rocblas_cgemm_strided_batched" &&
+    //            precision == rocblas_datatype_f32_c) {
+    //   std::function<decltype(rocblas_cgemm_strided_batched)> cgemm_var =
+    //       rocblas_cgemm_strided_batched;
+    //   threads.push_back(thread(&rocblasGemm::testTgemmStridedBatched<hipComplex>,
+    //                            this, cgemm_var, &mat));
+    // }
+    
     // gemmEx
-    else if (strided && function == "rocblas_gemm_strided_batched_ex") {
+    // else if (strided && function == "rocblas_gemm_strided_batched_ex") {
+    if (strided && function == "rocblas_gemm_strided_batched_ex") {
       // Call the Gemm strided batched deployment script
     } else if (batched && function == "rocblas_gemm_batched_ex") {
       // Call the Gemm batched code
@@ -466,184 +468,184 @@ std::tuple<double, double, double> rocblasGemm::calculateFOM(
                                             avgTime_us);
 }
 
-template <typename T>
-void rocblasGemm::testTgemm(
-    std::function<rocblas_status(
-        rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
-        const T *, const T *, int, const T *, int, const T *, T *, int)>
-        func,
-    rocblasgemmInst *mat) {
-  rocblas_status stat;
-  rocblas_handle handle;
-  hipStream_t stream;
-  checkHip(hipSetDevice(mat->devIDX));
-  checkRocblas(rocblas_create_handle(&handle));
-  checkHip(hipStreamCreate(&stream));
-  checkRocblas(rocblas_set_stream(handle, stream));
-  // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
+// template <typename T>
+// void rocblasGemm::testTgemm(
+//     std::function<rocblas_status(
+//         rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
+//         const T *, const T *, int, const T *, int, const T *, T *, int)>
+//         func,
+//     rocblasgemmInst *mat) {
+//   rocblas_status stat;
+//   rocblas_handle handle;
+//   hipStream_t stream;
+//   checkHip(hipSetDevice(mat->devIDX));
+//   checkRocblas(rocblas_create_handle(&handle));
+//   checkHip(hipStreamCreate(&stream));
+//   checkRocblas(rocblas_set_stream(handle, stream));
+//   // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
 
-  T *alphaP = static_cast<T *>(alpha);
-  T *betaP = static_cast<T *>(beta);
-  T *devAP = static_cast<T *>(mat->devA);
-  T *devBP = static_cast<T *>(mat->devB);
-  T *devCP = static_cast<T *>(mat->devC);
+//   T *alphaP = static_cast<T *>(alpha);
+//   T *betaP = static_cast<T *>(beta);
+//   T *devAP = static_cast<T *>(mat->devA);
+//   T *devBP = static_cast<T *>(mat->devB);
+//   T *devCP = static_cast<T *>(mat->devC);
 
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc);
+//   // Cold iters
+//   for (int rep = 0; rep < cold_iters; rep++) {
+//     stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
+//                 betaP, devCP, ldc);
 
-    // Check for errors during the gemm run
-    checkRocblas(stat);
-    checkHip(hipGetLastError());
-  }
-  hipStreamSynchronize(stream);
+//     // Check for errors during the gemm run
+//     checkRocblas(stat);
+//     checkHip(hipGetLastError());
+//   }
+//   hipStreamSynchronize(stream);
 
-  hipEvent_t start, stop;
-  hipEventCreate(&start);
-  hipEventCreate(&stop);
+//   hipEvent_t start, stop;
+//   hipEventCreate(&start);
+//   hipEventCreate(&stop);
 
-  /*
-    Run and time the performance test
-  */
-  hipEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc);
-  }
-  hipEventRecord(stop, stream);
-  hipEventSynchronize(stop);
+//   /*
+//     Run and time the performance test
+//   */
+//   hipEventRecord(start, stream);
+//   for (int rep = 0; rep < iters; rep++) {
+//     stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
+//                 betaP, devCP, ldc);
+//   }
+//   hipEventRecord(stop, stream);
+//   hipEventSynchronize(stop);
 
-  // Check for errors during the performance test
-  checkRocblas(stat);
-  checkHip(hipGetLastError());
+//   // Check for errors during the performance test
+//   checkRocblas(stat);
+//   checkHip(hipGetLastError());
 
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  hipEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculateFOM(static_cast<double>(elapsedTime_ms));
-}
+//   // Calculate and report GFlops
+//   float elapsedTime_ms;
+//   hipEventElapsedTime(&elapsedTime_ms, start, stop);
+//   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
+//       calculateFOM(static_cast<double>(elapsedTime_ms));
+// }
 
-template <typename T>
-void rocblasGemm::testTgemmBatched(
-    std::function<rocblas_status(rocblas_handle, rocblas_operation,
-                                 rocblas_operation, int, int, int, T const *,
-                                 T const *const *, int, T const *const *, int,
-                                 T const *, T *const *, int, int)>
-        func,
-    rocblasgemmInst *mat) {
-  rocblas_status stat;
-  rocblas_handle handle;
-  hipStream_t stream;
-  checkHip(hipSetDevice(mat->devIDX));
-  checkRocblas(rocblas_create_handle(&handle));
-  checkHip(hipStreamCreate(&stream));
-  checkRocblas(rocblas_set_stream(handle, stream));
-  // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
+// template <typename T>
+// void rocblasGemm::testTgemmBatched(
+//     std::function<rocblas_status(rocblas_handle, rocblas_operation,
+//                                  rocblas_operation, int, int, int, T const *,
+//                                  T const *const *, int, T const *const *, int,
+//                                  T const *, T *const *, int, int)>
+//         func,
+//     rocblasgemmInst *mat) {
+//   rocblas_status stat;
+//   rocblas_handle handle;
+//   hipStream_t stream;
+//   checkHip(hipSetDevice(mat->devIDX));
+//   checkRocblas(rocblas_create_handle(&handle));
+//   checkHip(hipStreamCreate(&stream));
+//   checkRocblas(rocblas_set_stream(handle, stream));
+//   // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
 
-  T *alphaP = static_cast<T *>(alpha);
-  T *betaP = static_cast<T *>(beta);
-  T **devAP = reinterpret_cast<T **>(mat->ptrDevA);
-  T **devBP = reinterpret_cast<T **>(mat->ptrDevB);
-  T **devCP = reinterpret_cast<T **>(mat->ptrDevC);
+//   T *alphaP = static_cast<T *>(alpha);
+//   T *betaP = static_cast<T *>(beta);
+//   T **devAP = reinterpret_cast<T **>(mat->ptrDevA);
+//   T **devBP = reinterpret_cast<T **>(mat->ptrDevB);
+//   T **devCP = reinterpret_cast<T **>(mat->ptrDevC);
 
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc, batchct);
+//   // Cold iters
+//   for (int rep = 0; rep < cold_iters; rep++) {
+//     stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
+//                 betaP, devCP, ldc, batchct);
 
-    // Check for errors during the gemm run
-    checkRocblas(stat);
-    checkHip(hipGetLastError());
-  }
-  hipStreamSynchronize(stream);
+//     // Check for errors during the gemm run
+//     checkRocblas(stat);
+//     checkHip(hipGetLastError());
+//   }
+//   hipStreamSynchronize(stream);
 
-  hipEvent_t start, stop;
-  hipEventCreate(&start);
-  hipEventCreate(&stop);
+//   hipEvent_t start, stop;
+//   hipEventCreate(&start);
+//   hipEventCreate(&stop);
 
-  /*
-    Run and time the performance test
-  */
-  hipEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc, batchct);
-  }
-  hipEventRecord(stop, stream);
-  hipEventSynchronize(stop);
+//   /*
+//     Run and time the performance test
+//   */
+//   hipEventRecord(start, stream);
+//   for (int rep = 0; rep < iters; rep++) {
+//     stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
+//                 betaP, devCP, ldc, batchct);
+//   }
+//   hipEventRecord(stop, stream);
+//   hipEventSynchronize(stop);
 
-  // Check for errors during the performance test
-  checkRocblas(stat);
-  checkHip(hipGetLastError());
+//   // Check for errors during the performance test
+//   checkRocblas(stat);
+//   checkHip(hipGetLastError());
 
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  hipEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculateFOM(static_cast<double>(elapsedTime_ms));
-}
+//   // Calculate and report GFlops
+//   float elapsedTime_ms;
+//   hipEventElapsedTime(&elapsedTime_ms, start, stop);
+//   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
+//       calculateFOM(static_cast<double>(elapsedTime_ms));
+// }
 
-template <typename T>
-void rocblasGemm::testTgemmStridedBatched(
-    std::function<rocblas_status(
-        rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
-        T const *, T const *, int, long long, T const *, int, long long,
-        T const *, T *, int, long long, int)>
-        func,
-    rocblasgemmInst *mat) {
-  rocblas_status stat;
-  rocblas_handle handle;
-  hipStream_t stream;
-  checkHip(hipSetDevice(mat->devIDX));
-  checkRocblas(rocblas_create_handle(&handle));
-  checkHip(hipStreamCreate(&stream));
-  checkRocblas(rocblas_set_stream(handle, stream));
-  // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
+// template <typename T>
+// void rocblasGemm::testTgemmStridedBatched(
+//     std::function<rocblas_status(
+//         rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
+//         T const *, T const *, int, long long, T const *, int, long long,
+//         T const *, T *, int, long long, int)>
+//         func,
+//     rocblasgemmInst *mat) {
+//   rocblas_status stat;
+//   rocblas_handle handle;
+//   hipStream_t stream;
+//   checkHip(hipSetDevice(mat->devIDX));
+//   checkRocblas(rocblas_create_handle(&handle));
+//   checkHip(hipStreamCreate(&stream));
+//   checkRocblas(rocblas_set_stream(handle, stream));
+//   // checkRocblas(rocblas_set_workspace(handle, mat->devWork, mat->wSZ));
 
-  T *alphaP = static_cast<T *>(alpha);
-  T *betaP = static_cast<T *>(beta);
-  T *devAP = static_cast<T *>(mat->devA);
-  T *devBP = static_cast<T *>(mat->devB);
-  T *devCP = static_cast<T *>(mat->devC);
+//   T *alphaP = static_cast<T *>(alpha);
+//   T *betaP = static_cast<T *>(beta);
+//   T *devAP = static_cast<T *>(mat->devA);
+//   T *devBP = static_cast<T *>(mat->devB);
+//   T *devCP = static_cast<T *>(mat->devC);
 
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, stride_a,
-                devBP, ldb, stride_b, betaP, devCP, ldc, stride_c, batchct);
+//   // Cold iters
+//   for (int rep = 0; rep < cold_iters; rep++) {
+//     stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, stride_a,
+//                 devBP, ldb, stride_b, betaP, devCP, ldc, stride_c, batchct);
 
-    // Check for errors during the gemm run
-    checkRocblas(stat);
-    checkHip(hipGetLastError());
-  }
-  hipStreamSynchronize(stream);
+//     // Check for errors during the gemm run
+//     checkRocblas(stat);
+//     checkHip(hipGetLastError());
+//   }
+//   hipStreamSynchronize(stream);
 
-  hipEvent_t start, stop;
-  hipEventCreate(&start);
-  hipEventCreate(&stop);
+//   hipEvent_t start, stop;
+//   hipEventCreate(&start);
+//   hipEventCreate(&stop);
 
-  /*
-    Run and time the performance test
-  */
-  hipEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, stride_a,
-                devBP, ldb, stride_b, betaP, devCP, ldc, stride_c, batchct);
-  }
-  hipEventRecord(stop, stream);
-  hipEventSynchronize(stop);
+//   /*
+//     Run and time the performance test
+//   */
+//   hipEventRecord(start, stream);
+//   for (int rep = 0; rep < iters; rep++) {
+//     stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, stride_a,
+//                 devBP, ldb, stride_b, betaP, devCP, ldc, stride_c, batchct);
+//   }
+//   hipEventRecord(stop, stream);
+//   hipEventSynchronize(stop);
 
-  // Check for errors during the performance test
-  checkRocblas(stat);
-  checkHip(hipGetLastError());
+//   // Check for errors during the performance test
+//   checkRocblas(stat);
+//   checkHip(hipGetLastError());
 
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  hipEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculateFOM(static_cast<double>(elapsedTime_ms));
-}
+//   // Calculate and report GFlops
+//   float elapsedTime_ms;
+//   hipEventElapsedTime(&elapsedTime_ms, start, stop);
+//   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
+//       calculateFOM(static_cast<double>(elapsedTime_ms));
+// }
 
 void rocblasGemm::testGemmEx(rocblasgemmInst *mat) {
   rocblas_status stat;

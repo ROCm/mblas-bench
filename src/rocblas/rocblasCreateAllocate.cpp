@@ -1,4 +1,4 @@
-#include "hipblasCreateAllocate.h"
+#include "rocblasCreateAllocate.h"
 
 #include <rocblas/rocblas.h>
 #include <hip/hip_bfloat16.h>
@@ -8,13 +8,13 @@
 #include <omp.h>
 
 // #include <cuda/std/complex>
-#include <hip/hip_complex.h>
+// #include <hip/hip_complex.h>
 #include <iostream>
 #include <random>
 #include <sstream>
 #include <string>
 
-#include "hipError.h"
+#include "rocblasError.h"
 
 // using cuda::std::complex;
 using std::string;
@@ -102,14 +102,14 @@ void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
 
 template void initHost<double>::operator()(std::string, void *, int, int, int,
                                            int, long long int, bool, float);
-template void initHost<hipDoubleComplex>::operator()(std::string, void *, int,
-                                                    int, int, int,
-                                                    long long int, bool, float);
+// template void initHost<hipDoubleComplex>::operator()(std::string, void *, int,
+//                                                     int, int, int,
+//                                                     long long int, bool, float);
 template void initHost<float>::operator()(std::string, void *, int, int, int,
                                           int, long long int, bool, float);
-template void initHost<hipComplex>::operator()(std::string, void *, int,
-                                                   int, int, int, long long int,
-                                                   bool, float);
+// template void initHost<hipComplex>::operator()(std::string, void *, int,
+//                                                    int, int, int, long long int,
+//                                                    bool, float);
 template void initHost<__int8_t>::operator()(std::string, void *, int, int, int,
                                              int, long long int, bool, float);
 // template void initHost<complex<__int8_t>>::operator()(std::string, void *, int,

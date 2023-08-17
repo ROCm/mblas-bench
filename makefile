@@ -23,8 +23,8 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 #CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -lcublas -arch=sm_80 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_90,code=sm_90 -O3
 CPPFLAGS ?= $(INC_FLAGS) -MMD -MP -lhipblas
 CXXFLAGS += --std=c++14
-CXX= hipcc
-CC= hipcc
+CXX= nvcc
+CC= nvcc
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 
