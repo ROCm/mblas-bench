@@ -163,26 +163,30 @@ template <typename T>
 void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
                          long long int stride, std::string filename) {
   std::ifstream file(filename);
-  std::vector<std::vector<T>> result(rows_A, std::vector<T>(cols_A));
+  std::vector<std::vector<T>> result;
 
-  size_t i = 0;
-  size_t j = 0;
-  for (string line; getline(file, line, '\n') && i < rows_A; ) {
+  for (string line; getline(file, line, '\n'); ) {
+    result.push_back(std::vector<T>());
     std::istringstream ss(line);
-    for (string field; getline(ss, field, ',') && j < cols_A; ) {
-      result[i][j] = (T)std::stod(field);
-      j ++;
+    for (string field; getline(ss, field, ','); ) {
+      result.back().push_back((T)std::stod(field));
     }
-    i ++;
-    j = 0;
+    if (result.back().empty()) {
+      std::cout << "warning: empty row in csv file" << std::endl;
+    }
+  }
+  if (result.empty()) {
+    std::cout << "warning: csv file is empty" << std::endl;
   }
 
   T *A = (T *)ptr;
+  size_t n_rows = result.size();
   for (size_t i_batch = 0; i_batch < batch; i_batch++) {
     for (size_t j = 0; j < cols_A; ++j) {
       size_t offset = j * ld + i_batch * stride;
       for (size_t i = 0; i < rows_A; ++i) {
-        A[i + offset] = result[i][j];
+        size_t n_cols = result[i % n_rows].size();
+        A[i + offset] = result[i % n_rows][j % n_cols];
       }
     }
   }
