@@ -167,15 +167,19 @@ void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
 
   size_t i = 0;
   size_t j = 0;
-  for (string line; getline(file, line, '\n'); ) {
+  for (string line; getline(file, line, '\n') && i < rows_A; ) {
     std::istringstream ss(line);
-    for (string field; getline(ss, field, ','); ) {
+    for (string field; getline(ss, field, ',') && j < cols_A; ) {
       result[i][j] = (T)std::stod(field);
       j ++;
     }
     i ++;
     j = 0;
   }
+
+  std::cout << "---- DEBUG: result[0] = " << result[0][0] << "," << result[0][1] << "," << result[0][2] << ", ..." << std::endl;
+  std::cout << "---- DEBUG: result[1] = " << result[1][0] << "," << result[1][1] << "," << result[1][2] << ", ..." << std::endl;
+  std::cout << "---- DEBUG: result[2] = " << result[2][0] << "," << result[2][1] << "," << result[2][2] << ", ..." << std::endl;
 
   T *A = (T *)ptr;
   for (size_t i_batch = 0; i_batch < batch; i_batch++) {
