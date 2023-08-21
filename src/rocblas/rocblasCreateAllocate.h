@@ -59,7 +59,7 @@ template <typename T>
 struct initHost {
   void operator()(std::string initialization, void *ptr, int rows_A, int cols_A,
                   int ld, int batch, long long int stride, bool control = false,
-                  float constant = 0.f);
+                  float constant = 0.f, std::string filename = "");
 };
 template <typename T>
 void *allocSetScalarFunc(std::string sval, std::string sval2, T dummy) {
@@ -139,6 +139,10 @@ void fillRandHostBlasgemm(void *ptr, int rows_A, int cols_A, int ld, int batch,
 template <typename T>
 void fillRandHostConstant(void *ptr, int rows_A, int cols_A, int ld, int batch,
                           long long int stride, float constant);
+
+template <typename T>
+void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
+                         long long int stride, std::string filename);
 
 template <typename T>
 void fillRandHostRandIntAS(void *ptr, int rows_A, int cols_A, int ld, int batch,

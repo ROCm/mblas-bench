@@ -142,6 +142,15 @@ int main(int argc, char **argv) {
             "Intialize with random integers, trig functions sin and cos, or "
             "hpl-like input. Options: rand_int, trig_float, hpl, blasgemm",
             cxxopts::value<string>()->default_value("rand_int"));
+  opp_adder("filenameA",
+            "Intialize matrix A with contents of a csv file",
+            cxxopts::value<string>()->default_value(""));
+  opp_adder("filenameB",
+            "Intialize matrix B with contents of a csv file",
+            cxxopts::value<string>()->default_value(""));
+  opp_adder("filenameC",
+            "Intialize matrix C with contents of a csv file",
+            cxxopts::value<string>()->default_value(""));
   opp_adder("i,iters",
             "Iterations to run inside timing loop  (Default value is: 10)",
             cxxopts::value<int>()->default_value("10"));

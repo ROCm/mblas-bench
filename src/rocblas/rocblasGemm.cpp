@@ -236,11 +236,11 @@ void rocblasGemm::fillHost() {
   //  thread.join();
   //}
   typeCallHost<initHost>(a_type, initialization, hostA, rowsA, colsA, lda,
-                         batchct, stride_a, controlA, constantA);
+                         batchct, stride_a, controlA, constantA, filenameA);
   typeCallHost<initHost>(b_type, initialization, hostB, rowsB, colsB, ldb,
-                         batchct, stride_b, controlB, constantB);
+                         batchct, stride_b, controlB, constantB, filenameB);
   typeCallHost<initHost>(c_type, initialization, hostC, rowsC, colsC, ldc,
-                         batchct, stride_c, controlC, constantC);
+                         batchct, stride_c, controlC, constantC, filenameC);
 }
 
 void rocblasGemm::copyHostToDev(rocblasgemmInst *mat) {

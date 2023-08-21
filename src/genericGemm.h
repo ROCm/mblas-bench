@@ -46,6 +46,11 @@ class genericGemm {
   float constantC = 1.f;
   float constantD = 1.f;
 
+  std::string filenameA;
+  std::string filenameB;
+  std::string filenameC;
+  std::string filenameD;
+
   double gflop_per_second = 0;
   double gbyte_per_second = 0;
   double iter_time_us = 0;

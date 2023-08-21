@@ -11,7 +11,9 @@
 // #include <hip/hip_complex.h>
 #include <iostream>
 #include <random>
+#include <fstream>
 #include <sstream>
+#include <vector>
 #include <string>
 
 #include "rocblasError.h"
@@ -87,8 +89,10 @@ template <typename T>
 void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
                              int cols_A, int ld, int batch,
                              long long int stride, bool control,
-                             float constant) {
-  if (initialization == "rand_int") {
+                             float constant, std::string filename) {
+  if (!filename.empty()) {
+    fillRandHostFromCSV<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
+  } else if (initialization == "rand_int") {
     fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
   } else if (initialization == "trig_float") {
     fillRandHostTrigFloat<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
@@ -101,35 +105,35 @@ void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
 }
 
 template void initHost<double>::operator()(std::string, void *, int, int, int,
-                                           int, long long int, bool, float);
+                                           int, long long int, bool, float, std::string);
 // template void initHost<hipDoubleComplex>::operator()(std::string, void *, int,
 //                                                     int, int, int,
-//                                                     long long int, bool, float);
+//                                                     long long int, bool, float, std::string);
 template void initHost<float>::operator()(std::string, void *, int, int, int,
-                                          int, long long int, bool, float);
+                                          int, long long int, bool, float, std::string);
 // template void initHost<hipComplex>::operator()(std::string, void *, int,
 //                                                    int, int, int, long long int,
-//                                                    bool, float);
+//                                                    bool, float, std::string);
 template void initHost<__int8_t>::operator()(std::string, void *, int, int, int,
-                                             int, long long int, bool, float);
+                                             int, long long int, bool, float, std::string);
 // template void initHost<complex<__int8_t>>::operator()(std::string, void *, int,
 //                                                       int, int, int,
 //                                                       long long int, bool,
-//                                                       float);
+//                                                       float, std::string);
 template void initHost<__uint8_t>::operator()(std::string, void *, int, int,
                                               int, int, long long int, bool,
-                                              float);
+                                              float, std::string);
 // template void initHost<complex<__uint8_t>>::operator()(std::string, void *, int,
 //                                                        int, int, int,
 //                                                        long long int, bool,
-//                                                        float);
+//                                                        float, std::string);
 template void initHost<__int32_t>::operator()(std::string, void *, int, int,
                                               int, int, long long int, bool,
-                                              float);
+                                              float, std::string);
 // template void initHost<complex<__int32_t>>::operator()(std::string, void *, int,
 //                                                        int, int, int,
 //                                                        long long int, bool,
-//                                                        float);
+//                                                        float, std::string);
 
 // Instances of the following functions should be defined implicitly by defining
 // those of initHost
@@ -152,6 +156,35 @@ void fillRandHostConstant(void *ptr, int rows_A, int cols_A, int ld, int batch,
   T *A = (T *)ptr;
   for (size_t i = 0; i < rows_A * cols_A * batch; i++) {
     A[i] = (T)(constant);
+  }
+}
+
+template <typename T>
+void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
+                         long long int stride, std::string filename) {
+  std::ifstream file(filename);
+  std::vector<std::vector<T>> result(rows_A, std::vector<T>(cols_A));
+
+  size_t i = 0;
+  size_t j = 0;
+  for (string line; getline(file, line, '\n'); ) {
+    std::istringstream ss(line);
+    for (string field; getline(ss, field, ','); ) {
+      result[i][j] = (T)std::stod(field);
+      j ++;
+    }
+    i ++;
+    j = 0;
+  }
+
+  T *A = (T *)ptr;
+  for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+    for (size_t j = 0; j < cols_A; ++j) {
+      size_t offset = j * ld + i_batch * stride;
+      for (size_t i = 0; i < rows_A; ++i) {
+        A[i + offset] = result[i][j];
+      }
+    }
   }
 }
 

@@ -54,6 +54,9 @@ genericGemm::genericGemm(cxxopts::ParseResult result) {
     stride_c = result["stride_c"].as<long long int>();
   }
   initialization = result["initialization"].as<string>();
+  filenameA = result["filenameA"].as<string>();
+  filenameB = result["filenameB"].as<string>();
+  filenameC = result["filenameC"].as<string>();
 
   // Set init control information
   if (initialization == "rand_int") {
