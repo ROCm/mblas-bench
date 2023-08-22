@@ -152,6 +152,10 @@ template <typename T>
 void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
                            long long int stride, bool isSin);
 
+template <typename T>
+void fillRandHostNormalFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
+                             long long int stride);
+
 template <template <typename> class tFunc, class... Args>
 auto typeCallHost(rocblas_datatype type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
@@ -233,6 +237,10 @@ inline T randIntGenN(std::uniform_int_distribution<int> &idist,
 // inline cuda::std::complex<T> randIntGenN(
 //     std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
 //     cuda::std::complex<T> &dummy);
+
+template <typename T>
+inline T normalFloatGen(std::normal_distribution<double> &ndist,
+                        std::mt19937 &gen, T &dummy);
 
 // void dummy2() {
 //  // This function forces the compiler to generate the needed templated

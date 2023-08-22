@@ -96,6 +96,8 @@ void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
     fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
   } else if (initialization == "trig_float") {
     fillRandHostTrigFloat<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
+  } else if (initialization == "normal_float") {
+    fillRandHostNormalFloat<T>(ptr, rows_A, cols_A, ld, batch, stride);
   } else if (initialization == "hpl") {
   } else if (initialization == "blasgemm") {
     fillRandHostBlasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
@@ -234,6 +236,25 @@ void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
 }
 
 template <typename T>
+void fillRandHostNormalFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
+                             long long int stride) {
+  std::random_device r;
+  std::seed_seq seed{r(), r(), r(), r(), r(), r(), r(), r()};
+  std::mt19937 gen(seed);
+  std::normal_distribution<double> normal_dist(5.0, 2.0);
+  T *A = (T *)ptr;
+  T dummy;
+  for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+    for (size_t j = 0; j < cols_A; ++j) {
+      size_t offset = j * ld + i_batch * stride;
+      for (size_t i = 0; i < rows_A; ++i) {
+        A[i + offset] = normalFloatGen(normal_dist, gen, dummy);
+      }
+    }
+  }
+}
+
+template <typename T>
 inline T randIntGen(std::uniform_int_distribution<int> &idist,
                     std::mt19937 &gen, T &dummy) {
   return T(idist(gen));
@@ -304,60 +325,9 @@ inline T randIntGenN(std::uniform_int_distribution<int> &idist,
 //                              std::mt19937 &gen, complex<T> &dummy) {
 //  return {-T(rand()), -T(rand())};
 //}
-// int sizeof_cudt_host(cudaDataType_t type) {
-//     int size = 0;
-//     complex<double> z1(1,1.5);
-//     switch(type) {
-//         case CUDA_R_64F:
-//             size = sizeof(double);
-//             break;
-//         case CUDA_C_64F:
-//             size = sizeof(complex<double>);
-//             break;
-//         case CUDA_R_32F:
-//             size = sizeof(float);
-//             break;
-//         case CUDA_C_32F:
-//             size = sizeof(complex<float>);
-//             break;
-//         case CUDA_R_16BF:
-//             size = sizeof(float);
-//             break;
-//         case CUDA_C_16BF:
-//             size = sizeof(complex<float>);
-//             break;
-//         case CUDA_R_16F:
-//             size = sizeof(float);
-//             break;
-//         case CUDA_C_16F:
-//             size = sizeof(complex<float>);
-//             break;
-//         case CUDA_R_8F_E4M3:
-//             size = sizeof(float);
-//             break;
-//         case CUDA_R_8F_E5M2:
-//             size = sizeof(complex<float>);
-//             break;
-//         case CUDA_R_8I:
-//             size = sizeof(__int8_t);
-//             break;
-//         case CUDA_C_8I:
-//             size = sizeof(complex<__int8_t>);
-//             break;
-//         case CUDA_R_8U:
-//             size = sizeof(__uint8_t);
-//             break;
-//         case CUDA_C_8U:
-//             size = sizeof(complex<__uint8_t>);
-//             break;
-//         case CUDA_R_32I:
-//             size = sizeof(__int32_t);
-//             break;
-//         case CUDA_C_32I:
-//             size = sizeof(complex<__int32_t>);
-//             break;
-//         default:
-//             size = sizeof(float);
-//     }
-//     return size;
-// }
+
+template <typename T>
+inline T normalFloatGen(std::normal_distribution<double> &ndist,
+                        std::mt19937 &gen, T &dummy) {
+  return T(ndist(gen));
+}

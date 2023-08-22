@@ -75,15 +75,15 @@ int main(int argc, char **argv) {
             "BLAS-3.  (Default value is based on size of A if not specified)",
             cxxopts::value<string>()->default_value(""));
   opp_adder("ldb",
-            "Leading dimension of matrix A, is only applicable to BLAS-2 & "
+            "Leading dimension of matrix B, is only applicable to BLAS-2 & "
             "BLAS-3.  (Default value is based on size of B if not specified)",
             cxxopts::value<string>()->default_value(""));
   opp_adder("ldc",
-            "Leading dimension of matrix A, is only applicable to BLAS-2 & "
+            "Leading dimension of matrix C, is only applicable to BLAS-2 & "
             "BLAS-3.  (Default value is based on size of C if not specified)",
             cxxopts::value<string>()->default_value(""));
   opp_adder("ldd",
-            "Leading dimension of matrix A, is only applicable to BLAS-EX.  "
+            "Leading dimension of matrix D, is only applicable to BLAS-EX.  "
             "(Default value is based on size of D if not specified)",
             cxxopts::value<string>()->default_value(""));
   opp_adder("stride_a",
@@ -134,13 +134,18 @@ int main(int argc, char **argv) {
             "Number of matrices. Only applicable to batched and "
             "strided_batched routines  (Default value is: 1)",
             cxxopts::value<int>()->default_value("1"));
+  opp_adder("num_blocks",
+            "Number of memory blocks for arrays. Each benchmarking iteration "
+            "will use the next block of memory (or loop to the first block)",
+            cxxopts::value<int>()->default_value("1"));
   opp_adder("device", "GPU device(s) to run on",
             cxxopts::value<string>()->default_value("0"));
   opp_adder("instances", "Number of instances to run on each GPU",
             cxxopts::value<int>()->default_value("1"));
   opp_adder("initialization",
             "Intialize with random integers, trig functions sin and cos, or "
-            "hpl-like input. Options: rand_int, trig_float, hpl, blasgemm",
+            "hpl-like input. Options: rand_int, trig_float, normal_float, "
+            "hpl, blasgemm",
             cxxopts::value<string>()->default_value("rand_int"));
   opp_adder("filenameA",
             "Intialize matrix A with contents of a csv file",
