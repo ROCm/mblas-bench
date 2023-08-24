@@ -5,6 +5,7 @@
 #include "third_party/barrier.h"
 
 #include <iostream>
+#include <vector>
 #include <string>
 
 #include "genericGemm.h"
@@ -32,9 +33,9 @@ struct rocblasgemmInst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
-  void *devA;
-  void *devB;
-  void *devC;
+  std::vector<void *> devA;
+  std::vector<void *> devB;
+  std::vector<void *> devC;
   void *alpha;
   void *beta;
   /*
@@ -42,22 +43,33 @@ struct rocblasgemmInst {
     Only used for Batched variant of gemms
     Unused for others
   */
-  void **ptrDevA;
-  void **ptrDevB;
-  void **ptrDevC;
-  void **ptrHostA;
-  void **ptrHostB;
-  void **ptrHostC;
+  std::vector<void **> ptrDevA;
+  std::vector<void **> ptrDevB;
+  std::vector<void **> ptrDevC;
+  std::vector<void **> ptrHostA;
+  std::vector<void **> ptrHostB;
+  std::vector<void **> ptrHostC;
   void *devWork;
   long wSZ;
-  rocblasgemmInst(int devID) { devIDX = devID; }
+  rocblasgemmInst(int devID, int nblocks) { 
+    devIDX = devID;
+    devA.resize(nblocks);
+    devB.resize(nblocks);
+    devC.resize(nblocks);
+    ptrDevA.resize(nblocks);
+    ptrDevB.resize(nblocks);
+    ptrDevC.resize(nblocks);
+    ptrHostA.resize(nblocks);
+    ptrHostB.resize(nblocks);
+    ptrHostC.resize(nblocks);
+  }
 };
 
 class rocblasGemm : public genericGemm {
  private:
-  void *hostA;
-  void *hostB;
-  void *hostC;
+  std::vector<void *> hostA;
+  std::vector<void *> hostB;
+  std::vector<void *> hostC;
 
   // // Device array.  These are where the memory is stored on GPU
   // void *devA;

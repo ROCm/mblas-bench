@@ -36,6 +36,8 @@ class genericGemm {
   int iters;
   int cold_iters;
 
+  int nblocks;
+
   bool controlA = false;
   bool controlB = false;
   bool controlC = false;

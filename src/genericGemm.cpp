@@ -44,15 +44,17 @@ genericGemm::genericGemm(cxxopts::ParseResult result) {
   batchct = 1;
   if (function.find("Batched") != string::npos) {
     batched = true;
-    batchct = result["batch_count"].as<int>();
   }
-
+  batchct = result["batch_count"].as<int>();
   if (function.find("Strided") != string::npos) {
     strided = true;
-    stride_a = result["stride_a"].as<long long int>();
-    stride_b = result["stride_b"].as<long long int>();
-    stride_c = result["stride_c"].as<long long int>();
   }
+  stride_a = result["stride_a"].as<long long int>();
+  stride_b = result["stride_b"].as<long long int>();
+  stride_c = result["stride_c"].as<long long int>();
+
+  nblocks = result["num_blocks"].as<int>();
+
   initialization = result["initialization"].as<string>();
   filenameA = result["filenameA"].as<string>();
   filenameB = result["filenameB"].as<string>();
