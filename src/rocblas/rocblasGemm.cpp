@@ -17,7 +17,7 @@
 #include "rocblasCreateAllocate.h"
 #include "rocblasDtypeUtils.h"
 #include "rocblasError.h"
-#include "third_party/cxxopts.hpp"
+#include "cxxopts.hpp"
 
 using std::cerr;
 using std::cout;
@@ -28,7 +28,7 @@ using std::thread;
 using std::vector;
 
 // clang-format off
-std::vector<gemmPrecType> rocblasGemm::gemmExSupported = {
+std::vector<gemmPrecTypeAMD> rocblasGemm::gemmExSupported = {
     // Compute type             Scale Type                A/B Type                  C Type
     {rocblas_datatype_f64_r,    rocblas_datatype_f64_r,   rocblas_datatype_f64_r,   rocblas_datatype_f64_r  },
     {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f32_r,   rocblas_datatype_f32_r  },
@@ -43,7 +43,7 @@ std::vector<gemmPrecType> rocblasGemm::gemmExSupported = {
 };
 // clang-format on
 
-std::vector<TgemmPrecType> rocblasGemm::TgemmExSupported = {};
+std::vector<TgemmPrecTypeAMD> rocblasGemm::TgemmExSupported = {};
 
 void rocblasGemm::initPrecMap() {}
 
@@ -91,7 +91,7 @@ void rocblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
         rocblasGemmExBatched
         rocblasGemmExStridedBatched
     */
-    gemmPrecType selType = {compute, scalar, a_type, c_type};
+    gemmPrecTypeAMD selType = {compute, scalar, a_type, c_type};
     auto result =
         std::find(begin(gemmExSupported), end(gemmExSupported), selType);
     if (result == end(gemmExSupported)) {
@@ -105,7 +105,7 @@ void rocblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
       throw std::invalid_argument(errorString);
     }
   } else if (function.find("gemmEx")) {
-    TgemmPrecType selType = {a_type, c_type};
+    TgemmPrecTypeAMD selType = {a_type, c_type};
     auto result =
         std::find(begin(TgemmExSupported), end(TgemmExSupported), selType);
     if (result == end(TgemmExSupported)) {

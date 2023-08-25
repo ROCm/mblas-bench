@@ -14,7 +14,7 @@ __global__ void floatToBfloat16(float *input, size_t num_elements,
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elements)
   {
-    output[idx] = input[idx];
+    output[idx] = (hip_bfloat16) input[idx];
   }
 }
 

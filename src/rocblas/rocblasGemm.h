@@ -1,8 +1,7 @@
 #pragma once
 #include <rocblas/rocblas.h>
-#include <hip/hip_runtime.h>
+//#include <hip/hip_runtime.h>
 #include <cxxabi.h>
-#include "third_party/barrier.h"
 
 #include <iostream>
 #include <vector>
@@ -10,21 +9,21 @@
 
 #include "genericGemm.h"
 
-struct gemmPrecType {
+struct gemmPrecTypeAMD {
   rocblas_datatype compute;
   rocblas_datatype scalar;
   rocblas_datatype ab_type;
   rocblas_datatype c_type;
-  bool operator==(const gemmPrecType rhs) const {
+  bool operator==(const gemmPrecTypeAMD rhs) const {
     return rhs.compute == compute && rhs.scalar == scalar &&
-           rhs.ab_type == rhs.ab_type && rhs.c_type == c_type;
+           rhs.ab_type == ab_type && rhs.c_type == c_type;
   }
 };
-struct TgemmPrecType {
+struct TgemmPrecTypeAMD {
   rocblas_datatype ab_type;
   rocblas_datatype c_type;
-  bool operator==(const TgemmPrecType rhs) const {
-    return rhs.ab_type == rhs.ab_type && rhs.c_type == c_type;
+  bool operator==(const TgemmPrecTypeAMD rhs) const {
+    return rhs.ab_type == ab_type && rhs.c_type == c_type;
   }
 };
 
@@ -108,10 +107,10 @@ class rocblasGemm : public genericGemm {
   // std::map<std::string, rocblas_datatype> precDType;
   // std::map<std::string, rocblas_datatype> computeDType;
   // std::map<rocblas_datatype, rocblas_datatype> precToCompute;
-  // static gemmPrecType gemmExSupported[];
+  // static gemmPrecTypeAMD gemmExSupported[];
 
-  static std::vector<gemmPrecType> gemmExSupported;
-  static std::vector<TgemmPrecType> TgemmExSupported;
+  static std::vector<gemmPrecTypeAMD> gemmExSupported;
+  static std::vector<TgemmPrecTypeAMD> TgemmExSupported;
   std::vector<rocblasgemmInst> matPtrs;
   std::vector<std::vector<hipEvent_t *> *> eventPtr;
 

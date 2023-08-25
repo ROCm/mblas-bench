@@ -2,7 +2,7 @@
 #include <string>
 #include <utility>
 
-#include "third_party/cxxopts.hpp"
+#include "cxxopts.hpp"
 
 class genericGemm {
  protected:

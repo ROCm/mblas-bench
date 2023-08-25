@@ -1,6 +1,4 @@
 #include <assert.h>
-// #include <rocblas/rocblas.h>
-// #include <hip/hip_runtime.h>
 #include <cxxabi.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -8,16 +6,14 @@
 #include <cctype>
 #include <iostream>
 
-#include "rocblas/rocblasGemm.h"
-// #include "rocblas/hipblasLtGemm.h"
-#include "genericGemm.h"
 
-// #include "fp16_conversion.h"
+#include "genericGemm.h"
+#include "rocblasGemm.h"
+#include "cublasGemm.h"
+#include "cublasLtGemm.h"
+
 #include "third_party/cxxopts.hpp"
 
-//#include "error_handling.h"
-//#include "create-allocate.h"
-//#include "cublas/cudaError.h"
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -179,12 +175,18 @@ int main(int argc, char **argv) {
   string driver = sToLower(result["driver"].as<string>());
   string function = sToLower(result["function"].as<string>());
 
+  if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
+    // Since regular cublas has no matmul, we can safely assume the user means
+    // cublaslt
+    gemm = new cublasLtGemm(result);
+  } else if (driver == "cublas-bench" || driver == "cublas") {
+    gemm = new cublasGemm(result);
   // if (driver == "hipblaslt" || (driver == "rocblas" && function == "matmul")) {
   //   // Since regular rocblas has no matmul, we can safely assume the user means
   //   // hipblaslt
   //   gemm = new cublasLtGemm(result);
   // } else 
-  if (driver == "rocblas-bench" || driver == "rocblas") {
+  } else if (driver == "rocblas-bench" || driver == "rocblas") {
     gemm = new rocblasGemm(result);
   } else {
     cerr << "Driver \"" << driver << "\" not supported" << endl;
