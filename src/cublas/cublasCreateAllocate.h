@@ -32,7 +32,7 @@ struct sizeofCUDTP {
 template <typename T>
 struct batchedPtrMagic {
   void operator()(void **hptr, void **dptr, void *hArr, int batchct, int x,
-                  int y);
+                  int y, int blockct);
 };
 
 template <typename T>
@@ -104,11 +104,14 @@ void *allocSetScalar<T>::operator()(std::string sval1, std::string sval2) {
 
 template <typename T>
 void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
-                                    int batchct, int x, int y) {
+                                    int batchct, int x, int y, int blockct) {
   T **host = reinterpret_cast<T **>(hptr);
   T *device_array = static_cast<T *>(dAr);
-  for (int i = 0; i < batchct; i++) {
-    host[i] = device_array + (i * x * y);
+  for (int j = 0; j < blockct; j++) {
+    int offset = j*batchct;
+    for (int i = 0; i < batchct; i++) {
+      host[offset + i] = device_array + (i * x * y);
+    }
   }
   // checkCuda(cudaMalloc(&dptr, batchct * sizeof(T *)));
   // hptr = reinterpret_cast<void **>(host);

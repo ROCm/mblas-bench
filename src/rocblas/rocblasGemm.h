@@ -115,6 +115,8 @@ class rocblasGemm : public genericGemm {
   std::vector<std::vector<hipEvent_t *> *> eventPtr;
 
   inline void * getOffsetPtr(void * mat, long long int blockstride, int rep, int nblocks, rocblas_datatype type);
+  template<typename T>
+  inline T * getOffsetPtrNC(T * mat, long long int blockstride, int rep); 
 
  public:
   rocblasGemm(cxxopts::ParseResult result);
@@ -140,33 +142,22 @@ class rocblasGemm : public genericGemm {
   double testGemmExBatched();
   double testGemmExStridedBatched();
 
-  // Parameter names are included in function definitions for refrence only
-  // template <typename T>
-  // void testTgemm(std::function<rocblas_status(
-  //                    rocblas_handle handle, rocblas_operation transa,
-  //                    rocblas_operation transb, int m, int n, int k,
-  //                    const T *alpha, const T *A, int lda, const T *B, int ldb,
-  //                    const T *beta, T *C, int ldc)>
-  //                    func,
-  //                rocblasgemmInst *mat);
+  template <typename T>
+  void testTgemm(std::function<rocblas_status_(_rocblas_handle*, rocblas_operation_, rocblas_operation_, int, int, int, T const*, T const*, int, T const*, int, T const*, T*, int)> func, rocblasgemmInst *mat);
 
-  // template <typename T>
-  // void testTgemmBatched(
-  //     std::function<rocblas_status(rocblas_handle, rocblas_operation,
-  //                                   rocblas_operation, int, int, int, T const *,
-  //                                   T const *const *, int, T const *const *, int,
-  //                                   T const *, T *const *, int, int)>
-  //         func,
-  //     rocblasgemmInst *mat);
+  template <typename T>
+  void testTgemm_batched(
+      std::function<rocblas_status_(_rocblas_handle*, rocblas_operation_, rocblas_operation_, int, int, int, T const*, T const* const*, int, T const* const*, int, T const*, T* const*, int, int)>
+          func,
+      rocblasgemmInst *mat);
 
-  // template <typename T>
-  // void testTgemmStridedBatched(
-  //     std::function<rocblas_status(
-  //         rocblas_handle, rocblas_operation, rocblas_operation, int, int, int,
-  //         T const *, T const *, int, long long, T const *, int, long long,
-  //         T const *, T *, int, long long, int)>
-  //         func,
-  //     rocblasgemmInst *mat);
+  template <typename T>
+  void testTgemm_strided_batched(
+          std::function<rocblas_status_(_rocblas_handle*, rocblas_operation_, rocblas_operation_, int, int, int, T const*, T const*, int, long, T const*, int, long, T const*, T*, int, long, int)>
+          func, rocblasgemmInst *mat);
 
-  void testGemmEx(rocblasgemmInst *mat);
+
+  void test_gemm_ex(rocblasgemmInst *mat);
+  void test_gemm_batched_ex(rocblasgemmInst *mat);
+  void test_gemm_strided_batched_ex(rocblasgemmInst *mat);
 };
