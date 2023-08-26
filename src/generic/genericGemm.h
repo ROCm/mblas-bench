@@ -40,12 +40,12 @@ class genericGemm {
 
   bool strided;
   bool batched;
-  int batchct;
 
   int iters;
   int cold_iters;
 
-  int nblocks;
+  int blockct;
+  int batchct;
 
   bool controlA = false;
   bool controlB = false;

@@ -12,9 +12,9 @@
 #include <string>
 
 // int sizeof_cudt_host(rocblas_datatype type);
-void *allocateHostArr(rocblas_datatype type, long x, long y, int batch = 1);
-void *allocateDevArr(rocblas_datatype type, long x, long y, int batch = 1);
-void *allocateHDevArr(rocblas_datatype type, long x, long y, int batch = 1);
+void *allocateHostArr(rocblas_datatype type, long x, long y, int batch = 1, int block = 1);
+void *allocateDevArr(rocblas_datatype type, long x, long y, int batch = 1, int block = 1);
+void *allocateHDevArr(rocblas_datatype type, long x, long y, int batch = 1, int block = 1);
 
 void initHostH(rocblas_datatype precision, std::string initialization, void *ptr,
                int rows_A, int cols_A, int ld, int batch, long long int stride,
@@ -33,7 +33,7 @@ struct sizeofCUDTP {
 template <typename T>
 struct batchedPtrMagic {
   void operator()(void **hptr, void **dptr, void *hArr, int batchct, int x,
-                  int y);
+                  int y, int blockct);
 };
 
 template <typename T>
@@ -58,7 +58,7 @@ auto typeCallDev(rocblas_datatype type, Args... args) ->
 template <typename T>
 struct initHost {
   void operator()(std::string initialization, void *ptr, int rows_A, int cols_A,
-                  int ld, int batch, long long int stride, bool control = false,
+                  int ld, int batch, long long int stride, int block, bool control = false,
                   float constant = 0.f, std::string filename = "");
 };
 template <typename T>
@@ -121,7 +121,7 @@ void *allocSetScalar<T>::operator()(std::string sval1, std::string sval2) {
 
 template <typename T>
 void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
-                                    int batchct, int x, int y) {
+                                    int batchct, int x, int y, int blockct) {
   T **host = reinterpret_cast<T **>(hptr);
   T *device_array = static_cast<T *>(dAr);
   for (int i = 0; i < batchct; i++) {
@@ -135,26 +135,26 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
 
 template <typename T>
 void fillRandHostBlasgemm(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                          long long int stride);
+                          long long int stride, int block);
 template <typename T>
 void fillRandHostConstant(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                          long long int stride, float constant);
+                          long long int stride, int block, float constant);
 
 template <typename T>
 void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                         long long int stride, std::string filename);
+                         long long int stride, int block, std::string filename);
 
 template <typename T>
 void fillRandHostRandIntAS(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                           long long int stride, bool alternating);
+                           long long int stride, int block, bool alternating);
 
 template <typename T>
 void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                           long long int stride, bool isSin);
+                           long long int stride, int block, bool isSin);
 
 template <typename T>
 void fillRandHostNormalFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                             long long int stride);
+                             long long int stride, int block);
 
 template <template <typename> class tFunc, class... Args>
 auto typeCallHost(rocblas_datatype type, Args... args) ->
