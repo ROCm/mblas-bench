@@ -48,7 +48,7 @@ __global__ void floatToFp16(float *input, size_t num_elements, __half *output)
 //   }
 // }
 
-void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, int y, int batchsz)
+void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, int y, int batchsz, int blockct)
 {
 
   int hostsz = typeCallHost<sizeofCUDT>(precision);
@@ -59,9 +59,9 @@ void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, 
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
     checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
                        hipMemcpyHostToDevice));
-    int num_elements = batchsz * x * y;
-    int block_size = 256;
-    int num_blocks = (num_elements + block_size - 1) / block_size;
+    long num_elements = batchsz * x * y * blockct;
+    long block_size = 256;
+    long num_blocks = (num_elements + block_size - 1) / block_size;
     floatToFp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
     hipFree(tmpA);
   }
@@ -71,9 +71,9 @@ void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, 
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
     checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
                        hipMemcpyHostToDevice));
-    int num_elements = batchsz * x * y;
-    int block_size = 256;
-    int num_blocks = (num_elements + block_size - 1) / block_size;
+    long num_elements = batchsz * x * y * blockct;
+    long block_size = 256;
+    long num_blocks = (num_elements + block_size - 1) / block_size;
     floatToBfloat16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
     hipFree(tmpA);
   }
@@ -112,7 +112,7 @@ void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, 
   // }
   else
   {
-    checkHip(hipMemcpy(devA, hostA, (long)batchsz * x * y * hostsz,
+    checkHip(hipMemcpy(devA, hostA, (long)batchsz * blockct * x * y * hostsz,
                        hipMemcpyHostToDevice));
   }
 }
