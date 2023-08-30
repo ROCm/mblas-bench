@@ -237,32 +237,30 @@ void rocblasGemm::fillHost() {
 
 void rocblasGemm::copyHostToDev(rocblasgemmInst *mat) {
   hipSetDevice(mat->devIDX);
-  for (size_t i_block = 0; i_block < blockct; i_block++) {
-    copyAndConvert(a_type, hostA, mat->devA, m, k, batchct, blockct);
-    copyAndConvert(b_type, hostB, mat->devB, k, n, batchct, blockct);
-    copyAndConvert(c_type, hostC, mat->devC, n, m, batchct, blockct);
-    if (batched && !strided) {
-      // Perform some pointer arithmetic to calculate the arrays we pass to the
-      // gpu
-      mat->ptrHostA =
-          (void **)malloc(batchct * blockct * typeCallHost<sizeofCUDTP>(a_type));
-      mat->ptrHostB =
-          (void **)malloc(batchct * blockct * typeCallHost<sizeofCUDTP>(b_type));
-      mat->ptrHostC =
-          (void **)malloc(batchct * blockct * typeCallHost<sizeofCUDTP>(c_type));
-      checkHip(
-          hipMalloc(&mat->ptrDevA, batchct * blockct * typeCallHost<sizeofCUDTP>(a_type)));
-      checkHip(
-          hipMalloc(&mat->ptrDevB, batchct * blockct * typeCallHost<sizeofCUDTP>(b_type)));
-      checkHip(
-          hipMalloc(&mat->ptrDevC, batchct * blockct * typeCallHost<sizeofCUDTP>(c_type)));
-      typeCallDev<batchedPtrMagic>(a_type, mat->ptrHostA, mat->ptrDevA, mat->devA,
-                                  batchct, m, k, blockct);
-      typeCallDev<batchedPtrMagic>(b_type, mat->ptrHostB, mat->ptrDevB, mat->devB,
-                                  batchct, k, n, blockct);
-      typeCallDev<batchedPtrMagic>(c_type, mat->ptrHostC, mat->ptrDevC, mat->devC,
-                                  batchct, n, m, blockct);
-    }
+  copyAndConvert(a_type, hostA, mat->devA, m, k, batchct, blockct);
+  copyAndConvert(b_type, hostB, mat->devB, k, n, batchct, blockct);
+  copyAndConvert(c_type, hostC, mat->devC, n, m, batchct, blockct);
+  if (batched && !strided) {
+    // Perform some pointer arithmetic to calculate the arrays we pass to the
+    // gpu
+    mat->ptrHostA =
+        (void **)malloc(batchct * blockct * typeCallHost<sizeofCUDTP>(a_type));
+    mat->ptrHostB =
+        (void **)malloc(batchct * blockct * typeCallHost<sizeofCUDTP>(b_type));
+    mat->ptrHostC =
+        (void **)malloc(batchct * blockct * typeCallHost<sizeofCUDTP>(c_type));
+    checkHip(
+        hipMalloc(&mat->ptrDevA, batchct * blockct * typeCallHost<sizeofCUDTP>(a_type)));
+    checkHip(
+        hipMalloc(&mat->ptrDevB, batchct * blockct * typeCallHost<sizeofCUDTP>(b_type)));
+    checkHip(
+        hipMalloc(&mat->ptrDevC, batchct * blockct * typeCallHost<sizeofCUDTP>(c_type)));
+    typeCallDev<batchedPtrMagic>(a_type, mat->ptrHostA, mat->ptrDevA, mat->devA,
+                                batchct, m, k, blockct);
+    typeCallDev<batchedPtrMagic>(b_type, mat->ptrHostB, mat->ptrDevB, mat->devB,
+                                batchct, k, n, blockct);
+    typeCallDev<batchedPtrMagic>(c_type, mat->ptrHostC, mat->ptrDevC, mat->devC,
+                                batchct, n, m, blockct);
   }
 }
 
@@ -382,7 +380,7 @@ double rocblasGemm::test() {
     
     // gemmEx
     // else if (strided && function == "rocblas_gemm_strided_batched_ex") {
-    if (strided && function == "rocblas_gemm_strided_batched_ex") {
+    else if (strided && function == "rocblas_gemm_strided_batched_ex") {
       // Call the Gemm strided batched deployment script
     } else if (batched && function == "rocblas_gemm_batched_ex") {
       // Call the Gemm batched code

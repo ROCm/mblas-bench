@@ -56,8 +56,8 @@ void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, 
   if (precision == rocblas_datatype_f16_c || precision == rocblas_datatype_f16_r)
   {
     // Allocate memory in the device for host precision (float)
-    void *tmpA = allocateHDevArr(precision, x, y, batchsz);
-    checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+    void *tmpA = allocateHDevArr(precision, x, y, batchsz, blockct);
+    checkHip(hipMemcpy(tmpA, hostA, blockct * batchsz * x * y * hostsz,
                        hipMemcpyHostToDevice));
     long num_elements = batchsz * x * y * blockct;
     long block_size = 256;
@@ -68,8 +68,8 @@ void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, 
   else if (precision == rocblas_datatype_bf16_c || precision == rocblas_datatype_bf16_r)
   {
     // Allocate memory in the device for host precision (float)
-    void *tmpA = allocateHDevArr(precision, x, y, batchsz);
-    checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+    void *tmpA = allocateHDevArr(precision, x, y, batchsz, blockct);
+    checkHip(hipMemcpy(tmpA, hostA, blockct * batchsz * x * y * hostsz,
                        hipMemcpyHostToDevice));
     long num_elements = batchsz * x * y * blockct;
     long block_size = 256;
