@@ -181,10 +181,8 @@ cublasGemm::cublasGemm(cxxopts::ParseResult result) : genericGemm(result) {
 }
 
 string cublasGemm::prepareArray() {
-  // std::cout << "Pre Convert: " << *((float *)alpha) << std::endl;
-  // alpha = convertScalar(scalar, alpha);
-  // std::cout << "Post Convert: " << __half2float(*(__half *)alpha) <<
-  // std::endl; beta = convertScalar(scalar, beta);
+  alpha = convertScalar(scalar, alpha);
+  beta = convertScalar(scalar, beta);
   this->allocHost();
   this->fillHost();
 
