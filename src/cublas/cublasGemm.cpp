@@ -234,16 +234,16 @@ void cublasGemm::allocHost() {
   // hostA = resultA.get();
   // hostB = resultB.get();
   // hostC = resultC.get();
-  hostA = allocateHostArr(a_type, m, k, batchct);
-  hostB = allocateHostArr(b_type, k, n, batchct);
-  hostC = allocateHostArr(c_type, m, n, batchct);
+  hostA = allocateHostArr(a_type, rowsMemA, colsMemA, batchct);
+  hostB = allocateHostArr(b_type, rowsMemB, colsMemB, batchct);
+  hostC = allocateHostArr(c_type, rowsMemC, colsMemC, batchct);
 }
 
 void cublasGemm::allocDev(cublasgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
-  mat->devA = allocateDevArr(a_type, m, k, batchct);
-  mat->devB = allocateDevArr(b_type, k, n, batchct);
-  mat->devC = allocateDevArr(c_type, m, n, batchct);
+  mat->devA = allocateDevArr(a_type, rowsMemA, colsMemA, batchct);
+  mat->devB = allocateDevArr(b_type, rowsMemB, colsMemB, batchct);
+  mat->devC = allocateDevArr(c_type, rowsMemC, colsMemC, batchct);
   mat->wSZ = workspaceSz;
   cudaMalloc(&mat->devWork, mat->wSZ);
 }

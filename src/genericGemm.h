@@ -19,6 +19,15 @@ class genericGemm {
   int rowsD;
   int colsD;
 
+  int rowsMemA;
+  int colsMemA;
+  int rowsMemB;
+  int colsMemB;
+  int rowsMemC;
+  int colsMemC;
+  int rowsMemD;
+  int colsMemD;
+
   int lda;
   int ldb;
   int ldc;

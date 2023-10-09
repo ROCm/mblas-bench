@@ -30,10 +30,21 @@ genericGemm::genericGemm(cxxopts::ParseResult result) {
   ldc = setLd(ldcS, "N", m, 0);
   ldd = setLd(lddS, "N", m, 0);
 
+  // Set matrix dimensions
   std::tie(rowsA, colsA) = setRowCol(tA, m, k);
   std::tie(rowsB, colsB) = setRowCol(tB, k, n);
   std::tie(rowsC, colsC) = setRowCol("N", m, n);
   std::tie(rowsD, colsD) = setRowCol("N", m, n);
+
+  // Set memory dimensions
+  rowsMemA = lda;
+  rowsMemB = ldb;
+  rowsMemC = ldc;
+  rowsMemD = ldd;
+  std::tie(std::ignore, colsMemA) = setRowCol(tA, m, k);
+  std::tie(std::ignore, colsMemB) = setRowCol(tB, k, n);
+  std::tie(std::ignore, colsMemC) = setRowCol("N", m, n);
+  std::tie(std::ignore, colsMemD) = setRowCol("N", m, n);
 
   strided = false;
   batched = false;
