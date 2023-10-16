@@ -273,9 +273,9 @@ void cublasGemm::fillHost() {
 
 void cublasGemm::copyHostToDev(cublasgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
-  copyAndConvert(a_type, hostA, mat->devA, m, k, batchct);
-  copyAndConvert(b_type, hostB, mat->devB, k, n, batchct);
-  copyAndConvert(c_type, hostC, mat->devC, n, m, batchct);
+  copyAndConvert(a_type, hostA, mat->devA, rowsMemA, colsMemA, batchct);
+  copyAndConvert(b_type, hostB, mat->devB, rowsMemB, colsMemB, batchct);
+  copyAndConvert(c_type, hostC, mat->devC, rowsMemC, colsMemC, batchct);
   if (batched && !strided) {
     // Perform some pointer arithmetic to calculate the arrays we pass to the
     // gpu
@@ -327,36 +327,31 @@ double cublasGemm::test() {
   double gflops = 0.0;
   for (auto &mat : matPtrs) {
     // TgemmBatched
-    if ((function == "cublasDgemm" && precision == CUDA_R_64F) ||
-        (function == "gemm" && precision == CUDA_R_64F)) {
+    if (matchGemmType(precision, function, CUDA_R_64F, {"cublasDgemm", "dgemm", "gemm"})) {
       std::function<decltype(cublasDgemm)> dgemm_var = cublasDgemm;
       threads.push_back(
           thread(&cublasGemm::testTgemm<double>, this, dgemm_var, &mat));
-    } else if ((function == "cublasSgemm" && precision == CUDA_R_32F) ||
-               (function == "gemm" && precision == CUDA_R_32F)) {
+    } else if (matchGemmType(precision, function, CUDA_R_32F, {"cublasSgemm", "sgemm", "gemm"})) {
       std::function<decltype(cublasSgemm)> sgemm_var = cublasSgemm;
       threads.push_back(
           thread(&cublasGemm::testTgemm<float>, this, sgemm_var, &mat));
-    } else if ((function == "cublasHgemm" && precision == CUDA_R_16F) ||
-               (function == "gemm" && precision == CUDA_R_16F)) {
+    } else if (matchGemmType(precision, function, CUDA_R_16F, {"cublasHgemm", "hgemm", "gemm"})) {
       std::function<decltype(cublasHgemm)> hgemm_var = cublasHgemm;
       threads.push_back(
           thread(&cublasGemm::testTgemm<__half>, this, hgemm_var, &mat));
-    } else if ((function == "cublasZgemm" && precision == CUDA_C_64F) ||
-               (function == "gemm" && precision == CUDA_C_64F)) {
+    } else if (matchGemmType(precision, function, CUDA_C_64F, {"cublasZgemm", "zgemm", "gemm"})) {
       std::function<decltype(cublasZgemm)> zgemm_var = cublasZgemm;
       threads.push_back(thread(&cublasGemm::testTgemm<cuDoubleComplex>, this,
                                zgemm_var, &mat));
-    } else if ((function == "cublasCgemm" && precision == CUDA_C_32F) ||
-               (function == "gemm" && precision == CUDA_C_32F)) {
+    } else if (matchGemmType(precision, function, CUDA_C_32F, {"cublasCgemm", "cgemm", "gemm"})) {
       std::function<decltype(cublasCgemm)> cgemm_var = cublasCgemm;
       threads.push_back(
           thread(&cublasGemm::testTgemm<cuComplex>, this, cgemm_var, &mat));
-    } else if (function == "cublasZgemm3m" && precision == CUDA_C_64F) {
+    } else if (matchGemmType(precision, function, CUDA_C_64F, {"cublasZgemm3m", "zgemm3m", "gemm3m"})) {
       std::function<decltype(cublasZgemm3m)> zgemm3m_var = cublasZgemm3m;
       threads.push_back(thread(&cublasGemm::testTgemm<cuDoubleComplex>, this,
                                zgemm3m_var, &mat));
-    } else if (function == "cublasCgemm3m" && precision == CUDA_C_32F) {
+    } else if (matchGemmType(precision, function, CUDA_C_32F, {"cublasCgemm3m", "cgemm3m", "gemm3m"})) {
       std::function<decltype(cublasCgemm3m)> cgemm3m_var = cublasCgemm3m;
       threads.push_back(
           thread(&cublasGemm::testTgemm<cuComplex>, this, cgemm3m_var, &mat));

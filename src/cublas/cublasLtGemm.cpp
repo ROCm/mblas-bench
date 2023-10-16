@@ -263,18 +263,18 @@ void cublasLtGemm::allocHost() {
   // hostA = resultA.get();
   // hostB = resultB.get();
   // hostC = resultC.get();
-  hostA = allocateHostArr(a_type, m, k, batchct);
-  hostB = allocateHostArr(b_type, k, n, batchct);
-  hostC = allocateHostArr(c_type, n, m, batchct);
+  hostA = allocateHostArr(a_type, rowsMemA, colsMemA, batchct);
+  hostB = allocateHostArr(b_type, rowsMemB, colsMemB, batchct);
+  hostC = allocateHostArr(c_type, rowsMemC, colsMemC, batchct);
 }
 
 void cublasLtGemm::allocDev(cublasltgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
-  mat->devA = allocateDevArr(a_type, m, k, batchct);
-  mat->devB = allocateDevArr(b_type, k, n, batchct);
-  mat->devC = allocateDevArr(c_type, n, m, batchct);
+  mat->devA = allocateDevArr(a_type, rowsMemA, colsMemA, batchct);
+  mat->devB = allocateDevArr(b_type, rowsMemB, colsMemB, batchct);
+  mat->devC = allocateDevArr(c_type, rowsMemC, colsMemC, batchct);
   if (!inplace) {
-    mat->devD = allocateDevArr(d_type, n, m, batchct);
+    mat->devD = allocateDevArr(d_type, rowsMemD, colsMemD, batchct);
   } else {
     mat->devD = mat->devC;
   }
@@ -308,9 +308,9 @@ void cublasLtGemm::fillHost() {
 
 void cublasLtGemm::copyHostToDev(cublasltgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
-  copyAndConvert(a_type, hostA, mat->devA, m, k, batchct);
-  copyAndConvert(b_type, hostB, mat->devB, k, n, batchct);
-  copyAndConvert(c_type, hostC, mat->devC, n, m, batchct);
+  copyAndConvert(a_type, hostA, mat->devA, rowsMemA, colsMemA, batchct);
+  copyAndConvert(b_type, hostB, mat->devB, rowsMemB, colsMemB, batchct);
+  copyAndConvert(c_type, hostC, mat->devC, rowsMemC, colsMemC, batchct);
 }
 
 void cublasLtGemm::prepareMatrix(cublasltgemmInst *mat) {

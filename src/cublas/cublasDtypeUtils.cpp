@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <vector>
 using namespace std;
 
 bool isReal(cudaDataType_t type) {
@@ -147,4 +148,17 @@ std::string opToString(cublasOperation_t op) {
     }
   }
   return "N";
+}
+
+
+bool matchGemmType(cudaDataType_t precision, std::string function, cudaDataType_t desiredPrec, std::vector<string> acceptable) {
+  if (precision != desiredPrec) {
+    return false;
+  }
+  for (auto afunc : acceptable) {
+    if (function == afunc) {
+      return true;
+    }
+  }
+  return false;
 }

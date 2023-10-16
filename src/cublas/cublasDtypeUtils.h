@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 bool isReal(cudaDataType_t type);
 bool isFp8(cudaDataType precision);
@@ -15,6 +16,7 @@ cublasComputeType_t selectCompute(std::string computestr,
                                   cudaDataType_t precision);
 cublasOperation_t opStringToOp(std::string opstr);
 std::string opToString(cublasOperation_t);
+bool matchGemmType(cudaDataType_t precision, std::string function, cudaDataType_t desiredPrec, std::vector<std::string> acceptable);
 
 // data
 
