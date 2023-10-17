@@ -160,6 +160,11 @@ cublasGemm::cublasGemm(cxxopts::ParseResult result) : genericGemm(result) {
   string aT = result["a_type"].as<string>();
   string bT = result["b_type"].as<string>();
   string cT = result["c_type"].as<string>();
+  string compcomputeT = result["composite_compute_type"].as<string>();
+  if (compcomputeT == "f32") {
+    // Feature from rocBLAS, set the original compute type
+    computeT = "CUBLAS_COMPUTE_32F";
+  }
   parseMType(computeT, scalarT, aT, bT, cT);
 
   parseDevIters(result["device"].as<string>());
@@ -437,7 +442,7 @@ double cublasGemm::test() {
       // Call the Gemm strided batched deployment script
     } else if (batched && function == "cublasGemmExBatched") {
       // Call the Gemm batched code
-    } else if (function == "cublasGemmEx" || function == "gemm_ex") {
+    } else if (function == "cublasGemmEx" || function == "gemm_ex" || function == "gemm_ex3") {
       threads.push_back(thread(&cublasGemm::testGemmEx, this, &mat));
     }
   }

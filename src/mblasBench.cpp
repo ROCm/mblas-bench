@@ -126,6 +126,9 @@ int main(int argc, char **argv) {
             "What gemm kernel to use for the gemmEx family of functions"
             "Defaults to a value based on -r/--precision when not specified",
             cxxopts::value<string>()->default_value(""));
+  opp_adder("composite_compute_type",
+            "rocblas-bench compatibility variable, maps directly to --compute_type"
+            cxxopts::value<string>()->default_value(""));
   opp_adder("scalar_type",
             "What scalar type to use "
             "Defaults to a value based on -r/--precision when not specified",

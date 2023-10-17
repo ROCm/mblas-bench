@@ -183,6 +183,11 @@ cublasLtGemm::cublasLtGemm(cxxopts::ParseResult result) : genericGemm(result) {
   string bT = result["b_type"].as<string>();
   string cT = result["c_type"].as<string>();
   string dT = result["d_type"].as<string>();
+  string compcomputeT = result["composite_compute_type"].as<string>();
+  if (compcomputeT == "f32") {
+    // Feature from rocBLAS, set the original compute type
+    computeT = "CUBLAS_COMPUTE_32F";
+  }
   parseMType(computeT, scalarT, aT, bT, cT, dT);
 
   parseDevIters(result["device"].as<string>());

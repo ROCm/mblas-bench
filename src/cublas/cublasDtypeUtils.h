@@ -64,6 +64,8 @@ const std::map<std::string, cudaDataType_t> precDType = {
     {"CUDA_C_64U",  CUDA_C_64U},
     {"CUDA_R_8F_E4M3", CUDA_R_8F_E4M3},
     {"CUDA_R_8F_E5M2", CUDA_R_8F_E5M2},
+    {"f8_r", CUDA_R_8F_E4M3},
+    {"bf8_r", CUDA_R_8F_E5M2},
 };
 
 
