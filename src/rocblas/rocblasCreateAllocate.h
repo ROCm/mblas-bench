@@ -124,13 +124,16 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
                                     int batchct, int x, int y, int blockct) {
   T **host = reinterpret_cast<T **>(hptr);
   T *device_array = static_cast<T *>(dAr);
-  for (int i = 0; i < batchct; i++) {
-    host[i] = device_array + (i * x * y);
+  for (int j = 0; j < blockct; j++) {
+    int offset = j*batchct;
+    for (int i = 0; i < batchct; i++) {
+      host[offset + i] = device_array + (i * x * y);
+    }
   }
   // checkCuda(cudaMalloc(&dptr, batchct * sizeof(T *)));
   // hptr = reinterpret_cast<void **>(host);
   // checkCuda(
-  hipMemcpy(dptr, hptr, batchct * sizeof(T *), hipMemcpyHostToDevice);
+  hipMemcpy(dptr, hptr, blockct * batchct * sizeof(T *), hipMemcpyHostToDevice);
 }
 
 template <typename T>

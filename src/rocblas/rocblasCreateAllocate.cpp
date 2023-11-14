@@ -164,30 +164,35 @@ void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
                          long long int stride, int block, std::string filename) {
   std::ifstream file(filename);
   std::vector<std::vector<T>> result;
+  int n_cols = cols_A;
 
   for (string line; getline(file, line, '\n'); ) {
     result.push_back(std::vector<T>());
     std::istringstream ss(line);
     for (string field; getline(ss, field, ','); ) {
+      if (field.empty()) {
+        std::cout << "warning: empty field in csv file" << std::endl;
+      }
       result.back().push_back((T)std::stod(field));
     }
     if (result.back().empty()) {
       std::cout << "warning: empty row in csv file" << std::endl;
+    } else if (result.back().size() < n_cols) {
+      n_cols = result.back().size();
     }
   }
   if (result.empty()) {
     std::cout << "warning: csv file is empty" << std::endl;
   }
+  int n_rows = result.size();
 
   T *A = (T *)ptr;
-  size_t n_rows = result.size();
   long long int blockstride = stride * batch;
   for (size_t i_block = 0; i_block < block; i_block++) {
     for (size_t i_batch = 0; i_batch < batch; i_batch++) {
       for (size_t j = 0; j < cols_A; ++j) {
         size_t offset = j * ld + i_batch * stride + i_block * blockstride;
         for (size_t i = 0; i < rows_A; ++i) {
-          size_t n_cols = result[i % n_rows].size();
           A[i + offset] = result[i % n_rows][j % n_cols];
         }
       }
