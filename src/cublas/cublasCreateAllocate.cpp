@@ -14,30 +14,7 @@
 #include <string>
 
 #include "cudaError.h"
-
-using cuda::std::complex;
-using std::string;
-
-// struct sizeofCUDTHost
-// {
-//     int operator()()
-//     {
-
-//     }
-// };
-
-// template void *allocSetScalar<double>::operator()(string);
-// template void *allocSetScalar<float>::operator()(string);
-
-// template <>
-// void *allocSetScalar<complex<float>>::operator()(string sval) {
-//  return NULL;
-//}
-//
-// template <>
-// void *allocSetScalar<complex<double>>::operator()(string sval) {
-//  return NULL;
-//}
+#include "genericInit.h"
 
 void *allocateHostArr(cudaDataType_t type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
@@ -59,11 +36,6 @@ void *allocateHDevArr(cudaDataType_t type, long x, long y, int batch) {
   return data;
 }
 
-// void *allocateScalar(cudaDataType_t type) {
-//  int typesize = typeCallDev<sizeofCUDT>(type);
-//  void *scalar = (void *)
-//}
-
 void dummy() {
   // This function forces the compiler to generate the needed templated variants
   // of each function. It is never called
@@ -75,61 +47,62 @@ void dummy() {
   // template void *allocSetScalar<double>::operator()(string);
 }
 
-void initHostH(cudaDataType_t precision, std::string initialization, void *ptr,
-               int rows_A, int cols_A, int ld, int batch, long long int stride,
-               float constant, bool alternating) {
-  typeCallHost<initHost>(precision, initialization, ptr, rows_A, cols_A, ld,
-                         batch, stride, constant, alternating);
-}
+// void initHostH(cudaDataType_t precision, std::string initialization, void *ptr,
+//                int rows_A, int cols_A, int ld, int batch, long long int stride,
+//                float constant, bool control, std::string filename) {
+//   typeCallHost<initHost>(precision, initialization, ptr, rows_A, cols_A, ld,
+//                          batch, stride, constant, control, filename);
+// }
 
-template <typename T>
-void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
-                             int cols_A, int ld, int batch,
-                             long long int stride, bool control,
-                             float constant) {
-  if (initialization == "rand_int") {
-    fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
-  } else if (initialization == "trig_float") {
-    fillRandHostTrigFloat<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
-  } else if (initialization == "hpl") {
-  } else if (initialization == "blasgemm") {
-    fillRandHostBlasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
-  } else if (initialization == "constant") {
-    fillRandHostConstant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
-  }
-}
+// template <typename T>
+// void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
+//                              int cols_A, int ld, int batch,
+//                              long long int stride, bool control,
+//                              float constant) {
+//   if (initialization == "rand_int") {
+//     fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
+//   } else if (initialization == "trig_float") {
+//     fillRandHostTrigFloat<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
+//   } else if (initialization == "hpl") {
+//   } else if (initialization == "blasgemm") {
+//     fillRandHostBlasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
+//   } else if (initialization == "constant") {
+//     fillRandHostConstant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
+//   }
+// }
 
-template void initHost<double>::operator()(std::string, void *, int, int, int,
-                                           int, long long int, bool, float);
-template void initHost<complex<double>>::operator()(std::string, void *, int,
-                                                    int, int, int,
-                                                    long long int, bool, float);
-template void initHost<float>::operator()(std::string, void *, int, int, int,
-                                          int, long long int, bool, float);
-template void initHost<complex<float>>::operator()(std::string, void *, int,
-                                                   int, int, int, long long int,
-                                                   bool, float);
-template void initHost<__int8_t>::operator()(std::string, void *, int, int, int,
-                                             int, long long int, bool, float);
-template void initHost<complex<__int8_t>>::operator()(std::string, void *, int,
-                                                      int, int, int,
-                                                      long long int, bool,
-                                                      float);
-template void initHost<__uint8_t>::operator()(std::string, void *, int, int,
-                                              int, int, long long int, bool,
-                                              float);
-template void initHost<complex<__uint8_t>>::operator()(std::string, void *, int,
-                                                       int, int, int,
-                                                       long long int, bool,
-                                                       float);
-template void initHost<__int32_t>::operator()(std::string, void *, int, int,
-                                              int, int, long long int, bool,
-                                              float);
-template void initHost<complex<__int32_t>>::operator()(std::string, void *, int,
-                                                       int, int, int,
-                                                       long long int, bool,
-                                                       float);
+// template void initHost<double>::operator()(std::string, void *, int, int, int,
+//                                            int, long long int, bool, float);
+// template void initHost<complex<double>>::operator()(std::string, void *, int,
+//                                                     int, int, int,
+//                                                     long long int, bool, float);
+// template void initHost<float>::operator()(std::string, void *, int, int, int,
+//                                           int, long long int, bool, float);
+// template void initHost<complex<float>>::operator()(std::string, void *, int,
+//                                                    int, int, int, long long int,
+//                                                    bool, float);
+// template void initHost<__int8_t>::operator()(std::string, void *, int, int, int,
+//                                              int, long long int, bool, float);
+// template void initHost<complex<__int8_t>>::operator()(std::string, void *, int,
+//                                                       int, int, int,
+//                                                       long long int, bool,
+//                                                       float);
+// template void initHost<__uint8_t>::operator()(std::string, void *, int, int,
+//                                               int, int, long long int, bool,
+//                                               float);
+// template void initHost<complex<__uint8_t>>::operator()(std::string, void *, int,
+//                                                        int, int, int,
+//                                                        long long int, bool,
+//                                                        float);
+// template void initHost<__int32_t>::operator()(std::string, void *, int, int,
+//                                               int, int, long long int, bool,
+//                                               float);
+// template void initHost<complex<__int32_t>>::operator()(std::string, void *, int,
+//                                                        int, int, int,
+//                                                        long long int, bool,
+//                                                        float);
 
+/*
 // Instances of the following functions should be defined implicitly by defining
 // those of initHost
 template <typename T>
@@ -218,6 +191,7 @@ inline complex<T> randIntGenN(std::uniform_int_distribution<int> &idist,
                               std::mt19937 &gen, complex<T> &dummy) {
   return {-T(idist(gen)), -T(idist(gen))};
 }
+*/
 
 // template <typename T>
 // inline T randIntGen(std::uniform_int_distribution<int> &idist,

@@ -12,6 +12,8 @@
 #include <sstream>
 #include <string>
 
+#include "genericInit.h"
+
 // int sizeof_cudt_host(rocblas_datatype type);
 // int sizeof_cudt_host(hipblasDatatype_t type);
 void *allocateHostArr(rocblas_datatype type, long x, long y, int batch = 1);
@@ -71,12 +73,12 @@ template <template <typename> class tFunc, class... Args>
 auto typeCallDev(hipblasDatatype_t type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
-template <typename T>
-struct initHost {
-  void operator()(std::string initialization, void *ptr, int rows_A, int cols_A,
-                  int ld, int batch, long long int stride, bool control = false,
-                  float constant = 0.f, std::string filename = "");
-};
+// template <typename T>
+// struct initHost {
+//   void operator()(std::string initialization, void *ptr, int rows_A, int cols_A,
+//                   int ld, int batch, long long int stride, bool control = false,
+//                   float constant = 0.f, std::string filename = "");
+// };
 template <typename T>
 void *allocSetScalarFunc(std::string sval, std::string sval2, T dummy) {
   // Only for real numbers, no need to worry about contents from sval2
@@ -149,28 +151,28 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
   hipMemcpy(dptr, hptr, batchct * sizeof(T *), hipMemcpyHostToDevice);
 }
 
-template <typename T>
-void fillRandHostBlasgemm(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                          long long int stride);
-template <typename T>
-void fillRandHostConstant(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                          long long int stride, float constant);
-
-template <typename T>
-void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                         long long int stride, std::string filename);
-
-template <typename T>
-void fillRandHostRandIntAS(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                           long long int stride, bool alternating);
-
-template <typename T>
-void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                           long long int stride, bool isSin);
-
-template <typename T>
-void fillRandHostNormalFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                             long long int stride);
+// template <typename T>
+// void fillRandHostBlasgemm(void *ptr, int rows_A, int cols_A, int ld, int batch,
+//                           long long int stride);
+// template <typename T>
+// void fillRandHostConstant(void *ptr, int rows_A, int cols_A, int ld, int batch,
+//                           long long int stride, float constant);
+// 
+// template <typename T>
+// void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
+//                          long long int stride, std::string filename);
+// 
+// template <typename T>
+// void fillRandHostRandIntAS(void *ptr, int rows_A, int cols_A, int ld, int batch,
+//                            long long int stride, bool alternating);
+// 
+// template <typename T>
+// void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
+//                            long long int stride, bool isSin);
+// 
+// template <typename T>
+// void fillRandHostNormalFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
+//                              long long int stride);
 
 template <template <typename> class tFunc, class... Args>
 auto typeCallHost(rocblas_datatype type, Args... args) ->
@@ -179,12 +181,12 @@ auto typeCallHost(rocblas_datatype type, Args... args) ->
   switch (type) {
     case rocblas_datatype_f64_r:
       return tFunc<double>()(args...);
-    // case rocblas_datatype_f64_c:
-    //   return tFunc<hipDoubleComplex>()(args...);
+    case rocblas_datatype_f64_c:
+      return tFunc<std::complex<double>>()(args...);
     case rocblas_datatype_f32_r:
       return tFunc<float>()(args...);
-    // case rocblas_datatype_f32_c:
-    //   return tFunc<hipComplex>()(args...);
+    case rocblas_datatype_f32_c:
+      return tFunc<std::complex<float>>()(args...);
     case rocblas_datatype_bf16_r:
       return tFunc<float>()(args...);
     // case rocblas_datatype_bf16_c:
@@ -300,27 +302,27 @@ auto typeCallDev(hipblasDatatype_t type, Args... args) ->
   }
 }
 
-template <typename T>
-inline T randIntGen(std::uniform_int_distribution<int> &idist,
-                    std::mt19937 &gen, T &dummy);
-
 // template <typename T>
-// inline cuda::std::complex<T> randIntGen(
-//     std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
-//     cuda::std::complex<T> &dummy);
-
-template <typename T>
-inline T randIntGenN(std::uniform_int_distribution<int> &idist,
-                     std::mt19937 &gen, T &dummy);
-
+// inline T randIntGen(std::uniform_int_distribution<int> &idist,
+//                     std::mt19937 &gen, T &dummy);
+// 
+// // template <typename T>
+// // inline cuda::std::complex<T> randIntGen(
+// //     std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
+// //     cuda::std::complex<T> &dummy);
+// 
 // template <typename T>
-// inline cuda::std::complex<T> randIntGenN(
-//     std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
-//     cuda::std::complex<T> &dummy);
-
-template <typename T>
-inline T normalFloatGen(std::normal_distribution<double> &ndist,
-                        std::mt19937 &gen, T &dummy);
+// inline T randIntGenN(std::uniform_int_distribution<int> &idist,
+//                      std::mt19937 &gen, T &dummy);
+// 
+// // template <typename T>
+// // inline cuda::std::complex<T> randIntGenN(
+// //     std::uniform_int_distribution<int> &idist, std::mt19937 &gen,
+// //     cuda::std::complex<T> &dummy);
+// 
+// template <typename T>
+// inline T normalFloatGen(std::normal_distribution<double> &ndist,
+//                         std::mt19937 &gen, T &dummy);
 
 // void dummy2() {
 //  // This function forces the compiler to generate the needed templated

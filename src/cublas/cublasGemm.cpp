@@ -16,6 +16,7 @@
 #include "cublasDtypeUtils.h"
 #include "cudaError.h"
 #include "cxxopts.hpp"
+#include "genericInit.h"
 
 using std::cerr;
 using std::cout;
@@ -112,7 +113,7 @@ void cublasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
     string errorString = "A Type must the same as B Type";
     throw std::invalid_argument(errorString);
   }
-  if (function.find("GemmEx")) {
+  if (function.find("GemmEx") || function.find("gemm_ex")) {
     /*
       Possible functions:
         cublasGemmEx
@@ -269,11 +270,17 @@ void cublasGemm::fillHost() {
   //  thread.join();
   //}
   typeCallHost<initHost>(a_type, initialization, hostA, rowsA, colsA, lda,
-                         batchct, stride_a, controlA, constantA);
+                         batchct, stride_a, controlA, constantA, filenameA);
   typeCallHost<initHost>(b_type, initialization, hostB, rowsB, colsB, ldb,
-                         batchct, stride_b, controlB, constantB);
+                         batchct, stride_b, controlB, constantB, filenameB);
   typeCallHost<initHost>(c_type, initialization, hostC, rowsC, colsC, ldc,
-                         batchct, stride_c, controlC, constantC);
+                         batchct, stride_c, controlC, constantC, filenameC);
+  // initHostH(a_type, initialization, hostA, rowsA, colsA, lda,
+  //           batchct, stride_a, controlA, constantA, filenameA);
+  // initHostH(b_type, initialization, hostB, rowsB, colsB, ldb,
+  //           batchct, stride_b, controlB, constantB, filenameB);
+  // initHostH(c_type, initialization, hostC, rowsC, colsC, ldc,
+  //                        batchct, stride_c, controlC, constantC, filenameC);
 }
 
 void cublasGemm::copyHostToDev(cublasgemmInst *mat) {
