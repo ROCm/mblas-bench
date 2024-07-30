@@ -7,22 +7,25 @@
 #include <string>
 
 #include "genericGemm.h"
+#include "mblasHipDataType.h"
+#include "mblasHipComputeType.h"
+#include "mblasHipOperation.h"
 
 struct matmulPrecType {
-  hipblasLtComputeType_t compute;
-  hipblasDatatype_t scalar;
-  hipblasDatatype_t a_type;
-  hipblasDatatype_t b_type;
-  hipblasDatatype_t c_type;
-  hipblasDatatype_t d_type;
-  hipblasDatatype_t bias_type;
+  mblasHipComputeType compute;
+  mblasHipDataType scalar;
+  mblasHipDataType a_type;
+  mblasHipDataType b_type;
+  mblasHipDataType c_type;
+  mblasHipDataType d_type;
+  mblasHipDataType bias_type;
   bool operator==(const matmulPrecType rhs) const {
     return rhs.compute == compute && rhs.scalar == scalar &&
            rhs.a_type == a_type && rhs.b_type == b_type &&
            rhs.c_type == c_type && rhs.d_type == d_type &&
            // Omitting bias type is acceptable
            (rhs.bias_type == bias_type ||
-            rhs.bias_type == (hipblasDatatype_t)(-1));
+            rhs.bias_type == mblasHipDataType(MBLAS_ANY));
   }
 };
 
@@ -57,17 +60,17 @@ class hipblasLtGemm : public genericGemm {
   void *beta;
 
   bool inplace = false;
-  hipblasOperation_t transA;
-  hipblasOperation_t transB;
+  mblasHipOperation transA;
+  mblasHipOperation transB;
 
-  hipblasDatatype_t precision;
-  hipblasLtComputeType_t compute;
-  hipblasDatatype_t scalar;
-  hipblasDatatype_t a_type;
-  hipblasDatatype_t b_type;
-  hipblasDatatype_t c_type;
-  hipblasDatatype_t d_type;
-  hipblasDatatype_t bias_type;
+  mblasHipDataType precision;
+  mblasHipComputeType compute;
+  mblasHipDataType scalar;
+  mblasHipDataType a_type;
+  mblasHipDataType b_type;
+  mblasHipDataType c_type;
+  mblasHipDataType d_type;
+  mblasHipDataType bias_type;
 
   int workspaceSz = 64 * 1024 * 1024;
 
@@ -75,7 +78,7 @@ class hipblasLtGemm : public genericGemm {
   std::vector<hipblasLtGemmInst> matPtrs;
 
  private:
-  // hipblasDatatype_t precisionStringToHipblasDType(std::string stringPrecision);
+  // mblasHipDataType precisionStringToHipblasDType(std::string stringPrecision);
   // void parseMType(std::string a, std::string b, std::string c);
   void parseMType(std::string computeTStr, std::string scalarTStr,
                   std::string aStr, std::string bStr, std::string cStr,

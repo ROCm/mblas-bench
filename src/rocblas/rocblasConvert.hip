@@ -48,12 +48,12 @@ __global__ void floatToFp16(float *input, size_t num_elements, __half *output)
 //   }
 // }
 
-void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, int y, int batchsz)
+void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int y, int batchsz)
 {
 
   int hostsz = typeCallHost<sizeofCUDT>(precision);
   int devsz = typeCallDev<sizeofCUDT>(precision);
-  if (precision == rocblas_datatype_f16_c || precision == rocblas_datatype_f16_r)
+  if (precision == mblasDataType(MBLAS_C_16F) || precision == mblasDataType(MBLAS_R_16F))
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -65,7 +65,7 @@ void copyAndConvert(rocblas_datatype precision, void *hostA, void *devA, int x, 
     floatToFp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
     hipFree(tmpA);
   }
-  else if (precision == rocblas_datatype_bf16_c || precision == rocblas_datatype_bf16_r)
+  else if (precision == mblasDataType(MBLAS_C_16BF) || precision == mblasDataType(MBLAS_R_16BF))
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -116,10 +116,10 @@ void copyAndConvert(hipblasDatatype_t precision, void *hostA, void *devA, int x,
   }
 }
 
-void *convertScalar(rocblas_datatype precision, void *scalar)
+void *convertScalar(mblasDataType precision, void *scalar)
 {
 
-  if (precision == rocblas_datatype_f16_r)
+  if (precision == mblasDataType(MBLAS_R_16F))
   {
     float scalarVal = *static_cast<float *>(scalar);
     free(scalar);
@@ -127,7 +127,7 @@ void *convertScalar(rocblas_datatype precision, void *scalar)
     *hscalar = __float2half(scalarVal);
     return (void *)hscalar;
   }
-  else if (precision == rocblas_datatype_f16_c)
+  else if (precision == mblasDataType(MBLAS_C_16F))
   {
     // Implement me...
     return NULL;

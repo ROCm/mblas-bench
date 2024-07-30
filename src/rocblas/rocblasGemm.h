@@ -8,20 +8,23 @@
 #include <string>
 
 #include "genericGemm.h"
+#include "mblasRocDataType.h"
+#include "mblasRocComputeType.h"
+#include "mblasRocOperation.h"
 
 struct gemmPrecTypeAMD {
-  rocblas_datatype compute;
-  rocblas_datatype scalar;
-  rocblas_datatype ab_type;
-  rocblas_datatype c_type;
+  mblasRocComputeType compute;
+  mblasRocDataType scalar;
+  mblasRocDataType ab_type;
+  mblasRocDataType c_type;
   bool operator==(const gemmPrecTypeAMD rhs) const {
     return rhs.compute == compute && rhs.scalar == scalar &&
            rhs.ab_type == ab_type && rhs.c_type == c_type;
   }
 };
 struct TgemmPrecTypeAMD {
-  rocblas_datatype ab_type;
-  rocblas_datatype c_type;
+  mblasRocDataType ab_type;
+  mblasRocDataType c_type;
   bool operator==(const TgemmPrecTypeAMD rhs) const {
     return rhs.ab_type == ab_type && rhs.c_type == c_type;
   }
@@ -81,17 +84,17 @@ class rocblasGemm : public genericGemm {
   void *alpha;
   void *beta;
 
-  rocblas_operation transA;
-  rocblas_operation transB;
+  mblasRocOperation transA;
+  mblasRocOperation transB;
 
   // rocblas_status stat;
   // rocblas_handle handle;
-  rocblas_datatype precision;
-  rocblas_datatype compute;
-  rocblas_datatype scalar;
-  rocblas_datatype a_type;
-  rocblas_datatype b_type;
-  rocblas_datatype c_type;
+  mblasRocDataType precision;
+  mblasRocComputeType compute;
+  mblasRocDataType scalar;
+  mblasRocDataType a_type;
+  mblasRocDataType b_type;
+  mblasRocDataType c_type;
 
   int workspaceSz = 128 * 1024 * 1024;
 

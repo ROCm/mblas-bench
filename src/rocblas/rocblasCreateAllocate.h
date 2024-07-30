@@ -13,17 +13,18 @@
 #include <string>
 
 #include "genericInit.h"
+#include "mblasDataType.h"
 
-// int sizeof_cudt_host(rocblas_datatype type);
+// int sizeof_cudt_host(hipDataType type);
 // int sizeof_cudt_host(hipblasDatatype_t type);
-void *allocateHostArr(rocblas_datatype type, long x, long y, int batch = 1);
+void *allocateHostArr(mblasDataType type, long x, long y, int batch = 1);
 void *allocateHostArr(hipblasDatatype_t type, long x, long y, int batch = 1);
-void *allocateDevArr(rocblas_datatype type, long x, long y, int batch = 1);
+void *allocateDevArr(mblasDataType type, long x, long y, int batch = 1);
 void *allocateDevArr(hipblasDatatype_t type, long x, long y, int batch = 1);
-void *allocateHDevArr(rocblas_datatype type, long x, long y, int batch = 1);
+void *allocateHDevArr(mblasDataType type, long x, long y, int batch = 1);
 void *allocateHDevArr(hipblasDatatype_t type, long x, long y, int batch = 1);
 
-void initHostH(rocblas_datatype precision, std::string initialization, void *ptr,
+void initHostH(hipDataType precision, std::string initialization, void *ptr,
                int rows_A, int cols_A, int ld, int batch, long long int stride,
                float constant = 0.f, bool alternating = false);
 void initHostH(hipblasDatatype_t precision, std::string initialization, void *ptr,
@@ -58,7 +59,7 @@ struct allocSetScalar {
 // void *allocSetScalarFunc(std::string, std::string, cuda::std::complex<T>);
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(rocblas_datatype type, Args... args) ->
+auto typeCallHost(hipDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <template <typename> class tFunc, class... Args>
@@ -66,7 +67,7 @@ auto typeCallHost(hipblasDatatype_t type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(rocblas_datatype type, Args... args) ->
+auto typeCallDev(hipDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <template <typename> class tFunc, class... Args>
@@ -175,31 +176,27 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
 //                              long long int stride);
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(rocblas_datatype type, Args... args) ->
+auto typeCallHost(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
-    case rocblas_datatype_f64_r:
+    case MBLAS_R_64F:
       return tFunc<double>()(args...);
-    case rocblas_datatype_f64_c:
+    case MBLAS_C_64F:
       return tFunc<std::complex<double>>()(args...);
-    case rocblas_datatype_f32_r:
+    case MBLAS_R_32F:
       return tFunc<float>()(args...);
-    case rocblas_datatype_f32_c:
+    case MBLAS_C_32F:
       return tFunc<std::complex<float>>()(args...);
-    case rocblas_datatype_bf16_r:
+    case MBLAS_R_16BF:
       return tFunc<float>()(args...);
-    // case rocblas_datatype_bf16_c:
-    //   return tFunc<hipComplex>()(args...);
-    case rocblas_datatype_f16_r:
+    case MBLAS_R_16F:
       return tFunc<float>()(args...);
-    // case rocblas_datatype_f16_c:
-    //   return tFunc<hipComplex>()(args...);
-    case rocblas_datatype_i8_r:
+    case MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
-    case rocblas_datatype_u8_r:
+    case MBLAS_R_8U:
       return tFunc<__uint8_t>()(args...);
-    case rocblas_datatype_i32_r:
+    case MBLAS_R_32I:
       return tFunc<__int32_t>()(args...);
     default:
       return tFunc<double>()(args...);
@@ -239,31 +236,31 @@ auto typeCallHost(hipblasDatatype_t type, Args... args) ->
 }
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(rocblas_datatype type, Args... args) ->
+auto typeCallDev(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
-    case rocblas_datatype_f64_r:
+    case MBLAS_R_64F:
       return tFunc<double>()(args...);
-    // case rocblas_datatype_f64_c:
-    //   return tFunc<hipDoubleComplex>()(args...);
-    case rocblas_datatype_f32_r:
+    case MBLAS_C_64F:
+      return tFunc<std::complex<double>>()(args...);
+    case MBLAS_R_32F:
       return tFunc<float>()(args...);
-    // case rocblas_datatype_f32_c:
-    //   return tFunc<hipComplex>()(args...);
-    case rocblas_datatype_bf16_r:
+    case MBLAS_C_32F:
+      return tFunc<std::complex<float>>()(args...);
+    case MBLAS_R_16BF:
       return tFunc<hip_bfloat16>()(args...);
-    // case rocblas_datatype_bf16_c:
+    // case hipDataType_bf16_c:
     //   return tFunc<hipComplex>()(args...);
-    case rocblas_datatype_f16_r:
+    case MBLAS_R_16F:
       return tFunc<__half>()(args...);
-    // case rocblas_datatype_f16_c:
+    // case hipDataType_f16_c:
     //   return tFunc<hipComplex>()(args...);
-    case rocblas_datatype_i8_r:
+    case MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
-    case rocblas_datatype_u8_r:
+    case MBLAS_R_8U:
       return tFunc<__uint8_t>()(args...);
-    case rocblas_datatype_i32_r:
+    case MBLAS_R_32I:
       return tFunc<__int32_t>()(args...);
     default:
       return tFunc<double>()(args...);

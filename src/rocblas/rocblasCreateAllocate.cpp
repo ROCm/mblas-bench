@@ -44,7 +44,7 @@ using std::string;
 //  return NULL;
 //}
 
-void *allocateHostArr(rocblas_datatype type, long x, long y, int batch) {
+void *allocateHostArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
   void *data = (void *)malloc(x * y * batch * typesize);
   return data;
@@ -56,7 +56,7 @@ void *allocateHostArr(hipblasDatatype_t type, long x, long y, int batch) {
   return data;
 }
 
-void *allocateDevArr(rocblas_datatype type, long x, long y, int batch) {
+void *allocateDevArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallDev<sizeofCUDT>(type);
   void *data;
   checkHip(hipMalloc(&data, x * y * batch * typesize));
@@ -70,7 +70,7 @@ void *allocateDevArr(hipblasDatatype_t type, long x, long y, int batch) {
   return data;
 }
 
-void *allocateHDevArr(rocblas_datatype type, long x, long y, int batch) {
+void *allocateHDevArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
   void *data;
   checkHip(hipMalloc(&data, x * y * batch * typesize));
@@ -84,27 +84,27 @@ void *allocateHDevArr(hipblasDatatype_t type, long x, long y, int batch) {
   return data;
 }
 
-// void *allocateScalar(rocblas_datatype type) {
+// void *allocateScalar(hipDataType type) {
 //  int typesize = typeCallDev<sizeofCUDT>(type);
 //  void *scalar = (void *)
 //}
 
-void dummy() {
-  // This function forces the compiler to generate the needed templated variants
-  // of each function. It is never called
-  void *h_A;
-  typeCallHost<sizeofCUDTP>(rocblas_datatype_f64_r);
-  typeCallHost<allocSetScalar>(rocblas_datatype_f64_r, "1", "0");
-  typeCallDev<batchedPtrMagic>(rocblas_datatype_f64_r, (void **)NULL, (void **)NULL,
-                               (void *)NULL, 10, 10, 10);
-  typeCallHost<sizeofCUDTP>(HIPBLAS_R_32F);
-  typeCallHost<allocSetScalar>(HIPBLAS_R_32F, "1", "0");
-  typeCallDev<batchedPtrMagic>(HIPBLAS_R_32F, (void **)NULL, (void **)NULL,
-                               (void *)NULL, 10, 10, 10);
-  // template void *allocSetScalar<double>::operator()(string);
-}
+// void dummy() {
+//   // This function forces the compiler to generate the needed templated variants
+//   // of each function. It is never called
+//   void *h_A;
+//   typeCallHost<sizeofCUDTP>(hipDataType_f64_r);
+//   typeCallHost<allocSetScalar>(hipDataType_f64_r, "1", "0");
+//   typeCallDev<batchedPtrMagic>(hipDataType_f64_r, (void **)NULL, (void **)NULL,
+//                                (void *)NULL, 10, 10, 10);
+//   typeCallHost<sizeofCUDTP>(HIPBLAS_R_32F);
+//   typeCallHost<allocSetScalar>(HIPBLAS_R_32F, "1", "0");
+//   typeCallDev<batchedPtrMagic>(HIPBLAS_R_32F, (void **)NULL, (void **)NULL,
+//                                (void *)NULL, 10, 10, 10);
+//   // template void *allocSetScalar<double>::operator()(string);
+// }
 
-// void initHostH(rocblas_datatype precision, std::string initialization, void *ptr,
+// void initHostH(hipDataType precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
 //                float constant, bool alternating) {
 //   typeCallHost<initHost>(precision, initialization, ptr, rows_A, cols_A, ld,

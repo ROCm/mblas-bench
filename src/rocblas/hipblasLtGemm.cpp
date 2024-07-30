@@ -27,9 +27,9 @@ using std::vector;
 // clang-format off
 std::vector<matmulPrecType> hipblasLtGemm::matmulSupported = {
   // Compute type           Scale Type      A Type          B Type          C Type          D Type          Bias Type
-  {HIPBLASLT_COMPUTE_F32,   HIPBLAS_R_32F,  HIPBLAS_R_32F,  HIPBLAS_R_32F,  HIPBLAS_R_32F,  HIPBLAS_R_32F,  HIPBLAS_R_32F},
-  {HIPBLASLT_COMPUTE_F32,   HIPBLAS_R_32F,  HIPBLAS_R_16F,  HIPBLAS_R_16F,  HIPBLAS_R_16F,  HIPBLAS_R_16F,  HIPBLAS_R_16F},
-  {HIPBLASLT_COMPUTE_F32,   HIPBLAS_R_32F,  HIPBLAS_R_16B,  HIPBLAS_R_16B,  HIPBLAS_R_16B,  HIPBLAS_R_16B,  HIPBLAS_R_16B},
+  {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F},
+  {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16BF,  MBLAS_R_16BF,  MBLAS_R_16BF,  MBLAS_R_16BF,  MBLAS_R_16BF},
 };
 // clang-format on
 
@@ -48,8 +48,8 @@ void hipblasLtGemm::parseDevIters(std::string deviceStr) {
 void hipblasLtGemm::parseMType(string computeTStr, string scalarTStr,
                                string aStr, string bStr, string cStr,
                                string dStr) {
-  compute = selectCompute(computeTStr, precision);
-  scalar = selectScalar(scalarTStr, precision, compute);
+  compute.setCompute(computeTStr, precision);
+  scalar.setScalar(scalarTStr, precision, compute);
   bool noParse = false;
   if (aStr == "" || bStr == "" || cStr == "") {
     // Precision not completely specified, default to precision
@@ -72,17 +72,17 @@ void hipblasLtGemm::parseMType(string computeTStr, string scalarTStr,
 
   // Parse each precision
   if (!noParse) {
-    a_type = precisionStringToHipblasDType(aStr);
-    b_type = precisionStringToHipblasDType(bStr);
-    c_type = precisionStringToHipblasDType(cStr);
-    d_type = precisionStringToHipblasDType(dStr);
+    a_type = mblasHipDataType(aStr);
+    b_type = mblasHipDataType(bStr);
+    c_type = mblasHipDataType(cStr);
+    d_type = mblasHipDataType(dStr);
   }
 }
 
 void hipblasLtGemm::validateParameters() {
   // Validate that data types exist in table of supported configurations
   matmulPrecType selType = {
-      compute, scalar, a_type, b_type, c_type, d_type, (hipblasDatatype_t)(-1)};
+      compute, scalar, a_type, b_type, c_type, d_type, mblasHipDataType(MBLAS_ANY)};
   auto result =
       std::find(begin(matmulSupported), end(matmulSupported), selType);
   if (result == end(matmulSupported)) {
@@ -91,11 +91,11 @@ void hipblasLtGemm::validateParameters() {
         "Invalid GEMM specification for MatMul.  Combination of parameters "
         "not supported"
         "\nCompute type: " +
-        computeToString(compute) + "\nScalar type: " + precToString(scalar) +
-        "\nA type: " + precToString(a_type) +
-        "\nB type: " + precToString(b_type) +
-        "\nC type: " + precToString(c_type) +
-        "\nD type: " + precToString(d_type);
+        compute.toString() + "\nScalar type: " + scalar.toString() +
+        "\nA type: " + a_type.toString() +
+        "\nB type: " + b_type.toString() +
+        "\nC type: " + c_type.toString() +
+        "\nD type: " + d_type.toString();
     throw std::invalid_argument(errorString);
   }
   // Validate that FP8 kernels will use TN format only
@@ -113,7 +113,7 @@ void hipblasLtGemm::validateParameters() {
 
 hipblasLtGemm::hipblasLtGemm(cxxopts::ParseResult result) : genericGemm(result) {
   // Grab precision from command line
-  precision = precisionStringToHipblasDType(result["precision"].as<string>());
+  precision = mblasHipDataType(result["precision"].as<string>());
   // Grab compute type from command line
   string computeT = result["compute_type"].as<string>();
   string scalarT = result["scalar_type"].as<string>();
@@ -126,8 +126,8 @@ hipblasLtGemm::hipblasLtGemm(cxxopts::ParseResult result) : genericGemm(result) 
   parseDevIters(result["device"].as<string>());
   std::string tA = result["transposeA"].as<std::string>();
   std::string tB = result["transposeB"].as<std::string>();
-  transA = opStringToHipblasOp(result["transposeA"].as<std::string>());
-  transB = opStringToHipblasOp(result["transposeB"].as<std::string>());
+  transA = mblasHipOperation(result["transposeA"].as<std::string>());
+  transB = mblasHipOperation(result["transposeB"].as<std::string>());
   validateParameters();
 
   // Pull in alpha and beta, alloc memory and save to pointers
@@ -253,10 +253,14 @@ void hipblasLtGemm::copyHostToDev(hipblasLtGemmInst *mat) {
 
 void hipblasLtGemm::prepareMatrix(hipblasLtGemmInst *mat) {
   checkHipblas(hipblasLtMatmulDescCreate(&mat->descOP, compute, scalar));
+  // These values are read in with no type, so they need to be convirted first
+  // Thanks for the wonderful standard Nvidia :D!
+  hipblasOperation_t transA_local = transA.convertToHip()
+  hipblasOperation_t transB_local = transB.convertToHip()
   checkHipblas(hipblasLtMatmulDescSetAttribute(
-      mat->descOP, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(transA)));
+      mat->descOP, HIPBLASLT_MATMUL_DESC_TRANSA, &transA_local, sizeof(transA)));
   checkHipblas(hipblasLtMatmulDescSetAttribute(
-      mat->descOP, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(transB)));
+      mat->descOP, HIPBLASLT_MATMUL_DESC_TRANSB, &transB_local, sizeof(transB)));
 
   checkHipblas(
       hipblasLtMatrixLayoutCreate(&mat->descA, a_type, rowsA, colsA, lda));
@@ -350,7 +354,7 @@ double hipblasLtGemm::test() {
 std::string hipblasLtGemm::getResultString() {
   std::ostringstream ossValues;
   ossValues << std::setprecision(7);
-  ossValues << opToString(transA) << ',' << opToString(transB) << ',' << m
+  ossValues << transA.toStringShort() << ',' << transB.toStringShort() << ',' << m
             << ',' << n << ',' << k << ',' << lda << ',' << ldb << ',' << ldc
             << ',';
   if (batched) {
@@ -374,7 +378,7 @@ std::tuple<double, double, double> hipblasLtGemm::calculateFOM(
   int c_sz = typeCallDev<sizeofCUDT>(c_type);
 
   int flopPerSize = 2;
-  if (!isReal(precision)) {
+  if (!precision.isReal()) {
     int flopPerSize = 8;
   }
   double gbytes = ((static_cast<double>(a_sz) * static_cast<double>(m) *

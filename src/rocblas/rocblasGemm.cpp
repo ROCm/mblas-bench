@@ -30,16 +30,28 @@ using std::vector;
 // clang-format off
 std::vector<gemmPrecTypeAMD> rocblasGemm::gemmExSupported = {
     // Compute type             Scale Type                A/B Type                  C Type
-    {rocblas_datatype_f64_r,    rocblas_datatype_f64_r,   rocblas_datatype_f64_r,   rocblas_datatype_f64_r  },
-    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f32_r,   rocblas_datatype_f32_r  },
-    {rocblas_datatype_f16_r,    rocblas_datatype_f16_r,   rocblas_datatype_f16_r,   rocblas_datatype_f16_r  },
-    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f16_r,   rocblas_datatype_f16_r  },
-    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f16_r,   rocblas_datatype_f32_r  },
-    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_bf16_r,  rocblas_datatype_bf16_r },
-    {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_bf16_r,  rocblas_datatype_f32_r  },
-    {rocblas_datatype_i32_r,    rocblas_datatype_i32_r,   rocblas_datatype_i8_r,    rocblas_datatype_i32_r  }, 
-    {rocblas_datatype_f32_c,    rocblas_datatype_f32_c,   rocblas_datatype_f32_c,   rocblas_datatype_f32_c  },
-    {rocblas_datatype_f64_c,    rocblas_datatype_f64_c,   rocblas_datatype_f64_c,   rocblas_datatype_f64_c  },
+    // {rocblas_datatype_f64_r,    rocblas_datatype_f64_r,   rocblas_datatype_f64_r,   rocblas_datatype_f64_r  },
+    // {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f32_r,   rocblas_datatype_f32_r  },
+    // {rocblas_datatype_f16_r,    rocblas_datatype_f16_r,   rocblas_datatype_f16_r,   rocblas_datatype_f16_r  },
+    // {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f16_r,   rocblas_datatype_f16_r  },
+    // {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_f16_r,   rocblas_datatype_f32_r  },
+    // {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_bf16_r,  rocblas_datatype_bf16_r },
+    // {rocblas_datatype_f32_r,    rocblas_datatype_f32_r,   rocblas_datatype_bf16_r,  rocblas_datatype_f32_r  },
+    // {rocblas_datatype_i32_r,    rocblas_datatype_i32_r,   rocblas_datatype_i8_r,    rocblas_datatype_i32_r  }, 
+    // {rocblas_datatype_f32_c,    rocblas_datatype_f32_c,   rocblas_datatype_f32_c,   rocblas_datatype_f32_c  },
+    // {rocblas_datatype_f64_c,    rocblas_datatype_f64_c,   rocblas_datatype_f64_c,   rocblas_datatype_f64_c  },
+    // Compute/Scale Type     A/B Type    C Type
+    {MBLAS_COMPUTE_64F,   MBLAS_R_64F,  MBLAS_R_64F,  MBLAS_R_64F },
+    {MBLAS_COMPUTE_64F,   MBLAS_C_64F,  MBLAS_C_64F,  MBLAS_C_64F },
+    {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F },
+    {MBLAS_COMPUTE_32F,   MBLAS_C_32F,  MBLAS_C_32F,  MBLAS_C_32F },
+    {MBLAS_COMPUTE_16F,   MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F },
+    {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16F,  MBLAS_R_32F },
+    {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16F,  MBLAS_R_16F },
+    {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16BF, MBLAS_R_32F },
+    {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16BF, MBLAS_R_16BF},
+    {MBLAS_COMPUTE_32I,   MBLAS_R_32I,  MBLAS_R_8I,   MBLAS_R_32I },
+
 };
 // clang-format on
 
@@ -61,8 +73,8 @@ void rocblasGemm::parseDevIters(std::string deviceStr) {
 
 void rocblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
                              string bStr, string cStr) {
-  compute = selectCompute(computeTStr, precision);
-  scalar = selectScalar(scalarTStr, precision, compute);
+  compute.setCompute(computeTStr, precision);
+  scalar.setScalar(scalarTStr, precision, compute);
 
   if (aStr == "" || bStr == "" || cStr == "") {
     // Precision not completely specified, default to precision
@@ -75,9 +87,9 @@ void rocblasGemm::parseMType(string computeTStr, string scalarTStr, string aStr,
     return;
   }
   // Parse each precision
-  a_type = precisionStringToRocblasDType(aStr);
-  b_type = precisionStringToRocblasDType(bStr);
-  c_type = precisionStringToRocblasDType(cStr);
+  a_type = mblasRocDataType(aStr);
+  b_type = mblasRocDataType(bStr);
+  c_type = mblasRocDataType(cStr);
 
   // Validate against supported precision table (fun)
   if (a_type != b_type) {
@@ -113,7 +125,7 @@ rocblasGemm::rocblasGemm(cxxopts::ParseResult result) : genericGemm(result) {
   // checkRocblas(rocblas_create_handle(&handle));
   initPrecMap();
   // Grab precision from command line
-  precision = precisionStringToRocblasDType(result["precision"].as<string>());
+  precision = mblasRocDataType(result["precision"].as<string>());
   // Grab compute type from command line
   string computeT = result["compute_type"].as<string>();
   string scalarT = result["scalar_type"].as<string>();
@@ -125,8 +137,8 @@ rocblasGemm::rocblasGemm(cxxopts::ParseResult result) : genericGemm(result) {
   parseDevIters(result["device"].as<string>());
   std::string tA = result["transposeA"].as<std::string>();
   std::string tB = result["transposeB"].as<std::string>();
-  transA = opStringToRocblasOp(result["transposeA"].as<std::string>());
-  transB = opStringToRocblasOp(result["transposeB"].as<std::string>());
+  transA = mblasRocOperation(result["transposeA"].as<std::string>());
+  transB = mblasRocOperation(result["transposeB"].as<std::string>());
 
   // Pull in alpha and beta, alloc memory and save to pointers
   string salpha = result["alpha"].as<string>();
@@ -414,7 +426,7 @@ double rocblasGemm::test() {
 std::string rocblasGemm::getResultString() {
   std::ostringstream ossValues;
   ossValues << std::setprecision(7);
-  ossValues << opToString(transA) << ',' << opToString(transB) << ',' << m
+  ossValues << transA.toStringShort() << ',' << transB.toStringShort() << ',' << m
             << ',' << n << ',' << k << ',' << lda << ',' << ldb << ',' << ldc
             << ',';
   if (batched) {
@@ -438,7 +450,7 @@ std::tuple<double, double, double> rocblasGemm::calculateFOM(
   int c_sz = typeCallDev<sizeofCUDT>(c_type);
 
   int flopPerSize = 2;
-  if (!isReal(precision)) {
+  if (precision.isReal()) {
     int flopPerSize = 8;
   }
   double gbytes = ((static_cast<double>(a_sz) * static_cast<double>(m) *
@@ -480,7 +492,7 @@ void rocblasGemm::testTgemm(std::function<rocblas_status_(_rocblas_handle*, rocb
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
     // clang-format off
-    stat = func(handle, transA, transB, m, n, k, alphaP, 
+    stat = func(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alphaP, 
                devAP, lda, 
                devBP, ldb, betaP, 
                devCP, ldc);
@@ -501,7 +513,7 @@ void rocblasGemm::testTgemm(std::function<rocblas_status_(_rocblas_handle*, rocb
   hipEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
     // clang-format off
-    stat = func(handle, transA, transB, m, n, k, alphaP, 
+    stat = func(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alphaP, 
                devAP, lda, 
                devBP, ldb, betaP, 
                devCP, ldc);
@@ -540,7 +552,7 @@ void rocblasGemm::testTgemm_batched(std::function<rocblas_status_(_rocblas_handl
 
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
+    stat = func(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alphaP, devAP, lda, devBP, ldb,
                 betaP, devCP, ldc, batchct);
 
     // Check for errors during the gemm run
@@ -558,7 +570,7 @@ void rocblasGemm::testTgemm_batched(std::function<rocblas_status_(_rocblas_handl
   */
   hipEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA, transB, m, n, k, alphaP, devAP, lda, devBP, ldb,
+    stat = func(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alphaP, devAP, lda, devBP, ldb,
                 betaP, devCP, ldc, batchct);
   }
   hipEventRecord(stop, stream);
@@ -597,7 +609,7 @@ void rocblasGemm::testTgemm_strided_batched(
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
     // clang-format off
-    stat = func(handle, transA, transB, m, n, k, alphaP, 
+    stat = func(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alphaP, 
                 devAP, lda, stride_a,
                 devBP, ldb, stride_b, betaP, 
                 devCP, ldc, stride_c, batchct);
@@ -618,7 +630,7 @@ void rocblasGemm::testTgemm_strided_batched(
   hipEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
     // clang-format off
-    stat = func(handle, transA, transB, m, n, k, alphaP, 
+    stat = func(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alphaP, 
                 devAP, lda, stride_a,
                 devBP, ldb, stride_b, betaP, 
                 devCP, ldc, stride_c, batchct);
@@ -651,7 +663,7 @@ void rocblasGemm::test_gemm_ex(rocblasgemmInst *mat) {
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
     // clang-format off
-    stat = rocblas_gemm_ex(handle, transA, transB, m, n, k, alpha, 
+    stat = rocblas_gemm_ex(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alpha, 
                            mat->devA, a_type, lda, 
                            mat->devB, b_type, ldb, beta, 
                            mat->devC, c_type, ldc, 
@@ -674,7 +686,7 @@ void rocblasGemm::test_gemm_ex(rocblasgemmInst *mat) {
   hipEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
     // clang-format off
-    stat = rocblas_gemm_ex(handle, transA, transB, m, n, k, alpha, 
+    stat = rocblas_gemm_ex(handle, transA.convertToRocm(), transB.convertToRocm(), m, n, k, alpha, 
                            mat->devA, a_type, lda, 
                            mat->devB, b_type, ldb, beta, 
                            mat->devC, c_type, ldc, 

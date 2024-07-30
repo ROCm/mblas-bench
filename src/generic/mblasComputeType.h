@@ -20,6 +20,10 @@ class mblasComputeType {
     static const mblasComputeType MBLAS_COMPUTE_64F_PEDANTIC;
     static const mblasComputeType MBLAS_COMPUTE_32I;
     static const mblasComputeType MBLAS_COMPUTE_32I_PEDANTIC;
+    static const mblasComputeType MBLAS_COMPUTE_32F_8F_8F;
+    static const mblasComputeType MBLAS_COMPUTE_32F_8F_8BF;
+    static const mblasComputeType MBLAS_COMPUTE_32F_8BF_8F;
+    static const mblasComputeType MBLAS_COMPUTE_32F_8BF_8BF;
     static const mblasComputeType MBLAS_COMPUTE_NULL;
 
     // Internal enum
@@ -47,7 +51,7 @@ class mblasComputeType {
 
     virtual std::string toString() const { return toString("MBLAS"); }
   
-    void setCompute(std::string computestr, mblasDataType& precision);
+    virtual void setCompute(std::string computestr, mblasDataType& precision);
 };
 
 constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_16F{mblasComputeTypeEnum::MBLAS_COMPUTE_16F};
@@ -61,4 +65,8 @@ constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_64F{mblasComput
 constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_64F_PEDANTIC{mblasComputeTypeEnum::MBLAS_COMPUTE_64F_PEDANTIC};
 constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_32I{mblasComputeTypeEnum::MBLAS_COMPUTE_32I};
 constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_32I_PEDANTIC{mblasComputeTypeEnum::MBLAS_COMPUTE_32I_PEDANTIC};
+constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_32F_8F_8F{mblasComputeTypeEnum::MBLAS_COMPUTE_32F_8F_8F};
+constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_32F_8F_8BF{mblasComputeTypeEnum::MBLAS_COMPUTE_32F_8F_8BF};
+constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_32F_8BF_8F{mblasComputeTypeEnum::MBLAS_COMPUTE_32F_8BF_8F};
+constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_32F_8BF_8BF{mblasComputeTypeEnum::MBLAS_COMPUTE_32F_8BF_8BF};
 constexpr const mblasComputeType mblasComputeType::MBLAS_COMPUTE_NULL{mblasComputeTypeEnum::MBLAS_COMPUTE_NULL};
