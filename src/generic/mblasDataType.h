@@ -1,41 +1,10 @@
 #pragma once
 #include <map>
 #include <string>
+#include "mblasData.h"
 
-enum mblasDataTypeEnum {
-  MBLAS_R_32F   =  0,
-  MBLAS_R_64F   =  1,
-  MBLAS_R_16F   =  2,
-  MBLAS_R_8I    =  3,
-  MBLAS_C_32F   =  4,
-  MBLAS_C_64F   =  5,
-  MBLAS_C_16F   =  6,
-  MBLAS_C_8I    =  7,
-  MBLAS_R_8U    =  8,
-  MBLAS_C_8U    =  9,
-  MBLAS_R_32I   = 10,
-  MBLAS_C_32I   = 11,
-  MBLAS_R_32U   = 12,
-  MBLAS_C_32U   = 13,
-  MBLAS_R_16BF  = 14,
-  MBLAS_C_16BF  = 15,
-  MBLAS_R_4I    = 16,
-  MBLAS_C_4I    = 17,
-  MBLAS_R_4U    = 18,
-  MBLAS_C_4U    = 19,
-  MBLAS_R_16I   = 20,
-  MBLAS_C_16I   = 21,
-  MBLAS_R_16U   = 22,
-  MBLAS_C_16U   = 23,
-  MBLAS_R_64I   = 24,
-  MBLAS_C_64I   = 25,
-  MBLAS_R_64U   = 26,
-  MBLAS_C_64U   = 27,
-  MBLAS_R_8F_E4M3 = 28,
-  MBLAS_R_8F_E5M2 = 29,
-  MBLAS_ANY = 254,
-  MBLAS_NULL = 255
-};
+// Forward declaration of mblasComputeType
+class mblasComputeType;
 
 class mblasDataType {
   public:
@@ -66,6 +35,7 @@ class mblasDataType {
     void set(const mblasDataType mdt) {
       value = mdt;
     }
+    std::string toString(std::string) const;
   public:
     explicit constexpr mblasDataType(int y = 0) : mblasDataType{static_cast<mblasDataTypeEnum>(y)} {}
     constexpr mblasDataType(mblasDataTypeEnum y) : value(y) {}
@@ -78,10 +48,12 @@ class mblasDataType {
     bool operator>(const mblasDataType& other) const;
     bool operator<=(const mblasDataType& other) const;
     bool operator>=(const mblasDataType& other) const;
-    std::string toString() const;
+    virtual std::string toString() const { return toString("MBLAS"); }
     bool isReal() const;
     bool isFp8() const;
+    void setScalar(std::string scalarstr, mblasDataType precision, mblasComputeType& compute);
 };
+
 constexpr const mblasDataType mblasDataType::MBLAS_R_64F{mblasDataTypeEnum::MBLAS_R_64F},         mblasDataType::MBLAS_C_64F{mblasDataTypeEnum::MBLAS_C_64F};
 constexpr const mblasDataType mblasDataType::MBLAS_R_32F{mblasDataTypeEnum::MBLAS_R_32F},         mblasDataType::MBLAS_C_32F{mblasDataTypeEnum::MBLAS_C_32F};
 constexpr const mblasDataType mblasDataType::MBLAS_R_16F{mblasDataTypeEnum::MBLAS_R_16F},         mblasDataType::MBLAS_C_16F{mblasDataTypeEnum::MBLAS_C_16F};

@@ -6,19 +6,19 @@ cudaDataType mblasCuDataType::convertToCuda(const mblasCuDataType *data) {
   try {
     return precMappings.at(*data);
   } catch (std::out_of_range &e) {
-    std::cout << "issue " << data->toString() << std::endl;
+    std::cout << "Failed to convert to CUDA Datatype " << data->toString() << std::endl;
     throw e;
     return CUDA_R_32F;
   }
 }
 
-void mblasCuDataType::operator = (const cudaDataType cudt) {
-  for (auto ele : precMappings) {
-    if (ele.second == cudt) {
-      set(ele.first);
-    }
-  }
-}
+// void mblasCuDataType::operator = (const cudaDataType cudt) {
+//   for (auto ele : precMappings) {
+//     if (ele.second == cudt) {
+//       set(ele.first);
+//     }
+//   }
+// }
 
 mblasCuDataType & mblasCuDataType::operator = (const mblasCuDataType& mdt) {
   if (this == &mdt)
@@ -40,46 +40,6 @@ mblasCuDataType & mblasCuDataType::operator = (const mblasCuDataType& mdt) {
 mblasCuDataType::operator cudaDataType() const {
   return convertToCuda(this);
 }
-
-// // Defined based on parent
-// bool mblasCuDataType::operator==(const mblasCuDataType& other) const {
-//   mblasDataType * lhs = dynamic_cast<mblasDataType*>(this);
-//   mblasDataType * rhs = dynamic_cast<mblasDataType*>(&other);
-//   return *lhs == *rhs;
-// }
-// 
-// bool mblasCuDataType::operator!=(const mblasCuDataType& other) const {
-//   mblasDataType * lhs = dynamic_cast<mblasDataType*>(this);
-//   mblasDataType * rhs = dynamic_cast<mblasDataType*>(&other);
-//   return *lhs != *rhs;
-// }
-// 
-// bool mblasCuDataType::operator<(const mblasCuDataType& other) const {
-//   mblasDataType * lhs = dynamic_cast<mblasDataType*>(this);
-//   mblasDataType * rhs = dynamic_cast<mblasDataType*>(&other);
-//   return *lhs < *rhs;
-// }
-// 
-// 
-// bool mblasCuDataType::operator>(const mblasCuDataType& other) const {
-//   mblasDataType * lhs = dynamic_cast<mblasDataType*>(this);
-//   mblasDataType * rhs = dynamic_cast<mblasDataType*>(&other);
-//   return *lhs > *rhs;
-// }
-// 
-// bool mblasCuDataType::operator<=(const mblasCuDataType& other) const {
-//   mblasDataType * lhs = dynamic_cast<mblasDataType*>(this);
-//   mblasDataType * rhs = dynamic_cast<mblasDataType*>(&other);
-//   return *lhs <= *rhs;
-// }
-// 
-// bool mblasCuDataType::operator>=(const mblasCuDataType& other) const {
-//   mblasDataType * lhs = dynamic_cast<mblasDataType*>(this);
-//   mblasDataType * rhs = dynamic_cast<mblasDataType*>(&other);
-//   return *lhs >= *rhs;
-// }
-
-
 
 const std::map<mblasDataType, cudaDataType> mblasCuDataType::precMappings = {
     {MBLAS_R_16F,  CUDA_R_16F},

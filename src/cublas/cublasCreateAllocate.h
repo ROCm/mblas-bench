@@ -11,13 +11,14 @@
 #include <string>
 
 #include "genericInit.h"
+#include "mblasDataType.h"
 
-// int sizeof_cudt_host(cudaDataType_t type);
-void *allocateHostArr(cudaDataType_t type, long x, long y, int batch = 1);
-void *allocateDevArr(cudaDataType_t type, long x, long y, int batch = 1);
-void *allocateHDevArr(cudaDataType_t type, long x, long y, int batch = 1);
+// int sizeof_cudt_host(mblasDataType type);
+void *allocateHostArr(mblasDataType type, long x, long y, int batch = 1);
+void *allocateDevArr(mblasDataType type, long x, long y, int batch = 1);
+void *allocateHDevArr(mblasDataType type, long x, long y, int batch = 1);
 
-// void initHostH(cudaDataType_t precision, std::string initialization, void *ptr,
+// void initHostH(mblasDataType precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
 //                float constant = 0.f, bool control = false, std::string filename = "");
 
@@ -43,11 +44,11 @@ struct allocSetScalar {
 };
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(cudaDataType_t type, Args... args) ->
+auto typeCallHost(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(cudaDataType_t type, Args... args) ->
+auto typeCallDev(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <typename T>
@@ -124,41 +125,41 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
 // }
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(cudaDataType_t type, Args... args) ->
+auto typeCallHost(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
-    case CUDA_R_64F:
+    case mblasDataType::MBLAS_R_64F:
       return tFunc<double>()(args...);
-    case CUDA_C_64F:
+    case mblasDataType::MBLAS_C_64F:
       return tFunc<std::complex<double>>()(args...);
-    case CUDA_R_32F:
+    case mblasDataType::MBLAS_R_32F:
       return tFunc<float>()(args...);
-    case CUDA_C_32F:
+    case mblasDataType::MBLAS_C_32F:
       return tFunc<std::complex<float>>()(args...);
-    case CUDA_R_16BF:
+    case mblasDataType::MBLAS_R_16BF:
       return tFunc<float>()(args...);
-    case CUDA_C_16BF:
+    case mblasDataType::MBLAS_C_16BF:
       return tFunc<std::complex<float>>()(args...);
-    case CUDA_R_16F:
+    case mblasDataType::MBLAS_R_16F:
       return tFunc<float>()(args...);
-    case CUDA_C_16F:
+    case mblasDataType::MBLAS_C_16F:
       return tFunc<std::complex<float>>()(args...);
-    case CUDA_R_8F_E4M3:
+    case mblasDataType::MBLAS_R_8F_E4M3:
       return tFunc<float>()(args...);
-    case CUDA_R_8F_E5M2:
+    case mblasDataType::MBLAS_R_8F_E5M2:
       return tFunc<float>()(args...);
-    case CUDA_R_8I:
+    case mblasDataType::MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
-    case CUDA_C_8I:
+    case mblasDataType::MBLAS_C_8I:
       return tFunc<std::complex<__int8_t>>()(args...);
-    case CUDA_R_8U:
+    case mblasDataType::MBLAS_R_8U:
       return tFunc<__uint8_t>()(args...);
-    case CUDA_C_8U:
+    case mblasDataType::MBLAS_C_8U:
       return tFunc<std::complex<__uint8_t>>()(args...);
-    case CUDA_R_32I:
+    case mblasDataType::MBLAS_R_32I:
       return tFunc<__int32_t>()(args...);
-    case CUDA_C_32I:
+    case mblasDataType::MBLAS_C_32I:
       return tFunc<std::complex<__int32_t>>()(args...);
     default:
       return tFunc<double>()(args...);
@@ -166,41 +167,41 @@ auto typeCallHost(cudaDataType_t type, Args... args) ->
 }
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(cudaDataType_t type, Args... args) ->
+auto typeCallDev(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
-    case CUDA_R_64F:
+    case mblasDataType::MBLAS_R_64F:
       return tFunc<double>()(args...);
-    case CUDA_C_64F:
+    case mblasDataType::MBLAS_C_64F:
       return tFunc<std::complex<double>>()(args...);
-    case CUDA_R_32F:
+    case mblasDataType::MBLAS_R_32F:
       return tFunc<float>()(args...);
-    case CUDA_C_32F:
+    case mblasDataType::MBLAS_C_32F:
       return tFunc<std::complex<float>>()(args...);
-    case CUDA_R_16BF:
+    case mblasDataType::MBLAS_R_16BF:
       return tFunc<__nv_bfloat16>()(args...);
-    case CUDA_C_16BF:
+    case mblasDataType::MBLAS_C_16BF:
       return tFunc<std::complex<__nv_bfloat16>>()(args...);
-    case CUDA_R_16F:
+    case mblasDataType::MBLAS_R_16F:
       return tFunc<__half>()(args...);
-    case CUDA_C_16F:
+    case mblasDataType::MBLAS_C_16F:
       return tFunc<std::complex<__half>>()(args...);
-    case CUDA_R_8F_E4M3:
+    case mblasDataType::MBLAS_R_8F_E4M3:
       return tFunc<__nv_fp8_e4m3>()(args...);
-    case CUDA_R_8F_E5M2:
+    case mblasDataType::MBLAS_R_8F_E5M2:
       return tFunc<__nv_fp8_e5m2>()(args...);
-    case CUDA_R_8I:
+    case mblasDataType::MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
-    case CUDA_C_8I:
+    case mblasDataType::MBLAS_C_8I:
       return tFunc<std::complex<__int8_t>>()(args...);
-    case CUDA_R_8U:
+    case mblasDataType::MBLAS_R_8U:
       return tFunc<__uint8_t>()(args...);
-    case CUDA_C_8U:
+    case mblasDataType::MBLAS_C_8U:
       return tFunc<std::complex<__uint8_t>>()(args...);
-    case CUDA_R_32I:
+    case mblasDataType::MBLAS_R_32I:
       return tFunc<__int32_t>()(args...);
-    case CUDA_C_32I:
+    case mblasDataType::MBLAS_C_32I:
       return tFunc<std::complex<__int32_t>>()(args...);
     default:
       return tFunc<double>()(args...);

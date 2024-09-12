@@ -8,9 +8,11 @@
 
 #include "genericGemm.h"
 #include "mblasCuDataType.h"
+#include "mblasCuComputeType.h"
+#include "mblasCuOperation.h"
 
 struct gemmPrecType {
-  cublasComputeType_t compute;
+  mblasComputeType compute;
   mblasDataType scalar;
   mblasDataType ab_type;
   mblasDataType c_type;
@@ -80,24 +82,19 @@ class cublasGemm : public genericGemm {
   void *alpha;
   void *beta;
 
-  cublasOperation_t transA;
-  cublasOperation_t transB;
+  mblasCuOperation transA;
+  mblasCuOperation transB;
 
   // cublasStatus_t stat;
   // cublasHandle_t handle;
   mblasCuDataType precision;
-  cublasComputeType_t compute;
+  mblasCuComputeType compute;
   mblasCuDataType scalar;
   mblasCuDataType a_type;
   mblasCuDataType b_type;
   mblasCuDataType c_type;
 
   int workspaceSz = 128 * 1024 * 1024;
-
-  // std::map<std::string, cudaDataType_t> precDType;
-  // std::map<std::string, cublasComputeType_t> computeDType;
-  // std::map<cudaDataType_t, cublasComputeType_t> precToCompute;
-  // static gemmPrecType gemmExSupported[];
 
   static std::vector<gemmPrecType> gemmExSupported;
   static std::vector<TgemmPrecType> TgemmExSupported;

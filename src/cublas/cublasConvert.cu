@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 #include "cublasCreateAllocate.h"
 #include "cudaError.h"
+#include "mblasCuDataType.h"
 
 __global__ void floatToBfloat16(float *input, size_t num_elements,
                                 __nv_bfloat16 *output)
@@ -48,12 +49,12 @@ __global__ void intToInt8(__int32_t *input, size_t num_elements,
   }
 }
 
-void copyAndConvert(cublasDataType_t precision, void *hostA, void *devA, int x, int y, int batchsz)
+void copyAndConvert(mblasCuDataType precision, void *hostA, void *devA, int x, int y, int batchsz)
 {
 
   long hostsz = typeCallHost<sizeofCUDT>(precision);
   long devsz = typeCallDev<sizeofCUDT>(precision);
-  if (precision == CUDA_C_16F || precision == CUDA_R_16F)
+  if (precision == mblasDataType::MBLAS_C_16F || precision == mblasDataType::MBLAS_R_16F)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -65,7 +66,7 @@ void copyAndConvert(cublasDataType_t precision, void *hostA, void *devA, int x, 
     floatToFp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
     cudaFree(tmpA);
   }
-  else if (precision == CUDA_C_16BF || precision == CUDA_R_16BF)
+  else if (precision == mblasDataType::MBLAS_C_16BF || precision == mblasDataType::MBLAS_R_16BF)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -77,7 +78,7 @@ void copyAndConvert(cublasDataType_t precision, void *hostA, void *devA, int x, 
     floatToBfloat16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__nv_bfloat16 *)devA);
     cudaFree(tmpA);
   }
-  else if (precision == CUDA_R_8F_E4M3 || precision == CUDA_R_8F_E5M2)
+  else if (precision == mblasDataType::MBLAS_R_8F_E4M3 || precision == mblasDataType::MBLAS_R_8F_E5M2)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -87,18 +88,18 @@ void copyAndConvert(cublasDataType_t precision, void *hostA, void *devA, int x, 
     int block_size = 256;
     int num_blocks = (num_elements + block_size - 1) / block_size;
     __nv_fp8_interpretation_t interp;
-    if (precision == CUDA_R_8F_E4M3)
+    if (precision == mblasDataType::MBLAS_R_8F_E4M3)
     {
       interp = __NV_E4M3;
     }
-    else if (precision == CUDA_R_8F_E5M2)
+    else if (precision == mblasDataType::MBLAS_R_8F_E5M2)
     {
       interp = __NV_E5M2;
     }
     floatToFp8<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__nv_fp8_storage_t *)devA, interp);
     cudaFree(tmpA);
   }
-  // else if (precision == CUDA_C_8I || precision == CUDA_R_8I)
+  // else if (precision == mblasDataType::MBLAS_C_8I || precision == mblasDataType::MBLAS_R_8I)
   //{
   //   // Allocate memory in the device for host precision (float)
   //   void *tmpA = allocateHDevArr(precision, x, y, batchsz);
@@ -117,10 +118,10 @@ void copyAndConvert(cublasDataType_t precision, void *hostA, void *devA, int x, 
   }
 }
 
-void *convertScalar(cublasDataType_t precision, void *scalar)
+void *convertScalar(mblasCuDataType precision, void *scalar)
 {
 
-  if (precision == CUDA_R_16F)
+  if (precision == mblasDataType::MBLAS_R_16F)
   {
     float scalarVal = *static_cast<float *>(scalar);
     free(scalar);
@@ -128,7 +129,7 @@ void *convertScalar(cublasDataType_t precision, void *scalar)
     *hscalar = __float2half(scalarVal);
     return (void *)hscalar;
   }
-  else if (precision == CUDA_C_16F)
+  else if (precision == mblasDataType::MBLAS_C_16F)
   {
     // Implement me...
     return NULL;

@@ -4,55 +4,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "mblasCuDataType.h"
+#include "mblasCuComputeType.h"
 
-// bool isReal(cudaDataType_t type);
-// bool isFp8(cudaDataType precision);
-// std::string precToString(cudaDataType precision);
-std::string computeToString(cublasComputeType_t compute);
-// cudaDataType_t precisionStringToDType(std::string stringPrecision);
-cudaDataType_t selectScalar(std::string scalarstr, cudaDataType_t precision,
-                            cublasComputeType_t compute);
-cublasComputeType_t selectCompute(std::string computestr,
-                                  cudaDataType_t precision);
-cublasOperation_t opStringToOp(std::string opstr);
-std::string opToString(cublasOperation_t);
-bool matchGemmType(cudaDataType_t precision, std::string function, cudaDataType_t desiredPrec, std::vector<std::string> acceptable);
-
-// data
-
-// clang-format off
-const std::map<std::string, cublasOperation_t> opType = {
-  {"N", CUBLAS_OP_N},
-  {"T", CUBLAS_OP_T},
-  {"C", CUBLAS_OP_C},
-};
-
-const std::map<std::string, cublasComputeType_t> computeDType = {
-    {"CUBLAS_COMPUTE_16F", CUBLAS_COMPUTE_16F},
-    {"CUBLAS_COMPUTE_16F_PEDANTIC", CUBLAS_COMPUTE_16F_PEDANTIC},
-    {"CUBLAS_COMPUTE_32F", CUBLAS_COMPUTE_32F},
-    {"CUBLAS_COMPUTE_32F_PEDANTIC", CUBLAS_COMPUTE_32F_PEDANTIC},
-    {"CUBLAS_COMPUTE_32F_FAST_16F", CUBLAS_COMPUTE_32F_FAST_16F},
-    {"CUBLAS_COMPUTE_32F_FAST_16BF", CUBLAS_COMPUTE_32F_FAST_16BF},
-    {"CUBLAS_COMPUTE_32F_FAST_TF32", CUBLAS_COMPUTE_32F_FAST_TF32},
-    {"CUBLAS_COMPUTE_64F", CUBLAS_COMPUTE_64F},
-    {"CUBLAS_COMPUTE_64F_PEDANTIC", CUBLAS_COMPUTE_64F_PEDANTIC},
-    {"CUBLAS_COMPUTE_32I", CUBLAS_COMPUTE_32I},
-    {"CUBLAS_COMPUTE_32I_PEDANTIC", CUBLAS_COMPUTE_32I_PEDANTIC},
-    {"f32_r", CUBLAS_COMPUTE_32F},
-    {"f64_r", CUBLAS_COMPUTE_64F},
-    {"i32_r", CUBLAS_COMPUTE_32I},
-};
-
-const std::map<cudaDataType_t, cublasComputeType_t> precToCompute = {
-    {CUDA_R_64F, CUBLAS_COMPUTE_64F},
-    {CUDA_C_64F, CUBLAS_COMPUTE_64F},
-    {CUDA_R_32F, CUBLAS_COMPUTE_32F},
-    {CUDA_C_32F, CUBLAS_COMPUTE_32F},
-    {CUDA_R_16BF, CUBLAS_COMPUTE_32F},
-    {CUDA_C_16BF, CUBLAS_COMPUTE_32F},
-    {CUDA_R_16F, CUBLAS_COMPUTE_16F},
-    {CUDA_C_16F, CUBLAS_COMPUTE_16F},
-    {CUDA_R_32I, CUBLAS_COMPUTE_32I},
-};
-// clang-format on
+bool matchGemmType(mblasDataType precision, std::string function, mblasDataType desiredPrec, std::vector<std::string> acceptable);

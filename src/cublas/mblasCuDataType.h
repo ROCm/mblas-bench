@@ -9,7 +9,7 @@ class mblasCuDataType: public mblasDataType {
  public:
   static cudaDataType convertToCuda(mblasCuDataType data);
   static cudaDataType convertToCuda(const mblasCuDataType *data);
-  void operator = (const cudaDataType cudt);
+  //void operator = (const cudaDataType cudt);
   //mblasCuDataType& operator = (const mblasCuDataType mdt);
   //mblasCuDataType & operator = (const mblasCuDataType mdt);
   mblasCuDataType & operator = (const mblasCuDataType& mdt);
@@ -17,10 +17,7 @@ class mblasCuDataType: public mblasDataType {
   operator cudaDataType() const;
   mblasCuDataType(const std::string & instr) : mblasDataType(instr) {}
   mblasCuDataType() : mblasDataType() {}
-  // bool operator==(const mblasCuDataType& other) const;
-  // bool operator!=(const mblasCuDataType& other) const;
-  // bool operator<(const mblasCuDataType& other) const;
-  // bool operator>(const mblasCuDataType& other) const;
-  // bool operator<=(const mblasCuDataType& other) const;
-  // bool operator>=(const mblasCuDataType& other) const;
+  mblasCuDataType(mblasDataTypeEnum y) : mblasDataType(y) {}
+
+  std::string toString() const override { return mblasDataType::toString("CUDA"); }
 };

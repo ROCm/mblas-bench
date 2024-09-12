@@ -9,9 +9,11 @@
 
 #include "genericGemm.h"
 #include "mblasCuDataType.h"
+#include "mblasCuComputeType.h"
+#include "mblasCuOperation.h"
 
 struct matmulPrecType {
-  cublasComputeType_t compute;
+  mblasComputeType compute;
   mblasDataType scalar;
   mblasDataType a_type;
   mblasDataType b_type;
@@ -59,11 +61,11 @@ class cublasLtGemm : public genericGemm {
   void *beta;
 
   bool inplace = false;
-  cublasOperation_t transA;
-  cublasOperation_t transB;
+  mblasCuOperation transA;
+  mblasCuOperation transB;
 
   mblasCuDataType precision;
-  cublasComputeType_t compute;
+  mblasCuComputeType compute;
   mblasCuDataType scalar;
   mblasCuDataType a_type;
   mblasCuDataType b_type;

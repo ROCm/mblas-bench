@@ -1,5 +1,7 @@
 #include "mblasDataType.h"
+#include "mblasComputeType.h"
 #include <string>
+#include <iostream>
 
 const std::map<std::string, mblasDataTypeEnum> mblasDataType::precDType = {
     // Generic, similar to rocblas format
@@ -110,13 +112,18 @@ mblasDataType::mblasDataType(std::string instr) {
   }
 }
 
-std::string mblasDataType::toString() const {
+std::string mblasDataType::toString(std::string prefix) const {
   for (auto ele : precDType) {
-    if (ele.second == value && ele.first.find("MBLAS") != std::string::npos) {
+    if (ele.second == value && ele.first.find(prefix) != std::string::npos) {
       return ele.first;
     }
   }
-  return "";
+  for (auto ele : precDType) {
+    if (ele.second == value) {
+      return ele.first;
+    }
+  }
+  return "(DataType name not found)";
 }
 
 bool mblasDataType::isReal() const {
@@ -129,11 +136,31 @@ bool mblasDataType::isReal() const {
   return true;
 }
 
-bool isFp8() const {
+bool mblasDataType::isFp8() const {
   if (value == MBLAS_R_8F_E4M3 || value == MBLAS_R_8F_E5M2) {
     return true;
   }
   return false;
+}
+
+void mblasDataType::setScalar(std::string scalarstr, mblasDataType precision,
+                            mblasComputeType& compute) {
+  if (scalarstr != "") {
+    set(mblasDataType(scalarstr));
+    return;
+  } else {
+    // Scalar type not specified, setting based on compute type
+    for (auto ele : precToCompute) {
+      mblasDataType selDtype = mblasDataType(ele.first);
+      mblasComputeType selCtype = mblasComputeType(ele.second);
+      if (selCtype == compute && precision.isReal() == selDtype.isReal()) {
+        set(selDtype);
+        return;
+      }
+    }
+    // something terrible has happened
+    set(precision);
+  }
 }
 
 //mblasDataType::mblasDataType() {

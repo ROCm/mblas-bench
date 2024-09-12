@@ -1,0 +1,25 @@
+#pragma once
+
+#include <cuda_runtime.h>
+#include <cublas_v2.h>
+#include "mblasComputeType.h"
+
+class mblasCuComputeType: public mblasComputeType {
+ private:
+  static const std::map<mblasComputeTypeEnum, cublasComputeType_t> compMappings;
+ public:
+  static cublasComputeType_t convertToCuda(mblasCuComputeType data);
+  static cublasComputeType_t convertToCuda(const mblasCuComputeType *data);
+  // void operator = (const cublasComputeType_t cudt);
+  //mblasCuComputeType& operator = (const mblasCuComputeType mdt);
+  //mblasCuComputeType & operator = (const mblasCuComputeType mdt);
+  mblasCuComputeType & operator = (const mblasCuComputeType& mdt);
+  // mblasCuComputeType & operator = (const mblasComputeType& mdt);
+  operator cublasComputeType_t() const;
+  mblasCuComputeType(const std::string & instr) : mblasComputeType(instr) {}
+  mblasCuComputeType() : mblasComputeType() {}
+  mblasCuComputeType(mblasComputeTypeEnum y) : mblasComputeType(y) {}
+  //mblasCuComputeType(mblasComputeTypeEnum& y) : mblasComputeType(y) {}
+
+  std::string toString() const override { return mblasComputeType::toString("CUBLAS"); }
+};

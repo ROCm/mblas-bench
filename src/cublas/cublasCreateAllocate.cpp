@@ -16,38 +16,38 @@
 #include "cudaError.h"
 #include "genericInit.h"
 
-void *allocateHostArr(cudaDataType_t type, long x, long y, int batch) {
+void *allocateHostArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
   void *data = (void *)malloc(x * y * batch * typesize);
   return data;
 }
 
-void *allocateDevArr(cudaDataType_t type, long x, long y, int batch) {
+void *allocateDevArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallDev<sizeofCUDT>(type);
   void *data;
   checkCuda(cudaMalloc(&data, x * y * batch * typesize));
   return data;
 }
 
-void *allocateHDevArr(cudaDataType_t type, long x, long y, int batch) {
+void *allocateHDevArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
   void *data;
   checkCuda(cudaMalloc(&data, x * y * batch * typesize));
   return data;
 }
 
-void dummy() {
-  // This function forces the compiler to generate the needed templated variants
-  // of each function. It is never called
-  void *h_A;
-  typeCallHost<sizeofCUDTP>(CUDA_R_64F);
-  typeCallHost<allocSetScalar>(CUDA_R_64F, "1", "0");
-  typeCallDev<batchedPtrMagic>(CUDA_R_64F, (void **)NULL, (void **)NULL,
-                               (void *)NULL, 10, 10, 10);
-  // template void *allocSetScalar<double>::operator()(string);
-}
+// void dummy() {
+//   // This function forces the compiler to generate the needed templated variants
+//   // of each function. It is never called
+//   void *h_A;
+//   typeCallHost<sizeofCUDTP>(CUDA_R_64F);
+//   typeCallHost<allocSetScalar>(CUDA_R_64F, "1", "0");
+//   typeCallDev<batchedPtrMagic>(CUDA_R_64F, (void **)NULL, (void **)NULL,
+//                                (void *)NULL, 10, 10, 10);
+//   // template void *allocSetScalar<double>::operator()(string);
+// }
 
-// void initHostH(cudaDataType_t precision, std::string initialization, void *ptr,
+// void initHostH(mblasDataType precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
 //                float constant, bool control, std::string filename) {
 //   typeCallHost<initHost>(precision, initialization, ptr, rows_A, cols_A, ld,
@@ -240,7 +240,7 @@ inline complex<T> randIntGenN(std::uniform_int_distribution<int> &idist,
 //                              std::mt19937 &gen, complex<T> &dummy) {
 //  return {-T(rand()), -T(rand())};
 //}
-// int sizeof_cudt_host(cudaDataType_t type) {
+// int sizeof_cudt_host(mblasDataType type) {
 //     int size = 0;
 //     complex<double> z1(1,1.5);
 //     switch(type) {

@@ -26,6 +26,8 @@ add_library(mblascuda SHARED
     cublasDtypeUtils.cpp
     cudaError.cpp
     mblasCuDataType.cpp
+    mblasCuComputeType.cpp
+    mblasCuOperation.cpp
 )
 
 set_target_properties(mblascuda PROPERTIES POSITION_INDEPENDENT_CODE ON)
