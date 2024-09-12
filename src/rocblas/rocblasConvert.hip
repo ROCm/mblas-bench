@@ -51,8 +51,8 @@ __global__ void floatToFp16(float *input, size_t num_elements, __half *output)
 void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int y, int batchsz)
 {
 
-  int hostsz = typeCallHost<sizeofCUDT>(precision);
-  int devsz = typeCallDev<sizeofCUDT>(precision);
+  long hostsz = typeCallHost<sizeofCUDT>(precision);
+  long devsz = typeCallDev<sizeofCUDT>(precision);
   if (precision == mblasDataType(MBLAS_C_16F) || precision == mblasDataType(MBLAS_R_16F))
   {
     // Allocate memory in the device for host precision (float)
@@ -85,8 +85,8 @@ void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int
 void copyAndConvert(hipblasDatatype_t precision, void *hostA, void *devA, int x, int y, int batchsz)
 {
 
-  int hostsz = typeCallHost<sizeofCUDT>(precision);
-  int devsz = typeCallDev<sizeofCUDT>(precision);
+  long hostsz = typeCallHost<sizeofCUDT>(precision);
+  long devsz = typeCallDev<sizeofCUDT>(precision);
   if (precision == HIPBLAS_R_16F)
   {
     // Allocate memory in the device for host precision (float)
