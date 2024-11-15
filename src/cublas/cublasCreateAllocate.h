@@ -17,7 +17,6 @@
 void *allocateHostArr(mblasDataType type, long x, long y, int batch = 1);
 void *allocateDevArr(mblasDataType type, long x, long y, int batch = 1);
 void *allocateHDevArr(mblasDataType type, long x, long y, int batch = 1);
-
 // void initHostH(mblasDataType precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
 //                float constant = 0.f, bool control = false, std::string filename = "");
@@ -32,10 +31,16 @@ struct sizeofCUDTP {
   int operator()();
 };
 
+//template <typename T>
+//struct batchedPtrCopy {
+//  void operator()(void **dptr, void *hArr, int batchct, int x,
+//                  int y, int flush_batch_count = 1, long total_block_size = 0);
+//};
+
 template <typename T>
 struct batchedPtrMagic {
-  void operator()(void **hptr, void **dptr, void *hArr, int batchct, int x,
-                  int y);
+  void operator()(void **hptr, void *hArr, int batchct, int x,
+                  int y, int flush_batch_count = 1, long total_block_size = 0);
 };
 
 template <typename T>
@@ -93,36 +98,43 @@ void *allocSetScalar<T>::operator()(std::string sval1, std::string sval2) {
   return allocSetScalarFunc(sval1, sval2, std::forward<T>(dummy));
 }
 
+//template <typename T>
+//void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
+//                                    int batchct, int x, int y) {
+//  T **host = reinterpret_cast<T **>(hptr);
+//  T *device_array = static_cast<T *>(dAr);
+//  for (int i = 0; i < batchct; i++) {
+//    host[i] = device_array + (i * x * y);
+//  }
+//  // checkCuda(cudaMalloc(&dptr, batchct * sizeof(T *)));
+//  // hptr = reinterpret_cast<void **>(host);
+//  // checkCuda(
+//  cudaMemcpy(dptr, hptr, batchct * sizeof(T *), cudaMemcpyHostToDevice);
+//}
+
 template <typename T>
-void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
-                                    int batchct, int x, int y) {
+void batchedPtrMagic<T>::operator()(void **hptr, void *dAr,
+                                    int batch_count, int x, int y, int flush_batch_count, long total_block_size) {
   T **host = reinterpret_cast<T **>(hptr);
   T *device_array = static_cast<T *>(dAr);
-  for (int i = 0; i < batchct; i++) {
-    host[i] = device_array + (i * x * y);
+  for (int j = 0; j < flush_batch_count; j++) {
+    // Offset to the next block if using cache flushing
+    int flush_offset = j*total_block_size;
+    for (int i = 0; i < batch_count; i++) {
+      host[j*batch_count + i] = device_array + flush_offset + (i * x * y);
+    }
   }
-  // checkCuda(cudaMalloc(&dptr, batchct * sizeof(T *)));
-  // hptr = reinterpret_cast<void **>(host);
-  // checkCuda(
-  cudaMemcpy(dptr, hptr, batchct * sizeof(T *), cudaMemcpyHostToDevice);
 }
 
-// template <typename T>
-// void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
-//                              int cols_A, int ld, int batch,
-//                              long long int stride, bool control,
-//                              float constant) {
-//   if (initialization == "rand_int") {
-//     fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
-//   } else if (initialization == "trig_float") {
-//     fillRandHostTrigFloat<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
-//   } else if (initialization == "hpl") {
-//   } else if (initialization == "blasgemm") {
-//     fillRandHostBlasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
-//   } else if (initialization == "constant") {
-//     fillRandHostConstant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
-//   }
-// }
+//template <typename T>
+//void batchedPtrCopy<T>::operator()(void **dptr, void *dAr,
+//                                    int batch_count, int x, int y, int flush_batch_count = 1, long total_block_size = 0) {
+//  void **hptr = (void **)malloc(batchct * flush_batch_count * sizeof(T *));
+//  checkCuda(cudaMalloc(dptr, batchct * flush_batch_count * sizeof(T *)));
+//  batchedPtrMagic<T>::operator()(hptr, dAr, batch_count, x, y, flush_batch_count, total_block_size);
+//  cudaMemcpy(dptr, hptr, batchct * sizeof(T *), cudaMemcpyHostToDevice);
+//  free(hptr);
+//}
 
 template <template <typename> class tFunc, class... Args>
 auto typeCallHost(mblasDataType type, Args... args) ->

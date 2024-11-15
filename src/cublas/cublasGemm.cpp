@@ -305,12 +305,12 @@ void cublasGemm::copyHostToDev(cublasgemmInst *mat) {
         cudaMalloc(&mat->ptrDevB, batchct * typeCallHost<sizeofCUDTP>(b_type)));
     checkCuda(
         cudaMalloc(&mat->ptrDevC, batchct * typeCallHost<sizeofCUDTP>(c_type)));
-    typeCallDev<batchedPtrMagic>(a_type, mat->ptrHostA, mat->ptrDevA, mat->devA,
-                                batchct, rowsMemA, colsMemA);
-    typeCallDev<batchedPtrMagic>(b_type, mat->ptrHostB, mat->ptrDevB, mat->devB,
-                                batchct, rowsMemB, colsMemB);
-    typeCallDev<batchedPtrMagic>(c_type, mat->ptrHostC, mat->ptrDevC, mat->devC,
-                                batchct, rowsMemC, colsMemC);
+    //typeCallDev<batchedPtrMagic>(a_type, mat->ptrHostA, mat->ptrDevA, mat->devA,
+    //                            batchct, rowsMemA, colsMemA);
+    //typeCallDev<batchedPtrMagic>(b_type, mat->ptrHostB, mat->ptrDevB, mat->devB,
+    //                            batchct, rowsMemB, colsMemB);
+    //typeCallDev<batchedPtrMagic>(c_type, mat->ptrHostC, mat->ptrDevC, mat->devC,
+    //                            batchct, rowsMemC, colsMemC);
   }
 }
 

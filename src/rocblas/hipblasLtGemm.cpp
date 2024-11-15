@@ -255,8 +255,8 @@ void hipblasLtGemm::prepareMatrix(hipblasLtGemmInst *mat) {
   checkHipblas(hipblasLtMatmulDescCreate(&mat->descOP, compute, scalar));
   // These values are read in with no type, so they need to be convirted first
   // Thanks for the wonderful standard Nvidia :D!
-  hipblasOperation_t transA_local = transA.convertToHip()
-  hipblasOperation_t transB_local = transB.convertToHip()
+  hipblasOperation_t transA_local = transA.convertToHip();
+  hipblasOperation_t transB_local = transB.convertToHip();
   checkHipblas(hipblasLtMatmulDescSetAttribute(
       mat->descOP, HIPBLASLT_MATMUL_DESC_TRANSA, &transA_local, sizeof(transA)));
   checkHipblas(hipblasLtMatmulDescSetAttribute(

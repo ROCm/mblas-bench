@@ -63,6 +63,9 @@ genericGemm::genericGemm(cxxopts::ParseResult result) {
   stride_a = result["stride_a"].as<long long int>();
   stride_b = result["stride_b"].as<long long int>();
   stride_c = result["stride_c"].as<long long int>();
+  stride_d = result["stride_d"].as<long long int>();
+
+  flush_batch_count = result["flush_batch_count"].as<int>();
 
   initialization = result["initialization"].as<string>();
   filenameA = result["filenameA"].as<string>();

@@ -45,6 +45,7 @@ class genericGemm {
   int cold_iters;
 
   int batchct;
+  int flush_batch_count;
 
   bool controlA = false;
   bool controlB = false;

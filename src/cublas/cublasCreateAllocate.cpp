@@ -36,6 +36,7 @@ void *allocateHDevArr(mblasDataType type, long x, long y, int batch) {
   return data;
 }
 
+
 // void dummy() {
 //   // This function forces the compiler to generate the needed templated variants
 //   // of each function. It is never called

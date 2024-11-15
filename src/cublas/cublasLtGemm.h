@@ -35,10 +35,15 @@ struct cublasltgemmInst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
-  void *devA;
-  void *devB;
-  void *devC;
-  void *devD;
+  void **dataDev;
+  //void **devA;
+  //void **devB;
+  //void **devC;
+  //void **devD;
+  void **ptrDevA;
+  void **ptrDevB;
+  void **ptrDevC;
+  void **ptrDevD;
   cublasLtMatmulDesc_t descOP;
   cublasLtMatrixLayout_t descA;
   cublasLtMatrixLayout_t descB;
@@ -53,9 +58,11 @@ struct cublasltgemmInst {
 
 class cublasLtGemm : public genericGemm {
  private:
-  void *hostA;
-  void *hostB;
-  void *hostC;
+  void *dataHost;
+  void **ptrHostA;
+  void **ptrHostB;
+  void **ptrHostC;
+  void **ptrHostD;
 
   void *alpha;
   void *beta;
@@ -72,6 +79,19 @@ class cublasLtGemm : public genericGemm {
   mblasCuDataType c_type;
   mblasCuDataType d_type;
   mblasCuDataType bias_type;
+
+  uint64_t a_offset_host;
+  uint64_t b_offset_host;
+  uint64_t c_offset_host;
+  uint64_t d_offset_host;
+
+  uint64_t a_offset_dev;
+  uint64_t b_offset_dev;
+  uint64_t c_offset_dev;
+  uint64_t d_offset_dev;
+
+  uint64_t total_block_size_host;
+  uint64_t total_block_size_dev;
 
   int workspaceSz = 64 * 1024 * 1024;
 
