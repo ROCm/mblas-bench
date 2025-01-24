@@ -35,7 +35,7 @@ struct cublasltgemmInst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
-  void **dataDev;
+  void *dataDev;
   //void **devA;
   //void **devB;
   //void **devC;

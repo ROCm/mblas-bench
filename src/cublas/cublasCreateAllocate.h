@@ -126,6 +126,8 @@ void batchedPtrMagic<T>::operator()(void **hptr, void *dAr,
   }
 }
 
+void batchedPtrMagicGeneric(void **hptr, void *dAr, int batch_count, int x, int y, int flush_batch_count, long total_block_size, int type_size);
+
 //template <typename T>
 //void batchedPtrCopy<T>::operator()(void **dptr, void *dAr,
 //                                    int batch_count, int x, int y, int flush_batch_count = 1, long total_block_size = 0) {

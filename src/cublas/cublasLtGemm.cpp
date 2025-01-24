@@ -297,14 +297,10 @@ void cublasLtGemm::allocHost() {
       (void **)malloc(batchct * flush_batch_count * typeCallHost<sizeofCUDTP>(c_type));
   ptrHostD =
       (void **)malloc(batchct * flush_batch_count * typeCallHost<sizeofCUDTP>(d_type));
-  typeCallHost<batchedPtrMagic>(a_type, ptrHostA, dataHost + a_offset_host,
-                           batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_host);
-  typeCallHost<batchedPtrMagic>(b_type, ptrHostB, dataHost + b_offset_host,
-                           batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_host);
-  typeCallHost<batchedPtrMagic>(c_type, ptrHostC, dataHost + c_offset_host,
-                           batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_host);
-  typeCallHost<batchedPtrMagic>(d_type, ptrHostD, dataHost + d_offset_host,
-                              batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_host);
+  batchedPtrMagicGeneric(ptrHostA, dataHost + a_offset_host, batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(a_type));
+  batchedPtrMagicGeneric(ptrHostB, dataHost + b_offset_host, batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(b_type));
+  batchedPtrMagicGeneric(ptrHostC, dataHost + c_offset_host, batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(c_type));
+  batchedPtrMagicGeneric(ptrHostD, dataHost + d_offset_host, batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(d_type));
 }
 
 void cublasLtGemm::allocDev(cublasltgemmInst *mat) {
@@ -331,14 +327,11 @@ void cublasLtGemm::allocDev(cublasltgemmInst *mat) {
       (void **)malloc(batchct * flush_batch_count * typeCallDev<sizeofCUDTP>(c_type));
   mat->ptrDevD =
       (void **)malloc(batchct * flush_batch_count * typeCallDev<sizeofCUDTP>(d_type));
-  typeCallHost<batchedPtrMagic>(a_type, mat->ptrDevA, mat->dataDev + a_offset_dev,
-                           batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_dev);
-  typeCallHost<batchedPtrMagic>(b_type, mat->ptrDevB, mat->dataDev + b_offset_dev,
-                           batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_dev);
-  typeCallHost<batchedPtrMagic>(c_type, mat->ptrDevC, mat->dataDev + c_offset_dev,
-                           batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_dev);
-  typeCallHost<batchedPtrMagic>(d_type, mat->ptrDevD, mat->dataDev + d_offset_dev,
-                              batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_dev);
+
+  batchedPtrMagicGeneric(mat->ptrDevA, mat->dataDev + a_offset_dev, batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(a_type));
+  batchedPtrMagicGeneric(mat->ptrDevB, mat->dataDev + b_offset_dev, batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(b_type));
+  batchedPtrMagicGeneric(mat->ptrDevC, mat->dataDev + c_offset_dev, batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(c_type));
+  batchedPtrMagicGeneric(mat->ptrDevD, mat->dataDev + d_offset_dev, batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(d_type));
   // mat->devA = allocateDevArr(a_type, rowsMemA, colsMemA, batchct);
   // mat->devB = allocateDevArr(b_type, rowsMemB, colsMemB, batchct);
   // mat->devC = allocateDevArr(c_type, rowsMemC, colsMemC, batchct);
@@ -568,7 +561,7 @@ void cublasLtGemm::testMatmul(cublasltgemmInst *mat) {
     checkCublas(stat);
     checkCuda(cudaGetLastError());
   }
-  cudaStreamSynchronize(stream);
+  checkCuda(cudaStreamSynchronize(stream));
 
   cudaEvent_t start, stop;
   checkCuda(cudaEventCreate(&start));

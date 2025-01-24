@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <iostream>
 /*
  * Round's a variable up to the nearest number divisible by 16
  * Used for ensuring that all our pointers fall on a 16 byte boundary
@@ -36,7 +37,7 @@ uint64_t calculate_offsets( uint64_t rows_mem_a, uint64_t cols_mem_a, uint64_t r
     d_size_round = roundUp(d_size, 16); 
   } else {
     d_size = c_size;
-    d_size_round = c_size_round;
+    d_size_round = 0;
   }
 
   total_block_size = a_size_round + b_size_round + c_size_round + d_size_round;

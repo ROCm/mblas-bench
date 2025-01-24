@@ -36,7 +36,18 @@ void *allocateHDevArr(mblasDataType type, long x, long y, int batch) {
   return data;
 }
 
-
+void batchedPtrMagicGeneric(void **hptr, void *dAr, int batch_count, int x, int y, int flush_batch_count, long total_block_size, int type_size) {
+  //T **host = reinterpret_cast<T **>(hptr);
+  //T *device_array = static_cast<T *>(dAr);
+  for (int j = 0; j < flush_batch_count; j++) {
+    // Offset to the next block if using cache flushing
+    int flush_offset = j*total_block_size;
+    for (int i = 0; i < batch_count; i++) {
+      hptr[j*batch_count + i] = (char*) dAr + flush_offset + (i * x * y * type_size);
+    }
+  }
+  
+}
 // void dummy() {
 //   // This function forces the compiler to generate the needed templated variants
 //   // of each function. It is never called
