@@ -377,13 +377,9 @@ void cublasLtGemm::fillHost() {
 void cublasLtGemm::copyHostToDev(cublasltgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
   for (int j = 0; j < flush_batch_count; j++) {
-    //for (int i = 0; i < batchct; i++) {
-      //copyAndConvert(precision, ptrHostA[j*batchct + i], mat->ptrDevA[j*batchct + i], rowsMemA, colsMemA, batchct);
-      //copyAndConvert(precision, ptrHostB[j*batchct + i], mat->ptrDevB[j*batchct + i], rowsMemB, colsMemB, batchct);
-      //copyAndConvert(precision, ptrHostC[j*batchct + i], mat->ptrDevC[j*batchct + i], rowsMemC, colsMemC, batchct);
-    copyAndConvert(precision, ptrHostA[j*batchct], mat->ptrDevA[j*batchct], rowsMemA, colsMemA, batchct);
-    copyAndConvert(precision, ptrHostB[j*batchct], mat->ptrDevB[j*batchct], rowsMemB, colsMemB, batchct);
-    copyAndConvert(precision, ptrHostC[j*batchct], mat->ptrDevC[j*batchct], rowsMemC, colsMemC, batchct);
+    copyAndConvert(a_type, ptrHostA[j*batchct], mat->ptrDevA[j*batchct], rowsMemA, colsMemA, batchct);
+    copyAndConvert(b_type, ptrHostB[j*batchct], mat->ptrDevB[j*batchct], rowsMemB, colsMemB, batchct);
+    copyAndConvert(c_type, ptrHostC[j*batchct], mat->ptrDevC[j*batchct], rowsMemC, colsMemC, batchct);
   }
 
   ////if (batched && !strided) {
