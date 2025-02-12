@@ -3,7 +3,7 @@
 #include <cassert>
 #include <iostream>
 
-int roundUp(int numToRound, int multiple);
+uint64_t roundUp(uint64_t numToRound, uint64_t multiple);
 
 uint64_t calculate_offsets( uint64_t rows_mem_a, uint64_t cols_mem_a, uint64_t rows_mem_b, uint64_t cols_mem_b,
                         uint64_t rows_mem_c, uint64_t cols_mem_c, uint64_t rows_mem_d, uint64_t cols_mem_d, 

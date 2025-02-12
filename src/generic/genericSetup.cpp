@@ -7,10 +7,14 @@
  * Round's a variable up to the nearest number divisible by 16
  * Used for ensuring that all our pointers fall on a 16 byte boundary
 */
-int roundUp(int numToRound, int multiple) 
+uint64_t roundUp(uint64_t numToRound, uint64_t multiple) 
 {
-    assert(multiple && ((multiple & (multiple - 1)) == 0));
-    return (numToRound + multiple - 1) & -multiple;
+    //assert(multiple && ((multiple & (multiple - 1)) == 0));
+    //return (numToRound + multiple - 1) & -multiple;
+  uint64_t remainder = numToRound % multiple;
+  uint64_t new_num = numToRound + (multiple - remainder);
+  assert(new_num % multiple == 0);
+  return new_num;
 }
 
 /* 
