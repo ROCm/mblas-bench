@@ -189,8 +189,8 @@ cublasGemm::cublasGemm(cxxopts::ParseResult result) : genericGemm(result) {
 }
 
 string cublasGemm::prepareArray() {
-  alpha = convertScalar(scalar, alpha);
-  beta = convertScalar(scalar, beta);
+  alpha = convert_scalar(scalar, alpha);
+  beta = convert_scalar(scalar, beta);
   this->allocHost();
   this->fillHost();
 
@@ -287,9 +287,9 @@ void cublasGemm::fillHost() {
 
 void cublasGemm::copyHostToDev(cublasgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
-  copyAndConvert(a_type, hostA, mat->devA, rowsMemA, colsMemA, batchct);
-  copyAndConvert(b_type, hostB, mat->devB, rowsMemB, colsMemB, batchct);
-  copyAndConvert(c_type, hostC, mat->devC, rowsMemC, colsMemC, batchct);
+  copy_and_convert(a_type, hostA, mat->devA, rowsMemA, colsMemA, batchct);
+  copy_and_convert(b_type, hostB, mat->devB, rowsMemB, colsMemB, batchct);
+  copy_and_convert(c_type, hostC, mat->devC, rowsMemC, colsMemC, batchct);
   if (batched && !strided) {
     // Perform some pointer arithmetic to calculate the arrays we pass to the
     // gpu

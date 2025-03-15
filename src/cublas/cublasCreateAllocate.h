@@ -3,6 +3,7 @@
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
+#include <cuda_fp4.h>
 #include <cuda_runtime.h>
 
 #include <complex>
@@ -30,6 +31,8 @@ template <typename T>
 struct sizeofCUDTP {
   int operator()();
 };
+
+int get_packing_count(mblasDataType type);
 
 //template <typename T>
 //struct batchedPtrCopy {
@@ -126,7 +129,7 @@ void batchedPtrMagic<T>::operator()(void **hptr, void *dAr,
   }
 }
 
-void batchedPtrMagicGeneric(void **hptr, void *dAr, int batch_count, int x, int y, int flush_batch_count, long total_block_size, int type_size);
+void batchedPtrMagicGeneric(void **hptr, void *dAr, int batch_count, long x, long y, int flush_batch_count, long total_block_size, mblasDataType type);
 
 //template <typename T>
 //void batchedPtrCopy<T>::operator()(void **dptr, void *dAr,
@@ -161,7 +164,11 @@ auto typeCallHost(mblasDataType type, Args... args) ->
       return tFunc<std::complex<float>>()(args...);
     case mblasDataType::MBLAS_R_8F_E4M3:
       return tFunc<float>()(args...);
+    //case mblasDataType::MBLAS_R_8F_UE4M3:
+    //  return tFunc<float>()(args...);
     case mblasDataType::MBLAS_R_8F_E5M2:
+      return tFunc<float>()(args...);
+    case mblasDataType::MBLAS_R_4F_E2M1:
       return tFunc<float>()(args...);
     case mblasDataType::MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
@@ -202,9 +209,13 @@ auto typeCallDev(mblasDataType type, Args... args) ->
     case mblasDataType::MBLAS_C_16F:
       return tFunc<std::complex<__half>>()(args...);
     case mblasDataType::MBLAS_R_8F_E4M3:
-      return tFunc<__nv_fp8_e4m3>()(args...);
+      return tFunc<float>()(args...);
+    //case mblasDataType::MBLAS_R_8F_UE4M3:
+    //  return tFunc<__nv_fp8_e4m3>()(args...);
     case mblasDataType::MBLAS_R_8F_E5M2:
       return tFunc<__nv_fp8_e5m2>()(args...);
+    case mblasDataType::MBLAS_R_4F_E2M1:
+      return tFunc<__nv_fp4x2_e2m1>()(args...);
     case mblasDataType::MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
     case mblasDataType::MBLAS_C_8I:

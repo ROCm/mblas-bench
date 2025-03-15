@@ -44,6 +44,10 @@ struct cublasltgemmInst {
   void **ptrDevB;
   void **ptrDevC;
   void **ptrDevD;
+  void *scale_dev_a;
+  void *scale_dev_b;
+  void *scale_dev_c;
+  void *scale_dev_d;
   cublasLtMatmulDesc_t descOP;
   cublasLtMatrixLayout_t descA;
   cublasLtMatrixLayout_t descB;
@@ -56,6 +60,16 @@ struct cublasltgemmInst {
   cublasltgemmInst(int devID) { devIDX = devID; }
 };
 
+struct scale_size {
+  long rows;
+  long cols;
+  inline size_t get_size() {
+    return rows*cols;
+  }
+  scale_size(std::pair<size_t,size_t> size) : rows(size.first), cols(size.second) {}
+  scale_size(){};
+};
+
 class cublasLtGemm : public genericGemm {
  private:
   void *dataHost;
@@ -64,10 +78,16 @@ class cublasLtGemm : public genericGemm {
   void **ptrHostC;
   void **ptrHostD;
 
+  void *scale_host_a;
+  void *scale_host_b;
+  void *scale_host_c;
+  void *scale_host_d;
+
   void *alpha;
   void *beta;
 
   bool inplace = false;
+  bool use_scaling = false;
   mblasCuOperation transA;
   mblasCuOperation transB;
 
@@ -78,7 +98,22 @@ class cublasLtGemm : public genericGemm {
   mblasCuDataType b_type;
   mblasCuDataType c_type;
   mblasCuDataType d_type;
+
+  mblasCuDataType a_scale_type;
+  mblasCuDataType b_scale_type;
+  mblasCuDataType c_scale_type;
+  mblasCuDataType d_scale_type;
   mblasCuDataType bias_type;
+
+  scale_size a_scale_size;
+  scale_size b_scale_size;
+  scale_size c_scale_size;
+  scale_size d_scale_size;
+
+  cublasLtMatmulMatrixScale_t a_scale_mode;
+  cublasLtMatmulMatrixScale_t b_scale_mode;
+  cublasLtMatmulMatrixScale_t c_scale_mode;
+  cublasLtMatmulMatrixScale_t d_scale_mode;
 
   uint64_t a_offset_host;
   uint64_t b_offset_host;

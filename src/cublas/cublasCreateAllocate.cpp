@@ -15,6 +15,7 @@
 
 #include "cudaError.h"
 #include "genericInit.h"
+#include "genericSetup.h"
 
 void *allocateHostArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
@@ -24,8 +25,11 @@ void *allocateHostArr(mblasDataType type, long x, long y, int batch) {
 
 void *allocateDevArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallDev<sizeofCUDT>(type);
+  long packing_count = get_packing_count(type);
+  // Compensate for packing of 4 bit dtypes
+  long malloc_size = ceil_division(x * y * batch * typesize, packing_count);
   void *data;
-  checkCuda(cudaMalloc(&data, x * y * batch * typesize));
+  checkCuda(cudaMalloc(&data, malloc_size));
   return data;
 }
 
@@ -36,17 +40,29 @@ void *allocateHDevArr(mblasDataType type, long x, long y, int batch) {
   return data;
 }
 
-void batchedPtrMagicGeneric(void **hptr, void *dAr, int batch_count, int x, int y, int flush_batch_count, long total_block_size, int type_size) {
+void batchedPtrMagicGeneric(void **hptr, void *dAr, int batch_count, long x, long y, int flush_batch_count, long total_block_size, mblasDataType type) {
   //T **host = reinterpret_cast<T **>(hptr);
   //T *device_array = static_cast<T *>(dAr);
+  long type_size = typeCallHost<sizeofCUDT>(type);
+  long packing_count = get_packing_count(type);
   for (int j = 0; j < flush_batch_count; j++) {
     // Offset to the next block if using cache flushing
     int flush_offset = j*total_block_size;
     for (int i = 0; i < batch_count; i++) {
-      hptr[j*batch_count + i] = (char*) dAr + flush_offset + (i * x * y * type_size);
+      hptr[j*batch_count + i] = (char*) dAr + flush_offset + ceil_division(i * x * y * type_size, packing_count);
     }
   }
-  
+}
+
+
+int get_packing_count(mblasDataType type) {
+  if (type == mblasDataType::MBLAS_R_4F_E2M1) {
+    // Two 4-bit FP4 floats per byte
+    return 2;
+  } else {
+    return 1;
+  }
+
 }
 // void dummy() {
 //   // This function forces the compiler to generate the needed templated variants

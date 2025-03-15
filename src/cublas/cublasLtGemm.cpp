@@ -87,6 +87,13 @@ std::vector<matmulPrecType> cublasLtGemm::matmulSupported = {
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_16F,       mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_32F,       mblasDataType::MBLAS_R_16BF},
+  // FP4 Kernels
+  // Compute type                   Scale Type    A Type            B Type            C Type        D Type            Bias Type
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16BF,   mblasDataType::MBLAS_R_4F_E2M1,       mblasDataType::MBLAS_R_16BF},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16BF,   mblasDataType::MBLAS_R_16BF,       mblasDataType::MBLAS_R_16BF},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_4F_E2M1,       mblasDataType::MBLAS_R_16F},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_16F,       mblasDataType::MBLAS_R_16F},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_32F,       mblasDataType::MBLAS_R_16BF},
   // Mixed precision complex kernels
   // Compute type                   Scale Type    A Type            B Type            C Type        D Type            Bias Type
   {mblasComputeType::MBLAS_COMPUTE_32F ,             mblasDataType::MBLAS_C_32F,   mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_C_16F,   mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_ANY},
@@ -140,6 +147,27 @@ void cublasLtGemm::parseMType(string computeTStr, string scalarTStr,
     c_type = mblasCuDataType(cStr);
     d_type = mblasCuDataType(dStr);
   }
+
+  use_scaling = a_type.isFp4() || b_type.isFp4() || c_type.isFp4() || d_type.isFp4();
+  if (use_scaling)
+  {
+    // Determine scale types (calculated from a,b,c,d type)
+    a_scale_type = a_type.get_scale_type();
+    b_scale_type = b_type.get_scale_type();
+    c_scale_type = c_type.get_scale_type();
+    d_scale_type = d_type.get_scale_type();
+    // Scale modes
+    a_scale_mode = a_type.get_scale_mode();
+    b_scale_mode = b_type.get_scale_mode();
+    c_scale_mode = c_type.get_scale_mode();
+    d_scale_mode = d_type.get_scale_mode();
+    // Calculate lengths
+    a_scale_size = get_scale_tensor_size(m, k, a_scale_mode);
+    b_scale_size = get_scale_tensor_size(k, n, b_scale_mode);
+    c_scale_size = get_scale_tensor_size(m, n, c_scale_mode);
+    d_scale_size = get_scale_tensor_size(m, n, d_scale_mode);
+  }
+
 }
 
 void cublasLtGemm::validateParameters() {
@@ -211,12 +239,17 @@ cublasLtGemm::cublasLtGemm(cxxopts::ParseResult result) : genericGemm(result) {
   uint64_t a_offset, b_offset, c_offset, d_offset;
   set_flush_batch_count(a_offset, b_offset, c_offset, d_offset, 
       typeCallDev<sizeofCUDT>(a_type), typeCallDev<sizeofCUDT>(b_type), 
-      typeCallDev<sizeofCUDT>(c_type), typeCallDev<sizeofCUDT>(d_type), inplace);
+      typeCallDev<sizeofCUDT>(c_type), typeCallDev<sizeofCUDT>(d_type), 
+      get_packing_count(a_type), 
+      get_packing_count(b_type), 
+      get_packing_count(c_type), 
+      get_packing_count(d_type), 
+      inplace);
 }
 
 string cublasLtGemm::prepareArray() {
-  alpha = convertScalar(scalar, alpha);
-  beta = convertScalar(scalar, beta);
+  alpha = convert_scalar(scalar, alpha);
+  beta = convert_scalar(scalar, beta);
   this->allocHost();
   this->fillHost();
 
@@ -284,6 +317,10 @@ void cublasLtGemm::allocHost() {
     typeCallHost<sizeofCUDT>(b_type),
     typeCallHost<sizeofCUDT>(c_type),
     typeCallHost<sizeofCUDT>(d_type),
+    get_packing_count(a_type),
+    get_packing_count(b_type),
+    get_packing_count(c_type),
+    get_packing_count(d_type),
     batchct, inplace
    );
   // Allocate big block of memory
@@ -301,10 +338,17 @@ void cublasLtGemm::allocHost() {
       (void **)malloc(batchct * flush_batch_count * typeCallHost<sizeofCUDTP>(c_type));
   ptrHostD =
       (void **)malloc(batchct * flush_batch_count * typeCallHost<sizeofCUDTP>(d_type));
-  batchedPtrMagicGeneric(ptrHostA, dataHost + a_offset_host, batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(a_type));
-  batchedPtrMagicGeneric(ptrHostB, dataHost + b_offset_host, batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(b_type));
-  batchedPtrMagicGeneric(ptrHostC, dataHost + c_offset_host, batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(c_type));
-  batchedPtrMagicGeneric(ptrHostD, dataHost + d_offset_host, batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_host, typeCallHost<sizeofCUDT>(d_type));
+  batchedPtrMagicGeneric(ptrHostA, dataHost + a_offset_host, batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_host, a_type);
+  batchedPtrMagicGeneric(ptrHostB, dataHost + b_offset_host, batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_host, b_type);
+  batchedPtrMagicGeneric(ptrHostC, dataHost + c_offset_host, batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_host, c_type);
+  batchedPtrMagicGeneric(ptrHostD, dataHost + d_offset_host, batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_host, d_type);
+  if (use_scaling) {
+    scale_host_a = malloc(a_scale_size.get_size()*typeCallHost<sizeofCUDT>(a_scale_type));
+    scale_host_b = malloc(b_scale_size.get_size()*typeCallHost<sizeofCUDT>(b_scale_type));
+    scale_host_c = malloc(c_scale_size.get_size()*typeCallHost<sizeofCUDT>(c_scale_type));
+    scale_host_d = malloc(d_scale_size.get_size()*typeCallHost<sizeofCUDT>(d_scale_type));
+  }
+
 }
 
 void cublasLtGemm::allocDev(cublasltgemmInst *mat) {
@@ -318,6 +362,10 @@ void cublasLtGemm::allocDev(cublasltgemmInst *mat) {
     typeCallDev<sizeofCUDT>(b_type),
     typeCallDev<sizeofCUDT>(c_type),
     typeCallDev<sizeofCUDT>(d_type),
+    get_packing_count(a_type),
+    get_packing_count(b_type),
+    get_packing_count(c_type),
+    get_packing_count(d_type),
     batchct, inplace
    );
 
@@ -332,10 +380,10 @@ void cublasLtGemm::allocDev(cublasltgemmInst *mat) {
   mat->ptrDevD =
       (void **)malloc(batchct * flush_batch_count * typeCallDev<sizeofCUDTP>(d_type));
 
-  batchedPtrMagicGeneric(mat->ptrDevA, mat->dataDev + a_offset_dev, batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(a_type));
-  batchedPtrMagicGeneric(mat->ptrDevB, mat->dataDev + b_offset_dev, batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(b_type));
-  batchedPtrMagicGeneric(mat->ptrDevC, mat->dataDev + c_offset_dev, batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(c_type));
-  batchedPtrMagicGeneric(mat->ptrDevD, mat->dataDev + d_offset_dev, batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_dev, typeCallDev<sizeofCUDT>(d_type));
+  batchedPtrMagicGeneric(mat->ptrDevA, mat->dataDev + a_offset_dev, batchct, rowsMemA, colsMemA, flush_batch_count, total_block_size_dev, a_type);
+  batchedPtrMagicGeneric(mat->ptrDevB, mat->dataDev + b_offset_dev, batchct, rowsMemB, colsMemB, flush_batch_count, total_block_size_dev, b_type);
+  batchedPtrMagicGeneric(mat->ptrDevC, mat->dataDev + c_offset_dev, batchct, rowsMemC, colsMemC, flush_batch_count, total_block_size_dev, c_type);
+  batchedPtrMagicGeneric(mat->ptrDevD, mat->dataDev + d_offset_dev, batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size_dev, d_type);
   // mat->devA = allocateDevArr(a_type, rowsMemA, colsMemA, batchct);
   // mat->devB = allocateDevArr(b_type, rowsMemB, colsMemB, batchct);
   // mat->devC = allocateDevArr(c_type, rowsMemC, colsMemC, batchct);
@@ -346,6 +394,12 @@ void cublasLtGemm::allocDev(cublasltgemmInst *mat) {
   // }
   mat->wSZ = workspaceSz;
   cudaMalloc(&mat->devWork, mat->wSZ);
+  if (use_scaling) {
+    cudaMalloc(&mat->scale_dev_a, a_scale_size.get_size()*typeCallDev<sizeofCUDT>(a_scale_type));
+    cudaMalloc(&mat->scale_dev_b, b_scale_size.get_size()*typeCallDev<sizeofCUDT>(b_scale_type));
+    cudaMalloc(&mat->scale_dev_c, c_scale_size.get_size()*typeCallDev<sizeofCUDT>(c_scale_type));
+    cudaMalloc(&mat->scale_dev_d, d_scale_size.get_size()*typeCallDev<sizeofCUDT>(d_scale_type));
+  }
 }
 
 void cublasLtGemm::fillHost() {
@@ -353,13 +407,13 @@ void cublasLtGemm::fillHost() {
   // vector<thread> threads;
   // threads.push_back(thread(initHostH, a_type, initialization, hostA, m, k,
   // lda,
-  //                         batchct, stride_a, 2.f, false));
+  //                         batchct, stride_a, 1.f, false));
   // threads.push_back(thread(initHostH, b_type, initialization, hostB, k, n,
   // ldb,
-  //                         batchct, stride_b, 3.f, true));
+  //                         batchct, stride_b, 2.f, true));
   // threads.push_back(thread(initHostH, c_type, initialization, hostC, m, n,
   // ldc,
-  //                         batchct, stride_c, 1.f, false));
+  //                         batchct, stride_c, 0.f, false));
   // for (auto &thread : threads) {
   //  thread.join();
   //}
@@ -372,14 +426,20 @@ void cublasLtGemm::fillHost() {
                            batchct, stride_c, controlC, constantC, filenameC);
     // D is just output, don't need to init
   }
+  if (use_scaling) {
+    typeCallHost<initHost>(a_scale_type, string("constant"), scale_host_a, (int)a_scale_size.rows, (int)a_scale_size.cols, 1, 1, 0LL, false, 2.0f, string(""));
+    typeCallHost<initHost>(b_scale_type, string("constant"), scale_host_b, (int)b_scale_size.rows, (int)b_scale_size.cols, 1, 1, 0LL, false, 0.5f, string(""));
+    typeCallHost<initHost>(c_scale_type, string("constant"), scale_host_c, (int)c_scale_size.rows, (int)c_scale_size.cols, 1, 1, 0LL, false, 1.0f, string(""));
+    typeCallHost<initHost>(d_scale_type, string("constant"), scale_host_d, (int)d_scale_size.rows, (int)d_scale_size.cols, 1, 1, 0LL, false, 1.0f, string(""));
+  }
 }
 
 void cublasLtGemm::copyHostToDev(cublasltgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
   for (int j = 0; j < flush_batch_count; j++) {
-    copyAndConvert(a_type, ptrHostA[j*batchct], mat->ptrDevA[j*batchct], rowsMemA, colsMemA, batchct);
-    copyAndConvert(b_type, ptrHostB[j*batchct], mat->ptrDevB[j*batchct], rowsMemB, colsMemB, batchct);
-    copyAndConvert(c_type, ptrHostC[j*batchct], mat->ptrDevC[j*batchct], rowsMemC, colsMemC, batchct);
+    copy_and_convert(a_type, ptrHostA[j*batchct], mat->ptrDevA[j*batchct], rowsMemA, colsMemA, batchct);
+    copy_and_convert(b_type, ptrHostB[j*batchct], mat->ptrDevB[j*batchct], rowsMemB, colsMemB, batchct);
+    copy_and_convert(c_type, ptrHostC[j*batchct], mat->ptrDevC[j*batchct], rowsMemC, colsMemC, batchct);
   }
 
   ////if (batched && !strided) {
@@ -394,6 +454,12 @@ void cublasLtGemm::copyHostToDev(cublasltgemmInst *mat) {
   //typeCallDev<batchedPtrCopy>(d_type, mat->ptrDevD, data + d_offset_host,
   //                            batchct, rowsMemD, colsMemD, flush_batch_count, total_block_size);
   //}
+  if (use_scaling) {
+    copy_and_convert(a_scale_type, scale_host_a, mat->scale_dev_a, a_scale_size.rows, a_scale_size.cols, 1);
+    copy_and_convert(b_scale_type, scale_host_b, mat->scale_dev_a, b_scale_size.rows, b_scale_size.cols, 1);
+    copy_and_convert(c_scale_type, scale_host_c, mat->scale_dev_a, c_scale_size.rows, c_scale_size.cols, 1);
+    copy_and_convert(d_scale_type, scale_host_d, mat->scale_dev_a, d_scale_size.rows, d_scale_size.cols, 1);
+  }
 }
 
 void cublasLtGemm::prepareMatrix(cublasltgemmInst *mat) {
@@ -404,7 +470,23 @@ void cublasLtGemm::prepareMatrix(cublasltgemmInst *mat) {
       mat->descOP, CUBLASLT_MATMUL_DESC_TRANSA, &transACU, sizeof(transACU)));
   checkCublas(cublasLtMatmulDescSetAttribute(
       mat->descOP, CUBLASLT_MATMUL_DESC_TRANSB, &transBCU, sizeof(transBCU)));
+  if (use_scaling) {
+    // set block scaling mode
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
+    //cublasLtMatmulMatrixScale_t d_scale_mode = CUBLASLT_MATMUL
+    //checkCublas(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &DOutScaleMode, sizeof(DOutScaleMode)));
 
+    // set scaling factors
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a, sizeof(mat->scale_dev_a)));
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_B_SCALE_POINTER, &mat->scale_dev_b, sizeof(mat->scale_dev_b)));
+
+    if (d_type.isFp4()) {
+      checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &d_scale_mode, sizeof(d_scale_mode)));
+      checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &mat->scale_dev_d, sizeof(mat->scale_dev_d)));
+    }
+    //checkCublas(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &d_out_scale, sizeof(d_out_scale)));
+  }
   checkCublas(
       cublasLtMatrixLayoutCreate(&mat->descA, a_type, rowsA, colsA, lda));
   checkCublas(
@@ -453,16 +535,20 @@ void cublasLtGemm::autoTuning(cublasltgemmInst *mat) {
 }
 
 void cublasLtGemm::freeMem() {
-  //free(alpha);
-  //free(beta);
-  //free(hostA);
-  //free(hostB);
-  //free(hostC);
-  //for (auto mat : matPtrs) {
-  //  cudaFree(mat.ptrDevA);
-  //  cudaFree(mat.ptrDevB);
-  //  cudaFree(mat.ptrDevC);
-  //}
+  free(alpha);
+  free(beta);
+  free(ptrHostA);
+  free(ptrHostB);
+  free(ptrHostC);
+  free(ptrHostD);
+  free(dataHost);
+  for (auto mat : matPtrs) {
+    cudaFree(mat.dataDev);
+    cudaFree(mat.ptrDevA);
+    cudaFree(mat.ptrDevB);
+    cudaFree(mat.ptrDevC);
+    cudaFree(mat.ptrDevD);
+  }
 }
 
 double cublasLtGemm::test() {

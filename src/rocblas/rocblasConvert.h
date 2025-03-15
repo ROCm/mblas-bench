@@ -7,10 +7,10 @@
 #include <hip/hip_runtime.h>
 #include "mblasDataType.h"
 
-__global__ void floatToBfloat16(float *input, size_t num_elements,
+__global__ void float_to_bf16(float *input, size_t num_elements,
                                 hip_bfloat16 *output);
 
-__global__ void floatToFp16(float *input, size_t num_elements, __half *output);
+__global__ void float_to_fp16(float *input, size_t num_elements, __half *output);
 
 void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x,
                     int y, int batchsz);

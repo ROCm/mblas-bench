@@ -103,12 +103,14 @@ std::pair<int, int> genericGemm::setRowCol(std::string OP, int d1, int d2) {
 }
 
 void genericGemm::set_flush_batch_count(uint64_t & a_offset, uint64_t & b_offset, uint64_t & c_offset, uint64_t & d_offset,
-                      int a_type_size,  int b_type_size, int c_type_size, int d_type_size, bool inplace) {
+                      int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
+                      int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing,
+                      bool inplace) {
   // test
   uint64_t single_block_size = calculate_offsets(rowsMemA, colsMemA, rowsMemB, colsMemB, rowsMemC, colsMemC, rowsMemD, colsMemD, 
                     a_offset, b_offset, c_offset, d_offset, a_type_size, b_type_size, c_type_size, d_type_size,
-                        batchct, inplace);
-  uint64_t flush_memory_size_bytes = (uint64_t)flush_memory_size * 1000 * 1000;
+                    a_type_packing, b_type_packing, c_type_packing, d_type_packing, batchct, inplace);
+  uint64_t flush_memory_size_bytes = (uint64_t)flush_memory_size * 1024 * 1024;
   if (flush_memory_size == 0) {
     // Not specified, return
     return;
@@ -117,7 +119,7 @@ void genericGemm::set_flush_batch_count(uint64_t & a_offset, uint64_t & b_offset
   int new_flush_batch_count = flush_memory_size_bytes / single_block_size;
   if (new_flush_batch_count == 0) {
     std::cerr << "Note: Unable to set flush_batch_count from flush_memory_size (rotating). "
-    "Problem does not fit into memory size of " << flush_memory_size << "MB" << std::endl;
+    "Problem does not fit into memory size of " << flush_memory_size << "MiB" << std::endl;
   } else {
     flush_batch_count = new_flush_batch_count;
   }
