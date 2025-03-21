@@ -86,14 +86,15 @@ template <typename T>
 void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
                            long long int stride, bool isSin) {
   T *A = (T *)ptr;
+  #pragma omp parallel for shared(A) collapse(3)
   for (size_t i_batch = 0; i_batch < batch; i_batch++) {
     for (size_t j = 0; j < cols_A; ++j) {
-      size_t offset = j * ld + i_batch * stride;
+      // size_t offset = j * ld + i_batch * stride;
       for (size_t i = 0; i < rows_A; ++i) {
         if (isSin) {
-          A[i + offset] = T(sin(i + offset));
+          A[i + j * ld + i_batch * stride] = T(sin(i + j * ld + i_batch * stride));
         } else {
-          A[i + offset] = T(cos(i + offset));
+          A[i + j * ld + i_batch * stride] = T(cos(i + j * ld + i_batch * stride));
         }
       }
     }
