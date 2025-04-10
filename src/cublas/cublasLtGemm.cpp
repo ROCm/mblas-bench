@@ -87,6 +87,7 @@ std::vector<matmulPrecType> cublasLtGemm::matmulSupported = {
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_16F,       mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_32F,       mblasDataType::MBLAS_R_16BF},
+#if (CUDART_VERSION >= 12800)
   // FP4 Kernels
   // Compute type                   Scale Type    A Type            B Type            C Type        D Type            Bias Type
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16BF,   mblasDataType::MBLAS_R_4F_E2M1,       mblasDataType::MBLAS_R_16BF},
@@ -94,6 +95,7 @@ std::vector<matmulPrecType> cublasLtGemm::matmulSupported = {
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_4F_E2M1,       mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_16F,       mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_32F,       mblasDataType::MBLAS_R_16BF},
+#endif
   // Mixed precision complex kernels
   // Compute type                   Scale Type    A Type            B Type            C Type        D Type            Bias Type
   {mblasComputeType::MBLAS_COMPUTE_32F ,             mblasDataType::MBLAS_C_32F,   mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_C_16F,   mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_ANY},
@@ -148,6 +150,7 @@ void cublasLtGemm::parseMType(string computeTStr, string scalarTStr,
     d_type = mblasCuDataType(dStr);
   }
 
+#if (CUDART_VERSION >= 12800)
   use_scaling = a_type.isFp4() || b_type.isFp4() || c_type.isFp4() || d_type.isFp4();
   if (use_scaling)
   {
@@ -167,7 +170,7 @@ void cublasLtGemm::parseMType(string computeTStr, string scalarTStr,
     c_scale_size = get_scale_tensor_size(m, n, c_scale_mode);
     d_scale_size = get_scale_tensor_size(m, n, d_scale_mode);
   }
-
+#endif
 }
 
 void cublasLtGemm::validateParameters() {
@@ -470,6 +473,7 @@ void cublasLtGemm::prepareMatrix(cublasltgemmInst *mat) {
       mat->descOP, CUBLASLT_MATMUL_DESC_TRANSA, &transACU, sizeof(transACU)));
   checkCublas(cublasLtMatmulDescSetAttribute(
       mat->descOP, CUBLASLT_MATMUL_DESC_TRANSB, &transBCU, sizeof(transBCU)));
+#if (CUDART_VERSION >= 12800)
   if (use_scaling) {
     // set block scaling mode
     checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
@@ -487,6 +491,7 @@ void cublasLtGemm::prepareMatrix(cublasltgemmInst *mat) {
     }
     //checkCublas(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &d_out_scale, sizeof(d_out_scale)));
   }
+#endif
   checkCublas(
       cublasLtMatrixLayoutCreate(&mat->descA, a_type, rowsA, colsA, lda));
   checkCublas(

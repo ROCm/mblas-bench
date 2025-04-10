@@ -26,6 +26,8 @@ bool matchGemmType(mblasDataType precision, std::string function, mblasDataType 
 
 // From https://github.com/NVIDIA/CUDALibrarySamples/blob/master/cuBLASLt/Common/helpers.h
 // Block scales used for mxfp8 and nvfp8 require a special layout: https://docs.nvidia.com/cuda/cublas/index.html#d-block-scaling-factors-layout for more details.
+
+#if (CUDART_VERSION >= 12800)
 std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, cublasLtMatmulMatrixScale_t ScaleMode) {
   if (ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F)
     return std::pair<size_t, size_t>(1, 1);
@@ -47,3 +49,4 @@ std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, cublasLtMatm
 
   return std::pair<size_t, size_t>(0, 0);
 }
+#endif

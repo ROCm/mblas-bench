@@ -110,11 +110,12 @@ class cublasLtGemm : public genericGemm {
   scale_size c_scale_size;
   scale_size d_scale_size;
 
+#if (CUDART_VERSION >= 12800)
   cublasLtMatmulMatrixScale_t a_scale_mode;
   cublasLtMatmulMatrixScale_t b_scale_mode;
   cublasLtMatmulMatrixScale_t c_scale_mode;
   cublasLtMatmulMatrixScale_t d_scale_mode;
-
+#endif
   uint64_t a_offset_host;
   uint64_t b_offset_host;
   uint64_t c_offset_host;

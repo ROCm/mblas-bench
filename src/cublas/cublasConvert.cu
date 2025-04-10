@@ -1,11 +1,13 @@
 #include "cublasConvert.h"
 
 #include <bitset>
-#include <cuda_fp4.h>
-#include <cuda_fp8.h>
+#include <cuda_runtime.h>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
-#include <cuda_runtime.h>
+#include <cuda_fp8.h>
+#if (CUDART_VERSION >= 12800)
+#include <cuda_fp4.h>
+#endif 
 #include "cublasCreateAllocate.h"
 #include "cudaError.h"
 #include "mblasCuDataType.h"
@@ -49,6 +51,8 @@ cudaRoundMode
     cudaRoundPosInf
     cudaRoundMinInf
 */
+
+#if (CUDART_VERSION >= 12800)
 __global__ void float_to_fp4(float2 *input, size_t num_elements,
                            __nv_fp4x2_storage_t *output)
 {
@@ -58,6 +62,7 @@ __global__ void float_to_fp4(float2 *input, size_t num_elements,
     output[idx] = __nv_cvt_float2_to_fp4x2(input[idx], __NV_E2M1, cudaRoundNearest);
   }
 }
+#endif
 
 __global__ void intToInt8(__int32_t *input, size_t num_elements,
                           __int8_t *output, __nv_fp8_interpretation_t interp)
@@ -129,6 +134,8 @@ void copy_and_convert(mblasCuDataType precision, void *hostA, void *devA, long x
   }
   else if (precision == mblasDataType::MBLAS_R_4F_E2M1)
   {
+
+#if (CUDART_VERSION >= 12800)
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
     checkCuda(cudaMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
@@ -139,6 +146,7 @@ void copy_and_convert(mblasCuDataType precision, void *hostA, void *devA, long x
     float_to_fp4<<<num_blocks, block_size>>>((float2 *)tmpA, num_elements, (__nv_fp4x2_storage_t *)devA);
     checkCuda(cudaGetLastError());
     cudaFree(tmpA);
+#endif
   }
   // else if (precision == mblasDataType::MBLAS_C_8I || precision == mblasDataType::MBLAS_R_8I)
   //{

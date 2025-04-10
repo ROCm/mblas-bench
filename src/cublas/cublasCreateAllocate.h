@@ -1,10 +1,13 @@
 #pragma once
+
+#include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
+#if (CUDART_VERSION >= 12800)
 #include <cuda_fp4.h>
-#include <cuda_runtime.h>
+#endif
 
 #include <complex>
 #include <random>
@@ -214,8 +217,10 @@ auto typeCallDev(mblasDataType type, Args... args) ->
     //  return tFunc<__nv_fp8_e4m3>()(args...);
     case mblasDataType::MBLAS_R_8F_E5M2:
       return tFunc<__nv_fp8_e5m2>()(args...);
+#if (CUDART_VERSION >= 12800)
     case mblasDataType::MBLAS_R_4F_E2M1:
       return tFunc<__nv_fp4x2_e2m1>()(args...);
+#endif
     case mblasDataType::MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
     case mblasDataType::MBLAS_C_8I:
