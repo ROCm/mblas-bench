@@ -12,6 +12,8 @@ __global__ void float_to_bf16(float *input, size_t num_elements,
 
 __global__ void float_to_fp16(float *input, size_t num_elements, __half *output);
 
+__global__ void float_to_fp8(float *input, size_t num_elements,
+                           __hip_fp8_storage_t *output, __hip_fp8_interpretation_t interp);
 void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x,
                     int y, int batchsz);
 //void copyAndConvert(hipblasDatatype_t precision, void *hostA, void *devA, int x,

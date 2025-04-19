@@ -37,6 +37,10 @@ const char *rocblasGetErrorString(rocblas_status status) {
       return "rocblas_status_continue";
     case rocblas_status_check_numerics_fail:
       return "rocblas_status_check_numerics_fail";
+    case rocblas_status_excluded_from_build:
+      return "rocblas_status_excluded_from_build";
+    case rocblas_status_arch_mismatch:
+      return "rocblas_status_arch_mismatch";
   }
   return "unknown error";
 }

@@ -192,6 +192,10 @@ auto typeCallHost(mblasDataType type, Args... args) ->
       return tFunc<float>()(args...);
     case MBLAS_R_16F:
       return tFunc<float>()(args...);
+    case mblasDataType::MBLAS_R_8F_E4M3:
+      return tFunc<float>()(args...);
+    case mblasDataType::MBLAS_R_8F_E5M2:
+      return tFunc<float>()(args...);
     case MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
     case MBLAS_R_8U:
@@ -256,6 +260,10 @@ auto typeCallDev(mblasDataType type, Args... args) ->
       return tFunc<__half>()(args...);
     // case hipDataType_f16_c:
     //   return tFunc<hipComplex>()(args...);
+    case mblasDataType::MBLAS_R_8F_E4M3:
+      return tFunc<__hip_fp8_e4m3>()(args...);
+    case mblasDataType::MBLAS_R_8F_E5M2:
+      return tFunc<__hip_fp8_e5m2>()(args...);
     case MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
     case MBLAS_R_8U:

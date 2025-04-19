@@ -8,17 +8,17 @@
 #include "rocblasCreateAllocate.h"
 #include "rocblasError.h"
 
-__global__ void floatToBfloat16(float *input, size_t num_elements,
+__global__ void float_to_bf16(float *input, size_t num_elements,
                                 hip_bfloat16 *output)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elements)
   {
-    output[idx] = (hip_bfloat16) input[idx];
+    output[idx] = __float2bfloat16(input[idx]);
   }
 }
 
-__global__ void floatToFp16(float *input, size_t num_elements, __half *output)
+__global__ void float_to_fp16(float *input, size_t num_elements, __half *output)
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elements)
@@ -27,15 +27,15 @@ __global__ void floatToFp16(float *input, size_t num_elements, __half *output)
   }
 }
 
-// __global__ void floatToFp8(float *input, size_t num_elements,
-//                            __nv_fp8_storage_t *output, __nv_fp8_interpretation_t interp)
-// {
-//   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-//   if (idx < num_elements)
-//   {
-//     output[idx] = __nv_cvt_float_to_fp8(input[idx], __NV_SATFINITE, interp);
-//   }
-// }
+__global__ void float_to_fp8(float *input, size_t num_elements,
+                           __hip_fp8_storage_t *output, __hip_fp8_interpretation_t interp)
+{
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < num_elements)
+  {
+    output[idx] = __hip_cvt_float_to_fp8(input[idx], __HIP_SATFINITE, interp);
+  }
+}
 
 // __global__ void intToInt8(__int32_t *input, size_t num_elements,
 //                           __int8_t *output, __nv_fp8_interpretation_t interp)
@@ -62,7 +62,7 @@ void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int
     long num_elements = batchsz * x * y;
     long block_size = 256;
     long num_blocks = (num_elements + block_size - 1) / block_size;
-    floatToFp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
+    float_to_fp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
     hipFree(tmpA);
   }
   else if (precision == mblasDataType(MBLAS_C_16BF) || precision == mblasDataType(MBLAS_R_16BF))
@@ -74,9 +74,33 @@ void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int
     long num_elements = batchsz * x * y;
     long block_size = 256;
     long num_blocks = (num_elements + block_size - 1) / block_size;
-    floatToBfloat16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
+    float_to_bf16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
     hipFree(tmpA);
-  } else {
+  } 
+  else if (precision == mblasDataType::MBLAS_R_8F_E4M3 || precision == mblasDataType::MBLAS_R_8F_E5M2 )
+  {
+    // Allocate memory in the device for host precision (float)
+    void *tmpA = allocateHDevArr(precision, x, y, batchsz);
+    checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+                         hipMemcpyHostToDevice));
+    long num_elements = batchsz * x * y;
+    long block_size = 256;
+    long num_blocks = (num_elements + block_size - 1) / block_size;
+    __hip_fp8_interpretation_t interp;
+    if (precision == mblasDataType::MBLAS_R_8F_E4M3)
+    {
+      interp = __HIP_E4M3_FNUZ;
+    }
+    else if (precision == mblasDataType::MBLAS_R_8F_E5M2)
+    {
+      interp = __HIP_E5M2_FNUZ;
+    }
+    float_to_fp8<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA, interp);
+    checkHip(hipGetLastError());
+    hipFree(tmpA);
+  }
+  else 
+  {
     checkHip(hipMemcpy(devA, hostA, (long)batchsz * x * y * hostsz,
                        hipMemcpyHostToDevice));
   }

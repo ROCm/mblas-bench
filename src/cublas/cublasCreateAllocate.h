@@ -212,7 +212,7 @@ auto typeCallDev(mblasDataType type, Args... args) ->
     case mblasDataType::MBLAS_C_16F:
       return tFunc<std::complex<__half>>()(args...);
     case mblasDataType::MBLAS_R_8F_E4M3:
-      return tFunc<float>()(args...);
+      return tFunc<__nv_fp8_e4m3>()(args...);
     //case mblasDataType::MBLAS_R_8F_UE4M3:
     //  return tFunc<__nv_fp8_e4m3>()(args...);
     case mblasDataType::MBLAS_R_8F_E5M2:
