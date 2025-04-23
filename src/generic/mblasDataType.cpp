@@ -12,6 +12,8 @@ const std::map<std::string, mblasDataTypeEnum> mblasDataType::precDType = {
     {"bf16_c", mblasDataTypeEnum::MBLAS_C_16BF}, {"i8_r", mblasDataTypeEnum::MBLAS_R_8I},   {"i8_c", mblasDataTypeEnum::MBLAS_C_8I},
     {"i32_r", mblasDataTypeEnum::MBLAS_R_32I},   {"i32_c", mblasDataTypeEnum::MBLAS_C_32I},
     {"f8_r", mblasDataTypeEnum::MBLAS_R_8F_E4M3},   {"bf8_r", mblasDataTypeEnum::MBLAS_R_8F_E5M2},
+    {"f6_r", mblasDataTypeEnum::MBLAS_R_6F_E3M2},
+    {"f4_r", mblasDataTypeEnum::MBLAS_R_4F_E2M1},
     // MBLAS
     {"MBLAS_ANY",  mblasDataTypeEnum::MBLAS_ANY},
     {"MBLAS_NULL",  mblasDataTypeEnum::MBLAS_NULL},
