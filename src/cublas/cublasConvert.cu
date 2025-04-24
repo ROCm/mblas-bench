@@ -5,7 +5,7 @@
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
 #include <cuda_fp4.h>
 #endif 
 #include "cublasCreateAllocate.h"
@@ -52,7 +52,7 @@ cudaRoundMode
     cudaRoundMinInf
 */
 
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
 __global__ void float_to_fp4(float2 *input, size_t num_elements,
                            __nv_fp4x2_storage_t *output)
 {
@@ -135,7 +135,7 @@ void copy_and_convert(mblasCuDataType precision, void *hostA, void *devA, long x
   else if (precision == mblasDataType::MBLAS_R_4F_E2M1)
   {
 
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
     // Allocate memory in the device for host precision (float)
     void *tmpA = allocateHDevArr(precision, x, y, batchsz);
     checkCuda(cudaMemcpy(tmpA, hostA, batchsz * x * y * hostsz,

@@ -4,7 +4,7 @@
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
 #include <cuda_fp4.h>
 #endif
 #include <cuda_runtime.h>
@@ -25,7 +25,7 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
                            __nv_fp8_storage_t *output, __nv_fp8_interpretation_t interp);
 
 
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
 __global__ void float_to_fp4(float2 *input, size_t num_elements,
                            __nv_fp4x2_storage_t *output);
 #endif

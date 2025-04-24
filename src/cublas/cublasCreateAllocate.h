@@ -5,7 +5,7 @@
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
 #include <cuda_fp4.h>
 #endif
 
@@ -217,7 +217,7 @@ auto typeCallDev(mblasDataType type, Args... args) ->
     //  return tFunc<__nv_fp8_e4m3>()(args...);
     case mblasDataType::MBLAS_R_8F_E5M2:
       return tFunc<__nv_fp8_e5m2>()(args...);
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
     case mblasDataType::MBLAS_R_4F_E2M1:
       return tFunc<__nv_fp4x2_e2m1>()(args...);
 #endif

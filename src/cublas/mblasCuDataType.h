@@ -24,7 +24,7 @@ class mblasCuDataType: public mblasDataType {
   std::string toString() const override { return mblasDataType::toString("CUDA"); }
   mblasCuDataType get_scale_type();
 
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
   cublasLtMatmulMatrixScale_t get_scale_mode();
 #endif
 };

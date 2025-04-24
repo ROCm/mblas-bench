@@ -110,7 +110,7 @@ class cublasLtGemm : public genericGemm {
   scale_size c_scale_size;
   scale_size d_scale_size;
 
-#if (CUDART_VERSION >= 12800)
+#if (CUDART_VERSION >= 12080)
   cublasLtMatmulMatrixScale_t a_scale_mode;
   cublasLtMatmulMatrixScale_t b_scale_mode;
   cublasLtMatmulMatrixScale_t c_scale_mode;
