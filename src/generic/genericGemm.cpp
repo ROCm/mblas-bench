@@ -70,19 +70,25 @@ genericGemm::genericGemm(cxxopts::ParseResult result) {
   flush_memory_size = result["flush_memory_size"].as<int>();
 
   initialization = result["initialization"].as<string>();
-  filenameA = result["filenameA"].as<string>();
-  filenameB = result["filenameB"].as<string>();
-  filenameC = result["filenameC"].as<string>();
+  filename_a = result["filename_a"].as<string>();
+  filename_b = result["filename_b"].as<string>();
+  filename_c = result["filename_c"].as<string>();
+
+  constant_a = result["constant_a"].as<float>();
+  constant_b = result["constant_b"].as<float>();
+  constant_c = result["constant_c"].as<float>();
+  constant_d = result["constant_d"].as<float>();
+
+  scale_factor_a = result["scale_factor_a"].as<float>();
+  scale_factor_b = result["scale_factor_b"].as<float>();
+  scale_factor_c = result["scale_factor_c"].as<float>();
+  scale_factor_d = result["scale_factor_d"].as<float>();
 
   // Set init control information
   if (initialization == "rand_int") {
-    controlB = true;
+    control_b = true;
   } else if (initialization == "trig_float") {
-    controlA = true;
-    constantA = 1; 
-    constantB = 1; 
-    constantC = 1; 
-    constantD = 1; 
+    control_a = true;
   }
 }
 
@@ -132,9 +138,9 @@ void genericGemm::set_flush_batch_count(uint64_t & a_offset, uint64_t & b_offset
 
 //void genericGemm::set_init_params(){
 //  if (initialization == "rand_int") {
-//    controlB = true;
+//    control_b = true;
 //  } else if (initialization == "trig_float") {
-//    controlA = true;
+//    control_a = true;
 //    if ()
 //  }
 //}

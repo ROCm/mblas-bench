@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
             cxxopts::value<string>()->default_value(""));
   opp_adder("batch_count",
             "Number of matrices. Only applicable to batched and "
-            "strided_batched routines  (Default value is: 1)",
+            "strided_batched routines",
             cxxopts::value<int>()->default_value("1"));
   opp_adder("flush_batch_count",
             "number of copies of arrays to allocate for cache flushing in timing code."
@@ -164,15 +164,63 @@ int main(int argc, char **argv) {
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
             "hpl, blasgemm",
             cxxopts::value<string>()->default_value("rand_int"));
-  opp_adder("filenameA",
+  opp_adder("filename_a",
             "Intialize matrix A with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
-  opp_adder("filenameB",
+  opp_adder("filename_b",
             "Intialize matrix B with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
-  opp_adder("filenameC",
+  opp_adder("filename_c",
             "Intialize matrix C with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
+  opp_adder("constant_a",
+            "Constant value used for the A matrix."
+            "In constant init mode, this value is used as the value to initialized"
+            "In trig_float init mode, this value is used as a scale factor",
+            cxxopts::value<float>()->default_value("1"));
+  opp_adder("constant_b",
+            "Constant value used for the B matrix."
+            "In constant init mode, this value is used as the value to initialized"
+            "In trig_float init mode, this value is used as a scale factor",
+            cxxopts::value<float>()->default_value("1"));
+  opp_adder("constant_c",
+            "Constant value used for the C matrix."
+            "In constant init mode, this value is used as the value to initialized"
+            "In trig_float init mode, this value is used as a scale factor",
+            cxxopts::value<float>()->default_value("1"));
+  opp_adder("constant_d",
+            "Constant value used for the D matrix."
+            "In constant init mode, this value is used as the value to initialized"
+            "In trig_float init mode, this value is used as a scale factor",
+            cxxopts::value<float>()->default_value("1"));
+  opp_adder("scale_mode_a,scaleA",
+            "Scale mode for A matrix.  Accepts both numeric and text input"
+            "0 = none, 1 = scalar, 2 = vector, 3 = block",
+            cxxopts::value<float>()->default_value("0"));
+  opp_adder("scale_mode_b,scaleB",
+            "Scale mode for B matrix.  Accepts both numeric and text input"
+            "0 = none, 1 = scalar, 2 = vector, 3 = block",
+            cxxopts::value<float>()->default_value("0"));
+  opp_adder("scale_mode_c,scaleC",
+            "Scale mode for C matrix.  Accepts both numeric and text input"
+            "0 = none, 1 = scalar, 2 = vector, 3 = block",
+            cxxopts::value<float>()->default_value("0"));
+  opp_adder("scale_mode_d,scaleD",
+            "Scale mode for D matrix.  Accepts both numeric and text input"
+            "0 = none, 1 = scalar, 2 = vector, 3 = block",
+            cxxopts::value<float>()->default_value("0"));
+  opp_adder("scale_factor_a",
+            "Scale factor for A matrix.",
+            cxxopts::value<float>()->default_value("1"));
+  opp_adder("scale_factor_b",
+            "Scale factor for B matrix.",
+            cxxopts::value<float>()->default_value("1"));
+  opp_adder("scale_factor_c",
+            "Scale factor for C matrix.",
+            cxxopts::value<float>()->default_value("1"));
+  opp_adder("scale_factor_d",
+            "Scale factor for D matrix.",
+            cxxopts::value<float>()->default_value("1"));
   opp_adder("i,iters",
             "Iterations to run inside timing loop  (Default value is: 10)",
             cxxopts::value<int>()->default_value("10"));

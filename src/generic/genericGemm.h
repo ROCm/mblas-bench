@@ -3,7 +3,7 @@
 #include <utility>
 
 #include "cxxopts.hpp"
-
+enum class scaling_type {None, Scalar, Vector, Block};
 class genericGemm {
  protected:
   int m;
@@ -48,20 +48,25 @@ class genericGemm {
   int flush_batch_count;
   int flush_memory_size;
 
-  bool controlA = false;
-  bool controlB = false;
-  bool controlC = false;
-  bool controlD = false;
+  bool control_a = false;
+  bool control_b = false;
+  bool control_c = false;
+  bool control_d = false;
 
-  float constantA = 2.f;
-  float constantB = 3.f;
-  float constantC = 1.f;
-  float constantD = 1.f;
+  float constant_a;
+  float constant_b;
+  float constant_c;
+  float constant_d;
 
-  std::string filenameA;
-  std::string filenameB;
-  std::string filenameC;
-  std::string filenameD;
+  float scale_factor_a;
+  float scale_factor_b;
+  float scale_factor_c;
+  float scale_factor_d;
+
+  std::string filename_a;
+  std::string filename_b;
+  std::string filename_c;
+  std::string filename_d;
 
   double gflop_per_second = 0;
   double gbyte_per_second = 0;

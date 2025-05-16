@@ -311,11 +311,11 @@ void hipblasLtGemm::fill_host() {
 
   for (int i = 0; i < flush_batch_count; i++){
     typeCallHost<initHost>(a_type, initialization, ptr_host_a[i], rows_a, cols_a, lda,
-                           batch_count, stride_a, controlA, constantA, filenameA);
+                           batch_count, stride_a, control_a, constant_a, filename_a);
     typeCallHost<initHost>(b_type, initialization, ptr_host_b[i], rows_b, cols_b, ldb,
-                           batch_count, stride_b, controlB, constantB, filenameB);
+                           batch_count, stride_b, control_b, constant_b, filename_b);
     typeCallHost<initHost>(c_type, initialization, ptr_host_c[i], rows_c, cols_c, ldc,
-                           batch_count, stride_c, controlC, constantC, filenameC);
+                           batch_count, stride_c, control_c, constant_c, filename_c);
   }
 }
 

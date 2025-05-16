@@ -171,16 +171,16 @@ void cublasLtGemm::parseMType(string computeTStr, string scalarTStr,
     d_scale_size = get_scale_tensor_size(m, n, d_scale_mode);
 
     if (a_type.isFp4()) {
-      constantA = 3.2;
+      constant_a = 3.2;
     }
     if (b_type.isFp4()) {
-      constantB = 3.2;
+      constant_b = 3.2;
     }
     if (c_type.isFp4()) {
-      constantC = 3.2;
+      constant_c = 3.2;
     }
     if (d_type.isFp4()) {
-      constantD = 3.2;
+      constant_d = 3.2;
     }
   }
 #endif
@@ -454,18 +454,18 @@ void cublasLtGemm::fill_host() {
   //}
   for (int i = 0; i < flush_batch_count; i++){
     typeCallHost<initHost>(a_type, initialization, ptr_host_a[i], rows_a, cols_a, lda,
-                           batch_count, stride_a, controlA, constantA, filenameA);
+                           batch_count, stride_a, control_a, constant_a, filename_a);
     typeCallHost<initHost>(b_type, initialization, ptr_host_b[i], rows_b, cols_b, ldb,
-                           batch_count, stride_b, controlB, constantB, filenameB);
+                           batch_count, stride_b, control_b, constant_b, filename_b);
     typeCallHost<initHost>(c_type, initialization, ptr_host_c[i], rows_c, cols_c, ldc,
-                           batch_count, stride_c, controlC, constantC, filenameC);
+                           batch_count, stride_c, control_c, constant_c, filename_c);
     // D is just output, don't need to init
   }
   if (use_scaling) {
-    typeCallHost<initHost>(a_scale_type, string("constant"), scale_host_a, a_scale_size.rows, a_scale_size.cols, 1, 1, 0LL, false, 0.5f, string(""));
-    typeCallHost<initHost>(b_scale_type, string("constant"), scale_host_b, b_scale_size.rows, b_scale_size.cols, 1, 1, 0LL, false, 0.5f, string(""));
-    typeCallHost<initHost>(c_scale_type, string("constant"), scale_host_c, c_scale_size.rows, c_scale_size.cols, 1, 1, 0LL, false, 0.5f, string(""));
-    typeCallHost<initHost>(d_scale_type, string("constant"), scale_host_d, d_scale_size.rows, d_scale_size.cols, 1, 1, 0LL, false, 0.5f, string(""));
+    typeCallHost<initHost>(a_scale_type, string("constant"), scale_host_a, a_scale_size.rows, a_scale_size.cols, 1, 1, 0LL, false, scale_factor_a, string(""));
+    typeCallHost<initHost>(b_scale_type, string("constant"), scale_host_b, b_scale_size.rows, b_scale_size.cols, 1, 1, 0LL, false, scale_factor_b, string(""));
+    typeCallHost<initHost>(c_scale_type, string("constant"), scale_host_c, c_scale_size.rows, c_scale_size.cols, 1, 1, 0LL, false, scale_factor_c, string(""));
+    typeCallHost<initHost>(d_scale_type, string("constant"), scale_host_d, d_scale_size.rows, d_scale_size.cols, 1, 1, 0LL, false, scale_factor_d, string(""));
   }
 }
 
