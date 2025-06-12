@@ -70,7 +70,7 @@ mblasOperation::mblasOperation(std::string instr) {
   }
 }
 
-std::string mblasOperation::toString(std::string prefix) const {
+std::string mblasOperation::to_string(std::string prefix) const {
   for (auto ele : opDType) {
     if (ele.second == value && ele.first.find(prefix) != std::string::npos) {
       return ele.first;
@@ -84,7 +84,7 @@ std::string mblasOperation::toString(std::string prefix) const {
   return "(Operation name not found)";
 }
 
-std::string mblasOperation::toStringShort() {
+std::string mblasOperation::to_string_short() {
   try {
     return opSShort.at(value);
   } catch (std::out_of_range &e) {

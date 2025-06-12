@@ -5,7 +5,7 @@
 
 class mblasHipDataType: public mblasDataType {
  private:
-  static const std::map<mblasDataType, hipDataType> precMappings;
+  static const std::map<mblasDataType, hipDataType> prec_mappings;
  public:
   // Constructors
   mblasHipDataType(const std::string & instr) : mblasDataType(instr) {}

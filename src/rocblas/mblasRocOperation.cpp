@@ -5,7 +5,7 @@ rocblas_operation mblasRocOperation::convertToRocm(mblasRocOperation data)  { re
 
 rocblas_operation mblasRocOperation::convertToRocm(const mblasRocOperation *data) {
   try {
-    return precMappings.at(*data);
+    return prec_mappings.at(*data);
   } catch (std::out_of_range &e) {
     std::cout << "Failed to convert to rocBLAS operation" << data->toString() << std::endl;
     throw e;
@@ -17,7 +17,7 @@ rocblas_operation mblasRocOperation::convertToRocm() {
 }
 
 // void mblasRocOperation::operator = (const rocblas_operation cudt) {
-//   for (auto ele : precMappings) {
+//   for (auto ele : prec_mappings) {
 //     if (ele.second == cudt) {
 //       set(ele.first);
 //     }
@@ -36,7 +36,7 @@ mblasRocOperation & mblasRocOperation::operator = (const mblasRocOperation& mdt)
 //   return convertToRocm(this);
 // }
 
-const std::map<mblasOperation, rocblas_operation> mblasRocOperation::precMappings = {
+const std::map<mblasOperation, rocblas_operation> mblasRocOperation::prec_mappings = {
     {MBLAS_OP_N,    rocblas_operation_none},
     {MBLAS_OP_T,    rocblas_operation_transpose},
     {MBLAS_OP_C,    rocblas_operation_conjugate_transpose},

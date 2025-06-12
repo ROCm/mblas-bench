@@ -6,8 +6,8 @@
 
 class mblasRocComputeType: public mblasComputeType {
  private:
-  static const std::map<mblasComputeTypeEnum, rocblas_computetype> compMappings;
-  //static const std::vector<std::pair<mblasComputeTypeEnum, mblasDataTypeEnum>> precMappings;
+  static const std::map<mblasComputeTypeEnum, rocblas_computetype> compute_mappings;
+  //static const std::vector<std::pair<mblasComputeTypeEnum, mblasDataTypeEnum>> prec_mappings;
   bool rocIsReal;
  public:
   // Constructors

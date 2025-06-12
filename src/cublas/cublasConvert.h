@@ -15,7 +15,7 @@ __global__ void float_to_bf16(float *input, size_t num_elements,
 
 __global__ void float_to_fp16(float *input, size_t num_elements, __half *output);
 
-void copy_and_convert(mblasCuDataType precision, void *hostA, void *devA, long x,
+void copy_and_convert(mblasCuDataType precision, void *host_a, void *devA, long x,
                     long y, int batchsz);
 void * convert_scalar(mblasCuDataType precision, void *scalar);
 void copy_and_convert_scalar(mblasCuDataType scalarPrecision, void *hostScalar,

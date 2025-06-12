@@ -11,7 +11,7 @@
 #include "mblasHipComputeType.h"
 #include "mblasHipOperation.h"
 
-struct matmulPrecType {
+struct matmul_prec_type {
   mblasHipComputeType compute;
   mblasHipDataType scalar;
   mblasHipDataType a_type;
@@ -19,7 +19,7 @@ struct matmulPrecType {
   mblasHipDataType c_type;
   mblasHipDataType d_type;
   mblasHipDataType bias_type;
-  bool operator==(const matmulPrecType rhs) const {
+  bool operator==(const matmul_prec_type rhs) const {
     return rhs.compute == compute && rhs.scalar == scalar &&
            rhs.a_type == a_type && rhs.b_type == b_type &&
            rhs.c_type == c_type && rhs.d_type == d_type &&
@@ -52,15 +52,15 @@ struct hipblasLtGemmInst {
   //void *devB;
   //void *devC;
   //void *devD;
-  void **ptrDevA;
-  void **ptrDevB;
-  void **ptrDevC;
-  void **ptrDevD;
-  hipblasLtMatmulDesc_t descOP;
-  hipblasLtMatrixLayout_t descA;
-  hipblasLtMatrixLayout_t descB;
-  hipblasLtMatrixLayout_t descC;
-  hipblasLtMatrixLayout_t descD;
+  void **ptr_dev_a;
+  void **ptr_dev_b;
+  void **ptr_dev_c;
+  void **ptr_dev_d;
+  hipblasLtMatmulDesc_t desc_op;
+  hipblasLtMatrixLayout_t desc_a;
+  hipblasLtMatrixLayout_t desc_b;
+  hipblasLtMatrixLayout_t desc_c;
+  hipblasLtMatrixLayout_t desc_d;
   hipblasLtMatmulPreference_t pref;
   hipblasLtMatmulHeuristicResult_t algo;
   void *devWork;
@@ -70,9 +70,9 @@ struct hipblasLtGemmInst {
 
 class hipblasLtGemm : public genericGemm {
  private:
-  // void *hostA;
-  // void *hostB;
-  // void *hostC;
+  // void *host_a;
+  // void *host_b;
+  // void *host_c;
 
   void **ptr_host_a;
   void **ptr_host_b;
@@ -95,35 +95,35 @@ class hipblasLtGemm : public genericGemm {
   mblasHipDataType d_type;
   mblasHipDataType bias_type;
 
-  int workspaceSz = 64 * 1024 * 1024;
+  int workspace_size = 64 * 1024 * 1024;
 
-  static std::vector<matmulPrecType> matmulSupported;
+  static std::vector<matmul_prec_type> matmul_supported;
   static std::vector<matmulPrecTypeF8> matmulSupportedF8;
-  std::vector<hipblasLtGemmInst> matPtrs;
+  std::vector<hipblasLtGemmInst> mat_ptrs;
 
  private:
   // mblasHipDataType precisionStringToHipblasDType(std::string stringPrecision);
-  // void parseMType(std::string a, std::string b, std::string c);
-  void parseMType(std::string computeTStr, std::string scalarTStr,
+  // void parse_problem_type(std::string a, std::string b, std::string c);
+  void parse_problem_type(std::string computeTStr, std::string scalarTStr,
                   std::string aStr, std::string bStr, std::string cStr,
                   std::string dStr);
-  void validateParameters();
-  void parseDevIters(std::string);
+  void validate_parameters();
+  void parse_dev_iters(std::string);
   void alloc_host();
   void alloc_dev(hipblasLtGemmInst *);
   void fill_host();
-  void copyHostToDev(hipblasLtGemmInst *);
-  void prepareMatrix(hipblasLtGemmInst *);
-  void noTuning(hipblasLtGemmInst *);
-  void autoTuning(hipblasLtGemmInst *);
-  void runThreaded(void (hipblasLtGemm::*func)(hipblasLtGemmInst *));
-  std::tuple<double, double, double> calculateFOM(double totalTime_ms);
-  void testMatmul(hipblasLtGemmInst *mat);
+  void copy_host_to_dev(hipblasLtGemmInst *);
+  void prepare_matrix(hipblasLtGemmInst *);
+  void no_tuning(hipblasLtGemmInst *);
+  void auto_tuning(hipblasLtGemmInst *);
+  void run_threaded(void (hipblasLtGemm::*func)(hipblasLtGemmInst *));
+  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
+  void test_matmul(hipblasLtGemmInst *mat);
 
  public:
   hipblasLtGemm(cxxopts::ParseResult result);
-  std::string prepareArray();
+  std::string prepare_array();
   double test();
-  std::string getResultString();
-  virtual void freeMem();
+  std::string get_result_string();
+  virtual void free_mem();
 };

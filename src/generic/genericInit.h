@@ -11,39 +11,39 @@
 
 // Rand int gen
 template <typename T>
-inline T randIntGen(std::uniform_int_distribution<int> &idist,
+inline T rand_int_gen(std::uniform_int_distribution<int> &idist,
                     std::mt19937 &gen, T &dummy) {
   return T(idist(gen));
 }
 
 template <typename T>
-inline std::complex<T> randIntGen(std::uniform_int_distribution<int> &idist,
+inline std::complex<T> rand_int_gen(std::uniform_int_distribution<int> &idist,
                              std::mt19937 &gen, std::complex<T> &dummy) {
   //return {T(idist(gen)), T(idist(gen))};
   return std::complex<T>(idist(gen), idist(gen));
 }
 
 template <typename T>
-inline T randIntGenN(std::uniform_int_distribution<int> &idist,
+inline T rand_int_gen_negative(std::uniform_int_distribution<int> &idist,
                      std::mt19937 &gen, T &dummy) {
   return -T(idist(gen));
 }
 
 template <typename T>
-inline std::complex<T> randIntGenN(std::uniform_int_distribution<int> &idist,
+inline std::complex<T> rand_int_gen_negative(std::uniform_int_distribution<int> &idist,
                               std::mt19937 &gen, std::complex<T> &dummy) {
   //return {-T(idist(gen)), -T(idist(gen))};
   return std::complex<T>(-idist(gen), -idist(gen));
 }
 
 template <typename T>
-inline T normalFloatGen(std::normal_distribution<double> &ndist,
+inline T normal_float_gen(std::normal_distribution<double> &ndist,
                         std::mt19937 &gen, T &dummy) {
   return T(ndist(gen));
 }
 
 template <typename T>
-void fillRandHostBlasgemm(void *ptr, long rows_A, long cols_A, long ld, int batch,
+void fill_rand_host_blasgemm(void *ptr, long rows_A, long cols_A, long ld, int batch,
                           long long int stride) {
   int a = 1;
   T *A = (T *)ptr;
@@ -53,7 +53,7 @@ void fillRandHostBlasgemm(void *ptr, long rows_A, long cols_A, long ld, int batc
 }
 
 template <typename T>
-void fillRandHostConstant(void *ptr, long rows_A, long cols_A, long ld, int batch,
+void fill_rand_host_constant(void *ptr, long rows_A, long cols_A, long ld, int batch,
                           long long int stride, float constant) {
   int a = 1;
   T *A = (T *)ptr;
@@ -63,7 +63,7 @@ void fillRandHostConstant(void *ptr, long rows_A, long cols_A, long ld, int batc
 }
 
 template <typename T>
-void fillRandHostRandIntAS(void *ptr, long rows_A, long cols_A, long ld, int batch,
+void fill_rand_host_rand_int_alternating(void *ptr, long rows_A, long cols_A, long ld, int batch,
                            long long int stride, bool alternating, int random_dev_seed) {
   T *A = (T *)ptr;
   #pragma omp parallel shared(A) 
@@ -77,9 +77,9 @@ void fillRandHostRandIntAS(void *ptr, long rows_A, long cols_A, long ld, int bat
       for (size_t j = 0; j < cols_A; ++j) {
         for (size_t i = 0; i < rows_A; ++i) {
           if ((!alternating) || (j % 2 ^ i % 2)) {
-            A[i + j * ld + i_batch * stride] = randIntGen(uniform_dist, gen, dummy);
+            A[i + j * ld + i_batch * stride] = rand_int_gen(uniform_dist, gen, dummy);
           } else {
-            A[i + j * ld + i_batch * stride] = randIntGenN(uniform_dist, gen, dummy);
+            A[i + j * ld + i_batch * stride] = rand_int_gen_negative(uniform_dist, gen, dummy);
           }
         }
       }
@@ -88,7 +88,7 @@ void fillRandHostRandIntAS(void *ptr, long rows_A, long cols_A, long ld, int bat
 }
 
 template <typename T>
-void fillRandHostNormalFloat(void *ptr, long rows_A, long cols_A, long ld, int batch,
+void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, int batch,
                              long long int stride) {
   T *A = (T *)ptr;
   std::random_device r;
@@ -103,7 +103,7 @@ void fillRandHostNormalFloat(void *ptr, long rows_A, long cols_A, long ld, int b
     for (size_t i_batch = 0; i_batch < batch; i_batch++) {
       for (size_t j = 0; j < cols_A; ++j) {
         for (size_t i = 0; i < rows_A; ++i) {
-          A[i + j * ld + i_batch * stride] = normalFloatGen(normal_dist, gen, dummy);
+          A[i + j * ld + i_batch * stride] = normal_float_gen(normal_dist, gen, dummy);
         }
       }
     }
@@ -111,7 +111,7 @@ void fillRandHostNormalFloat(void *ptr, long rows_A, long cols_A, long ld, int b
 }
 
 template <typename T>
-void fillRandHostTrigFloat(void *ptr, long rows_A, long cols_A, long ld, int batch,
+void fill_rand_host_trig_float(void *ptr, long rows_A, long cols_A, long ld, int batch,
                            long long int stride, bool isSin, float scaling) {
   T *A = (T *)ptr;
   #pragma omp parallel for shared(A) collapse(3)
@@ -130,7 +130,7 @@ void fillRandHostTrigFloat(void *ptr, long rows_A, long cols_A, long ld, int bat
 }
 
 template <typename T>
-void fillRandHostFromCSV(void *ptr, long rows_A, long cols_A, long ld, int batch,
+void fill_rand_host_csv(void *ptr, long rows_A, long cols_A, long ld, int batch,
                          long long int stride, std::string filename) {
   std::ifstream file(filename);
   std::vector<std::vector<T>> result;
@@ -176,19 +176,19 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
                              long long int stride, bool control,
                              float constant, std::string filename) {
   if (!filename.empty()) {
-    fillRandHostFromCSV<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
+    fill_rand_host_csv<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
   } else if (initialization == "rand_int") {
     std::random_device r;
-    fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
+    fill_rand_host_rand_int_alternating<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
   } else if (initialization == "trig_float") {
-    fillRandHostTrigFloat<T>(ptr, rows_A, cols_A, ld, batch, stride, control, constant);
+    fill_rand_host_trig_float<T>(ptr, rows_A, cols_A, ld, batch, stride, control, constant);
   } else if (initialization == "normal_float") {
-    fillRandHostNormalFloat<T>(ptr, rows_A, cols_A, ld, batch, stride);
+    fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride);
   } else if (initialization == "hpl") {
   } else if (initialization == "blasgemm") {
-    fillRandHostBlasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
+    fill_rand_host_blasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
   } else if (initialization == "constant") {
-    fillRandHostConstant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
+    fill_rand_host_constant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
   }
 }
 

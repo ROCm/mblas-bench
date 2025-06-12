@@ -6,7 +6,7 @@
 class genericGemmFactory {
  public:
   virtual ~genericGemmFactory(){};
-  virtual void createGemm(cxxopts::ParseResult) = 0;
+  virtual void create_gemm(cxxopts::ParseResult) = 0;
   /**
    * Also note that, despite its name, the Creator's primary responsibility is
    * not creating products. Usually, it contains some core business logic that
@@ -18,8 +18,8 @@ class genericGemmFactory {
   genericGemm * gemm;
 
  public:
-  std::string prepareArray() { return gemm->prepareArray(); } 
+  std::string prepare_array() { return gemm->prepare_array(); }
   void test() { gemm->test(); } 
-  std::string getResultString() { return gemm->getResultString(); } 
-  void freeMem() { gemm->freeMem(); } 
+  std::string get_result_string() { return gemm->get_result_string(); }
+  void free_mem() { gemm->free_mem(); }
 };

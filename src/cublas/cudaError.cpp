@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-const char *cublasGetErrorString(cublasStatus_t status) {
+const char *cublas_get_error_string(cublasStatus_t status) {
   switch (status) {
     case CUBLAS_STATUS_SUCCESS:
       return "CUBLAS_STATUS_SUCCESS";
@@ -34,7 +34,7 @@ const char *cublasGetErrorString(cublasStatus_t status) {
 
 // // Convenience function for checking CUDA runtime API results
 // // can be wrapped around any runtime API call. No-op in release builds.
-// inline cudaError_t checkCuda(cudaError_t result) {
+// inline cudaError_t check_cuda(cudaError_t result) {
 //   if (result != cudaSuccess) {
 //     fprintf(stderr, "CUDA Runtime Error: %s\n", cudaGetErrorString(result));
 //     assert(result == cudaSuccess);
@@ -42,10 +42,10 @@ const char *cublasGetErrorString(cublasStatus_t status) {
 //   return result;
 // }
 
-// inline cublasStatus_t checkCublas(cublasStatus_t result) {
+// inline cublasStatus_t check_cublas(cublasStatus_t result) {
 //   if (result != CUBLAS_STATUS_SUCCESS) {
 //     fprintf(stderr, "CUDA Runtime Error: %s\n",
-//     cublasGetErrorString(result)); assert(result == CUBLAS_STATUS_SUCCESS);
+//     cublas_get_error_string(result)); assert(result == CUBLAS_STATUS_SUCCESS);
 //   }
 //   return result;
 // }

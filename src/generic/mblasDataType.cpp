@@ -157,7 +157,7 @@ mblasDataType::mblasDataType(std::string instr) {
   }
 }
 
-std::string mblasDataType::toString(std::string prefix) const {
+std::string mblasDataType::to_string(std::string prefix) const {
   for (auto ele : precDType) {
     if (ele.second == value && ele.first.find(prefix) != std::string::npos) {
       return ele.first;
@@ -173,7 +173,7 @@ std::string mblasDataType::toString(std::string prefix) const {
 
 bool mblasDataType::isReal() const {
   // Uses toString for maintenence reasons, not perf critical
-  std::string str = toString();
+  std::string str = to_string();
   if (str.find("_C_") != std::string::npos) {
     return false;
   }

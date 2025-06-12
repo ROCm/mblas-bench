@@ -38,7 +38,7 @@ class mblasDataType {
     void set(const mblasDataType mdt) {
       value = mdt;
     }
-    std::string toString(std::string) const;
+    std::string to_string(std::string) const;
   public:
     explicit constexpr mblasDataType(int y = 0) : mblasDataType{static_cast<mblasDataTypeEnum>(y)} {}
     constexpr mblasDataType(mblasDataTypeEnum y) : value(y) {}
@@ -51,7 +51,7 @@ class mblasDataType {
     bool operator>(const mblasDataType& other) const;
     bool operator<=(const mblasDataType& other) const;
     bool operator>=(const mblasDataType& other) const;
-    virtual std::string toString() const { return toString("MBLAS"); }
+    virtual std::string to_string() const { return to_string("MBLAS"); }
     bool isReal() const;
     bool isFp8() const;
     bool isFp4() const;

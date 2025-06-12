@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-const char *rocblasGetErrorString(rocblas_status status) {
+const char *rocblas_get_error_string(rocblas_status status) {
   switch (status) {
     case rocblas_status_success:
       return "rocblas_status_success";
@@ -45,7 +45,7 @@ const char *rocblasGetErrorString(rocblas_status status) {
   return "unknown error";
 }
 
-const char *hipblasGetErrorString(hipblasStatus_t status) {
+const char *hipblas_get_error_string(hipblasStatus_t status) {
   switch (status) {
     case HIPBLAS_STATUS_SUCCESS:
       return "HIPBLAS_STATUS_SUCCESS";
@@ -77,7 +77,7 @@ const char *hipblasGetErrorString(hipblasStatus_t status) {
 
 // // Convenience function for checking CUDA runtime API results
 // // can be wrapped around any runtime API call. No-op in release builds.
-// inline cudaError_t checkCuda(cudaError_t result) {
+// inline cudaError_t check_cuda(cudaError_t result) {
 //   if (result != cudaSuccess) {
 //     fprintf(stderr, "CUDA Runtime Error: %s\n", cudaGetErrorString(result));
 //     assert(result == cudaSuccess);
@@ -85,10 +85,10 @@ const char *hipblasGetErrorString(hipblasStatus_t status) {
 //   return result;
 // }
 
-// inline cublasStatus_t checkCublas(cublasStatus_t result) {
+// inline cublasStatus_t check_cublas(cublasStatus_t result) {
 //   if (result != CUBLAS_STATUS_SUCCESS) {
 //     fprintf(stderr, "CUDA Runtime Error: %s\n",
-//     cublasGetErrorString(result)); assert(result == CUBLAS_STATUS_SUCCESS);
+//     cublas_get_error_string(result)); assert(result == CUBLAS_STATUS_SUCCESS);
 //   }
 //   return result;
 // }

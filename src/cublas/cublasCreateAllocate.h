@@ -18,9 +18,9 @@
 #include "mblasDataType.h"
 
 // int sizeof_cudt_host(mblasDataType type);
-void *allocateHostArr(mblasDataType type, long x, long y, int batch = 1);
-void *allocateDevArr(mblasDataType type, long x, long y, int batch = 1);
-void *allocateHDevArr(mblasDataType type, long x, long y, int batch = 1);
+void *allocate_host_array(mblasDataType type, long x, long y, int batch = 1);
+void *allocate_dev_array(mblasDataType type, long x, long y, int batch = 1);
+void *allocate_host_dev_array(mblasDataType type, long x, long y, int batch = 1);
 // void initHostH(mblasDataType precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
 //                float constant = 0.f, bool control = false, std::string filename = "");
@@ -55,15 +55,15 @@ struct allocSetScalar {
 };
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(mblasDataType type, Args... args) ->
+auto type_call_host(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(mblasDataType type, Args... args) ->
+auto type_call_dev(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
 template <typename T>
-void *allocSetScalarFunc(std::string sval, std::string sval2, T dummy) {
+void *alloc_set_scalar_val(std::string sval, std::string sval2, T dummy) {
   // Only for real numbers, no need to worry about contents from sval2
   void *ptr = (void *)malloc(sizeof(T));
   T *data = (T *)ptr;
@@ -73,7 +73,7 @@ void *allocSetScalarFunc(std::string sval, std::string sval2, T dummy) {
 }
 
 template <typename T>
-void *allocSetScalarFunc(std::string sval, std::string sval2,
+void *alloc_set_scalar_val(std::string sval, std::string sval2,
                          std::complex<T> dummy) {
   // Complex numbers, do something about sval2
   void *ptr = (void *)malloc(sizeof(std::complex<T>));
@@ -101,7 +101,7 @@ int sizeofCUDTP<T>::operator()() {
 template <typename T>
 void *allocSetScalar<T>::operator()(std::string sval1, std::string sval2) {
   T dummy;
-  return allocSetScalarFunc(sval1, sval2, std::forward<T>(dummy));
+  return alloc_set_scalar_val(sval1, sval2, std::forward<T>(dummy));
 }
 
 //template <typename T>
@@ -112,9 +112,9 @@ void *allocSetScalar<T>::operator()(std::string sval1, std::string sval2) {
 //  for (int i = 0; i < batch_count; i++) {
 //    host[i] = device_array + (i * x * y);
 //  }
-//  // checkCuda(cudaMalloc(&dptr, batch_count * sizeof(T *)));
+//  // check_cuda(cudaMalloc(&dptr, batch_count * sizeof(T *)));
 //  // hptr = reinterpret_cast<void **>(host);
-//  // checkCuda(
+//  // check_cuda(
 //  cudaMemcpy(dptr, hptr, batch_count * sizeof(T *), cudaMemcpyHostToDevice);
 //}
 
@@ -132,20 +132,20 @@ void batchedPtrMagic<T>::operator()(void **hptr, void *dAr,
   }
 }
 
-void batchedPtrMagicGeneric(void **hptr, void *dAr, int batch_count, long x, long y, int flush_batch_count, long total_block_size, mblasDataType type);
+void batched_pointer_magic_generic(void **hptr, void *dAr, int batch_count, long x, long y, int flush_batch_count, long total_block_size, mblasDataType type);
 
 //template <typename T>
 //void batchedPtrCopy<T>::operator()(void **dptr, void *dAr,
 //                                    int batch_count, int x, int y, int flush_batch_count = 1, long total_block_size = 0) {
 //  void **hptr = (void **)malloc(batch_count * flush_batch_count * sizeof(T *));
-//  checkCuda(cudaMalloc(dptr, batch_count * flush_batch_count * sizeof(T *)));
+//  check_cuda(cudaMalloc(dptr, batch_count * flush_batch_count * sizeof(T *)));
 //  batchedPtrMagic<T>::operator()(hptr, dAr, batch_count, x, y, flush_batch_count, total_block_size);
 //  cudaMemcpy(dptr, hptr, batch_count * sizeof(T *), cudaMemcpyHostToDevice);
 //  free(hptr);
 //}
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallHost(mblasDataType type, Args... args) ->
+auto type_call_host(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
@@ -191,7 +191,7 @@ auto typeCallHost(mblasDataType type, Args... args) ->
 }
 
 template <template <typename> class tFunc, class... Args>
-auto typeCallDev(mblasDataType type, Args... args) ->
+auto type_call_dev(mblasDataType type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {

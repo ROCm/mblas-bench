@@ -48,7 +48,7 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
 //   }
 // }
 
-void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int y, int batchsz)
+void copy_and_convert(mblasDataType precision, void *hostA, void *devA, int x, int y, int batchsz)
 {
 
   long hostsz = typeCallHost<sizeofCUDT>(precision);
@@ -140,7 +140,7 @@ void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int
 //  }
 //}
 
-void *convertScalar(mblasDataType precision, void *scalar)
+void *convert_scalar(mblasDataType precision, void *scalar)
 {
 
   if (precision == mblasDataType(MBLAS_R_16F))

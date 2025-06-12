@@ -1,19 +1,19 @@
 #include "mblasCuDataType.h"
 #include <iostream>
 
-cudaDataType mblasCuDataType::convertToCuda(mblasCuDataType data)  { return convertToCuda(&data); }
-cudaDataType mblasCuDataType::convertToCuda(const mblasCuDataType *data) {
+cudaDataType mblasCuDataType::convert_to_cuda(mblasCuDataType data)  { return convert_to_cuda(&data); }
+cudaDataType mblasCuDataType::convert_to_cuda(const mblasCuDataType *data) {
   try {
-    return precMappings.at(*data);
+    return prec_mappings.at(*data);
   } catch (std::out_of_range &e) {
-    std::cout << "Failed to convert to CUDA Datatype " << data->toString() << std::endl;
+    std::cout << "Failed to convert to CUDA Datatype " << data->to_string() << std::endl;
     throw e;
     return CUDA_R_32F;
   }
 }
 
 // void mblasCuDataType::operator = (const cudaDataType cudt) {
-//   for (auto ele : precMappings) {
+//   for (auto ele : prec_mappings) {
 //     if (ele.second == cudt) {
 //       set(ele.first);
 //     }
@@ -38,7 +38,7 @@ mblasCuDataType & mblasCuDataType::operator = (const mblasCuDataType& mdt) {
 // }
 
 mblasCuDataType::operator cudaDataType() const {
-  return convertToCuda(this);
+  return convert_to_cuda(this);
 }
 
 mblasCuDataType mblasCuDataType::get_scale_type() {
@@ -61,7 +61,7 @@ cublasLtMatmulMatrixScale_t mblasCuDataType::get_scale_mode() {
 }
 #endif
 
-const std::map<mblasDataType, cudaDataType> mblasCuDataType::precMappings = {
+const std::map<mblasDataType, cudaDataType> mblasCuDataType::prec_mappings = {
     {MBLAS_R_16F,  CUDA_R_16F},
     {MBLAS_C_16F,  CUDA_C_16F},
     {MBLAS_R_16BF, CUDA_R_16BF},

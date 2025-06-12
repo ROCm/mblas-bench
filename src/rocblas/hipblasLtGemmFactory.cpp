@@ -3,6 +3,6 @@
 #include <hipblasLtGemm.h>
 #include <hipblasLtGemmFactory.h>
 
-void hipblasLtGemmFactory::createGemm(cxxopts::ParseResult result) {
+void hipblasLtGemmFactory::create_gemm(cxxopts::ParseResult result) {
   gemm = new hipblasLtGemm(result);
 }

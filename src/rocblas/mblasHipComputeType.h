@@ -5,7 +5,7 @@
 
 class mblasHipComputeType: public mblasComputeType {
  private:
-  static const std::map<mblasComputeTypeEnum, hipblasComputeType_t> compMappings;
+  static const std::map<mblasComputeTypeEnum, hipblasComputeType_t> compute_mappings;
  public:
   static hipblasComputeType_t convertToHip(mblasHipComputeType data);
   static hipblasComputeType_t convertToHip(const mblasHipComputeType *data);

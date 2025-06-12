@@ -25,27 +25,27 @@ genericGemm::genericGemm(cxxopts::ParseResult result) {
 
   // Select a default LD based on OP.  See documentation here:
   // https://netlib.org/lapack/explore-html/d1/d54/group__double__blas__level3_gaeda3cbd99c8fb834a60a6412878226e1.html
-  lda = setLd(ldaS, tA, m, k);
-  ldb = setLd(ldbS, tB, k, n);
+  lda = set_ld(ldaS, tA, m, k);
+  ldb = set_ld(ldbS, tB, k, n);
   // LDC (and LDD) are always max( 1, m), so use that
-  ldc = setLd(ldcS, "N", m, 0);
-  ldd = setLd(lddS, "N", m, 0);
+  ldc = set_ld(ldcS, "N", m, 0);
+  ldd = set_ld(lddS, "N", m, 0);
 
   // Set matrix dimensions
-  std::tie(rows_a, cols_a) = setRowCol(tA, m, k);
-  std::tie(rows_b, cols_b) = setRowCol(tB, k, n);
-  std::tie(rows_c, cols_c) = setRowCol("N", m, n);
-  std::tie(rows_d, cold_d) = setRowCol("N", m, n);
+  std::tie(rows_a, cols_a) = set_row_col(tA, m, k);
+  std::tie(rows_b, cols_b) = set_row_col(tB, k, n);
+  std::tie(rows_c, cols_c) = set_row_col("N", m, n);
+  std::tie(rows_d, cold_d) = set_row_col("N", m, n);
 
   // Set memory dimensions
   rows_mem_a = lda;
   rows_mem_b = ldb;
   rows_mem_c = ldc;
   rows_mem_d = ldd;
-  std::tie(std::ignore, cols_mem_a) = setRowCol(tA, m, k);
-  std::tie(std::ignore, cols_mem_b) = setRowCol(tB, k, n);
-  std::tie(std::ignore, cols_mem_c) = setRowCol("N", m, n);
-  std::tie(std::ignore, cols_mem_d) = setRowCol("N", m, n);
+  std::tie(std::ignore, cols_mem_a) = set_row_col(tA, m, k);
+  std::tie(std::ignore, cols_mem_b) = set_row_col(tB, k, n);
+  std::tie(std::ignore, cols_mem_c) = set_row_col("N", m, n);
+  std::tie(std::ignore, cols_mem_d) = set_row_col("N", m, n);
 
   strided = false;
   batched = false;
@@ -92,7 +92,7 @@ genericGemm::genericGemm(cxxopts::ParseResult result) {
   }
 }
 
-int genericGemm::setLd(std::string ld, std::string OP, int x, int y) {
+int genericGemm::set_ld(std::string ld, std::string OP, int x, int y) {
   // Use user specified value
   if (ld != "") {
     return stoi(ld);
@@ -104,7 +104,7 @@ int genericGemm::setLd(std::string ld, std::string OP, int x, int y) {
   }
 }
 
-std::pair<int, int> genericGemm::setRowCol(std::string OP, int d1, int d2) {
+std::pair<int, int> genericGemm::set_row_col(std::string OP, int d1, int d2) {
   if (OP == "N") {
     return std::pair<int, int>(d1, d2);
   } else {

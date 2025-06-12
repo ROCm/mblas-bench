@@ -5,7 +5,7 @@
 
 class mblasHipOperation: public mblasOperation {
  private:
-  static const std::map<mblasOperation, hipblasOperation_t> precMappings;
+  static const std::map<mblasOperation, hipblasOperation_t> prec_mappings;
  public:
   static hipblasOperation_t convertToHip(mblasHipOperation data);
   static hipblasOperation_t convertToHip(const mblasHipOperation *data);

@@ -21,7 +21,7 @@ class mblasOperation {
     void set(const mblasOperation mdt) {
       value = mdt;
     }
-    std::string toString(std::string) const;
+    std::string to_string(std::string) const;
   public:
     explicit constexpr mblasOperation(int y = 0) : mblasOperation{static_cast<mblasOperationEnum>(y)} {}
     constexpr mblasOperation(mblasOperationEnum y) : value(y) {}
@@ -34,8 +34,8 @@ class mblasOperation {
     bool operator>(const mblasOperation& other) const;
     bool operator<=(const mblasOperation& other) const;
     bool operator>=(const mblasOperation& other) const;
-    virtual std::string toString() const { return toString("MBLAS"); }
-    std::string toStringShort();
+    virtual std::string to_string() const { return to_string("MBLAS"); }
+    std::string to_string_short();
 };
 
 constexpr const mblasOperation mblasOperation::MBLAS_OP_N{mblasOperationEnum::MBLAS_OP_N};

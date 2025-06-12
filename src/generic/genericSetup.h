@@ -3,7 +3,7 @@
 #include <cassert>
 #include <iostream>
 
-uint64_t roundUp(uint64_t numToRound, uint64_t multiple);
+uint64_t round_up(uint64_t numToRound, uint64_t multiple);
 
 template <typename T>
 T ceil_division(T x, T y) {

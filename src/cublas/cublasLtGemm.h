@@ -12,7 +12,7 @@
 #include "mblasCuComputeType.h"
 #include "mblasCuOperation.h"
 
-struct matmulPrecType {
+struct matmul_prec_type {
   mblasComputeType compute;
   mblasDataType scalar;
   mblasDataType a_type;
@@ -20,7 +20,7 @@ struct matmulPrecType {
   mblasDataType c_type;
   mblasDataType d_type;
   mblasDataType bias_type;
-  bool operator==(const matmulPrecType rhs) const {
+  bool operator==(const matmul_prec_type rhs) const {
     return compute == rhs.compute && scalar == rhs.scalar &&
            a_type == rhs.a_type && b_type == rhs.b_type &&
            c_type == rhs.c_type && d_type == rhs.d_type &&
@@ -30,34 +30,34 @@ struct matmulPrecType {
   }
 };
 
-struct cublasltgemmInst {
+struct cublaslt_gemm_inst {
   int devIDX;
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
-  void *dataDev;
+  //void *dataDev;
   //void **devA;
   //void **devB;
   //void **devC;
   //void **devD;
-  void **ptrDevA;
-  void **ptrDevB;
-  void **ptrDevC;
-  void **ptrDevD;
+  void **ptr_dev_a;
+  void **ptr_dev_b;
+  void **ptr_dev_c;
+  void **ptr_dev_d;
   void *scale_dev_a;
   void *scale_dev_b;
   void *scale_dev_c;
   void *scale_dev_d;
-  cublasLtMatmulDesc_t descOP;
-  cublasLtMatrixLayout_t descA;
-  cublasLtMatrixLayout_t descB;
-  cublasLtMatrixLayout_t descC;
-  cublasLtMatrixLayout_t descD;
+  cublasLtMatmulDesc_t desc_op;
+  cublasLtMatrixLayout_t desc_a;
+  cublasLtMatrixLayout_t desc_b;
+  cublasLtMatrixLayout_t desc_c;
+  cublasLtMatrixLayout_t desc_d;
   cublasLtMatmulPreference_t pref;
   cublasLtMatmulHeuristicResult_t algo;
   void *devWork;
   long wSZ;
-  cublasltgemmInst(int devID) { devIDX = devID; }
+  cublaslt_gemm_inst(int devID) { devIDX = devID; }
 };
 
 struct scale_size {
@@ -129,34 +129,34 @@ class cublasLtGemm : public genericGemm {
   uint64_t total_block_size_host;
   uint64_t total_block_size_dev;
 
-  int workspaceSz = 64 * 1024 * 1024;
+  int workspace_size = 64 * 1024 * 1024;
 
-  static std::vector<matmulPrecType> matmulSupported;
-  std::vector<cublasltgemmInst> matPtrs;
+  static std::vector<matmul_prec_type> matmul_supported;
+  std::vector<cublaslt_gemm_inst> mat_ptrs;
 
  private:
   // cudaDataType_t precisionStringToDType(std::string stringPrecision);
-  // void parseMType(std::string a, std::string b, std::string c);
-  void parseMType(std::string computeTStr, std::string scalarTStr,
+  // void parse_problem_type(std::string a, std::string b, std::string c);
+  void parse_problem_type(std::string computeTStr, std::string scalarTStr,
                   std::string aStr, std::string bStr, std::string cStr,
                   std::string dStr);
-  void validateParameters();
-  void parseDevIters(std::string);
+  void validate_parameters();
+  void parse_dev_iters(std::string);
   void alloc_host();
-  void alloc_dev(cublasltgemmInst *);
+  void alloc_dev(cublaslt_gemm_inst *);
   void fill_host();
-  void copyHostToDev(cublasltgemmInst *);
-  void prepareMatrix(cublasltgemmInst *);
-  void noTuning(cublasltgemmInst *);
-  void autoTuning(cublasltgemmInst *);
-  void runThreaded(void (cublasLtGemm::*func)(cublasltgemmInst *));
-  std::tuple<double, double, double> calculateFOM(double totalTime_ms);
-  void testMatmul(cublasltgemmInst *mat);
+  void copy_host_to_dev(cublaslt_gemm_inst *);
+  void prepare_matrix(cublaslt_gemm_inst *);
+  void no_tuning(cublaslt_gemm_inst *);
+  void auto_tuning(cublaslt_gemm_inst *);
+  void run_threaded(void (cublasLtGemm::*func)(cublaslt_gemm_inst *));
+  std::tuple<double, double, double> calculate_figure_of_merit(double total_time_ms);
+  void test_matmul(cublaslt_gemm_inst *mat);
 
  public:
   cublasLtGemm(cxxopts::ParseResult result);
-  std::string prepareArray();
+  std::string prepare_array();
   double test();
-  std::string getResultString();
-  virtual void freeMem();
+  std::string get_result_string();
+  virtual void free_mem();
 };

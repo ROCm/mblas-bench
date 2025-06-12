@@ -7,10 +7,10 @@
 
 class mblasCuDataType: public mblasDataType {
  private:
-  static const std::map<mblasDataType, cudaDataType> precMappings;
+  static const std::map<mblasDataType, cudaDataType> prec_mappings;
  public:
-  static cudaDataType convertToCuda(mblasCuDataType data);
-  static cudaDataType convertToCuda(const mblasCuDataType *data);
+  static cudaDataType convert_to_cuda(mblasCuDataType data);
+  static cudaDataType convert_to_cuda(const mblasCuDataType *data);
   //void operator = (const cudaDataType cudt);
   //mblasCuDataType& operator = (const mblasCuDataType mdt);
   //mblasCuDataType & operator = (const mblasCuDataType mdt);
@@ -21,7 +21,7 @@ class mblasCuDataType: public mblasDataType {
   mblasCuDataType() : mblasDataType() {}
   mblasCuDataType(mblasDataTypeEnum y) : mblasDataType(y) {}
 
-  std::string toString() const override { return mblasDataType::toString("CUDA"); }
+  std::string to_string() const override { return mblasDataType::to_string("CUDA"); }
   mblasCuDataType get_scale_type();
 
 #if (CUDART_VERSION >= 12080)

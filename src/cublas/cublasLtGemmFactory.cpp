@@ -3,6 +3,6 @@
 #include <cublasLtGemm.h>
 #include <cublasLtGemmFactory.h>
 
-void cublasLtGemmFactory::createGemm(cxxopts::ParseResult result) {
+void cublasLtGemmFactory::create_gemm(cxxopts::ParseResult result) {
   gemm = new cublasLtGemm(result);
 }

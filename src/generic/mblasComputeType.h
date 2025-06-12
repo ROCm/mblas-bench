@@ -35,7 +35,7 @@ class mblasComputeType {
     void set(const mblasComputeType mdt) {
       value = mdt;
     }
-    std::string toString(std::string) const;
+    std::string to_string(std::string) const;
   public:
     explicit constexpr mblasComputeType(int y = 0) : mblasComputeType{static_cast<mblasComputeTypeEnum>(y)} {}
     constexpr mblasComputeType(mblasComputeTypeEnum y) : value(y) {}
@@ -49,7 +49,7 @@ class mblasComputeType {
     bool operator<=(const mblasComputeType& other) const;
     bool operator>=(const mblasComputeType& other) const;
 
-    virtual std::string toString() const { return toString("MBLAS"); }
+    virtual std::string to_string() const { return to_string("MBLAS"); }
   
     virtual void set_compute(std::string computestr, mblasDataType& precision);
 };

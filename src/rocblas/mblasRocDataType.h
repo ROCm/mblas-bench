@@ -5,7 +5,7 @@
 
 class mblasRocDataType: public mblasDataType {
  private:
-  static const std::map<mblasDataType, rocblas_datatype> precMappings;
+  static const std::map<mblasDataType, rocblas_datatype> prec_mappings;
  public:
   // Constructors
   mblasRocDataType(const std::string & instr) : mblasDataType(instr) {}

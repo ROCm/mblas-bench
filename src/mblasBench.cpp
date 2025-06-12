@@ -26,7 +26,7 @@ using std::endl;
 using std::flush;
 using std::string;
 
-std::string sToLower(std::string data) {
+std::string s_to_lower(std::string data) {
   std::transform(data.begin(), data.end(), data.begin(),
                  [](unsigned char c) { return std::tolower(c); });
   return data;
@@ -240,8 +240,8 @@ int main(int argc, char **argv) {
 
   genericGemmFactory *gemm;
   // Select backend implementation
-  string driver = sToLower(result["driver"].as<string>());
-  string function = sToLower(result["function"].as<string>());
+  string driver = s_to_lower(result["driver"].as<string>());
+  string function = s_to_lower(result["function"].as<string>());
 
   if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
     // Since regular cublas has no matmul, we can safely assume the user means
@@ -261,16 +261,16 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  gemm->createGemm(result);
-  string header = gemm->prepareArray();
+  gemm->create_gemm(result);
+  string header = gemm->prepare_array();
   cout << header << flush;
   gemm->test();
   cout << std::fixed;
 
-  string results = gemm->getResultString();
+  string results = gemm->get_result_string();
   cout << results << flush;
 
-  gemm->freeMem();
+  gemm->free_mem();
   delete gemm;
 
   return 0;

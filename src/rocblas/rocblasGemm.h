@@ -45,9 +45,9 @@ struct rocblasgemmInst {
     Only used for Batched variant of gemms
     Unused for others
   */
-  void ** ptrDevA;
-  void ** ptrDevB;
-  void ** ptrDevC;
+  void ** ptr_dev_a;
+  void ** ptr_dev_b;
+  void ** ptr_dev_c;
   void ** ptr_host_a;
   void ** ptr_host_b;
   void ** ptr_host_c;
@@ -60,9 +60,9 @@ struct rocblasgemmInst {
 
 class rocblasGemm : public genericGemm {
  private:
-  void * hostA;
-  void * hostB;
-  void * hostC;
+  void * host_a;
+  void * host_b;
+  void * host_c;
 
   // // Device array.  These are where the memory is stored on GPU
   // void *devA;
@@ -74,9 +74,9 @@ class rocblasGemm : public genericGemm {
   //   Only used for Batched variant of gemms
   //   Unused for others
   // */
-  // void **ptrDevA;
-  // void **ptrDevB;
-  // void **ptrDevC;
+  // void **ptr_dev_a;
+  // void **ptr_dev_b;
+  // void **ptr_dev_c;
   // void **ptr_host_a;
   // void **ptr_host_b;
   // void **ptr_host_c;
@@ -96,7 +96,7 @@ class rocblasGemm : public genericGemm {
   mblasRocDataType b_type;
   mblasRocDataType c_type;
 
-  int workspaceSz = 128 * 1024 * 1024;
+  int workspace_size = 128 * 1024 * 1024;
 
   // std::map<std::string, rocblas_datatype> precDType;
   // std::map<std::string, rocblas_datatype> computeDType;
@@ -105,36 +105,36 @@ class rocblasGemm : public genericGemm {
 
   static std::vector<gemmPrecTypeAMD> gemmExSupported;
   static std::vector<TgemmPrecTypeAMD> TgemmExSupported;
-  std::vector<rocblasgemmInst> matPtrs;
+  std::vector<rocblasgemmInst> mat_ptrs;
   std::vector<std::vector<hipEvent_t *> *> eventPtr;
 
-  void initPrecMap();
+  void init_prec_map();
   // rocblas_datatype precisionStringToRocblasDType(std::string stringPrecision);
-  // void parseMType(std::string a, std::string b, std::string c);
-  void parseMType(std::string computeTStr, std::string scalarTStr,
+  // void parse_problem_type(std::string a, std::string b, std::string c);
+  void parse_problem_type(std::string computeTStr, std::string scalarTStr,
                   std::string aStr, std::string bStr, std::string cStr);
-  void parseDevIters(std::string);
+  void parse_dev_iters(std::string);
   rocblas_operation setOp(std::string);
   void alloc_host();
   void alloc_dev(rocblasgemmInst *);
   void fill_host();
-  void copyHostToDev(rocblasgemmInst *);
-  void runThreaded(void (rocblasGemm::*func)(rocblasgemmInst *));
-  std::tuple<double, double, double> calculateFOM(double totalTime_ms);
+  void copy_host_to_dev(rocblasgemmInst *);
+  void run_threaded(void (rocblasGemm::*func)(rocblasgemmInst *));
+  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
 
 
 
   template <typename T>
-  void testTgemm(std::function<rocblas_status_(_rocblas_handle*, rocblas_operation_, rocblas_operation_, int, int, int, T const*, T const*, int, T const*, int, T const*, T*, int)> func, rocblasgemmInst *mat);
+  void test_Tgemm(std::function<rocblas_status_(_rocblas_handle*, rocblas_operation_, rocblas_operation_, int, int, int, T const*, T const*, int, T const*, int, T const*, T*, int)> func, rocblasgemmInst *mat);
 
   template <typename T>
-  void testTgemm_batched(
+  void test_Tgemm_batched(
       std::function<rocblas_status_(_rocblas_handle*, rocblas_operation_, rocblas_operation_, int, int, int, T const*, T const* const*, int, T const* const*, int, T const*, T* const*, int, int)>
           func,
       rocblasgemmInst *mat);
 
   template <typename T>
-  void testTgemm_strided_batched(
+  void test_Tgemm_strided_batched(
           std::function<rocblas_status_(_rocblas_handle*, rocblas_operation_, rocblas_operation_, int, int, int, T const*, T const*, int, long, T const*, int, long, T const*, T*, int, long, int)>
           func, rocblasgemmInst *mat);
 
@@ -145,9 +145,9 @@ class rocblasGemm : public genericGemm {
 
  public:
   rocblasGemm(cxxopts::ParseResult result);
-  std::string prepareArray();
+  std::string prepare_array();
   double test();
-  std::string getResultString();
-  virtual void freeMem();
+  std::string get_result_string();
+  virtual void free_mem();
 
 };

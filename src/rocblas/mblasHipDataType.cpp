@@ -4,7 +4,7 @@
 hipDataType mblasHipDataType::convertToHip(mblasHipDataType data)  { return convertToHip(&data); }
 hipDataType mblasHipDataType::convertToHip(const mblasHipDataType *data) {
   try {
-    return precMappings.at(*data);
+    return prec_mappings.at(*data);
   } catch (std::out_of_range &e) {
     std::cout << "Failed to convert to Hip Datatype " << data->toString() << std::endl;
     throw e;
@@ -13,7 +13,7 @@ hipDataType mblasHipDataType::convertToHip(const mblasHipDataType *data) {
 }
 
 // void mblasHipDataType::operator = (const hipDataType cudt) {
-//   for (auto ele : precMappings) {
+//   for (auto ele : prec_mappings) {
 //     if (ele.second == cudt) {
 //       set(ele.first);
 //     }
@@ -41,7 +41,7 @@ mblasHipDataType::operator hipDataType() const {
   return convertToHip(this);
 }
 
-const std::map<mblasDataType, hipDataType> mblasHipDataType::precMappings = {
+const std::map<mblasDataType, hipDataType> mblasHipDataType::prec_mappings = {
     {MBLAS_R_16F,  HIP_R_16F},
     {MBLAS_C_16F,  HIP_C_16F},
     {MBLAS_R_16BF, HIP_R_16BF},

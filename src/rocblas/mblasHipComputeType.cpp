@@ -2,7 +2,7 @@
 #include <iostream>
 
 // Used for converting mblas type to cublas type
-const std::map<mblasComputeTypeEnum, hipblasComputeType_t> mblasHipComputeType::compMappings = {
+const std::map<mblasComputeTypeEnum, hipblasComputeType_t> mblasHipComputeType::compute_mappings = {
     {MBLAS_COMPUTE_16F, HIPBLAS_COMPUTE_16F},
     {MBLAS_COMPUTE_16F_PEDANTIC, HIPBLAS_COMPUTE_16F_PEDANTIC},
     {MBLAS_COMPUTE_32F, HIPBLAS_COMPUTE_32F},
@@ -19,7 +19,7 @@ const std::map<mblasComputeTypeEnum, hipblasComputeType_t> mblasHipComputeType::
 hipblasComputeType_t mblasHipComputeType::convertToHip(mblasHipComputeType data)  { return convertToHip(&data); }
 hipblasComputeType_t mblasHipComputeType::convertToHip(const mblasHipComputeType *data) {
   try {
-    return compMappings.at(*data);
+    return compute_mappings.at(*data);
   } catch (std::out_of_range &e) {
     std::cout << "Failed to convert to Hip Compute Type " << data->toString() << std::endl;
     throw e;
@@ -28,7 +28,7 @@ hipblasComputeType_t mblasHipComputeType::convertToHip(const mblasHipComputeType
 }
 
 // void mblasHipComputeType::operator = (const hipblasComputeType_t cudt) {
-//   for (auto ele : compMappings) {
+//   for (auto ele : compute_mappings) {
 //     if (ele.second == cudt) {
 //       set(ele.first);
 //     }

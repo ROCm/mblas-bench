@@ -5,7 +5,7 @@ hipblasOperation_t mblasHipOperation::convertToHip(mblasHipOperation data)  { re
 
 hipblasOperation_t mblasHipOperation::convertToHip(const mblasHipOperation *data) {
   try {
-    return precMappings.at(*data);
+    return prec_mappings.at(*data);
   } catch (std::out_of_range &e) {
     std::cout << "Failed to convert to Hip Operation " << data->toString() << std::endl;
     throw e;
@@ -17,7 +17,7 @@ hipblasOperation_t mblasHipOperation::convertToHip() {
 }
 
 // void mblasHipOperation::operator = (const hipblasOperation_t cudt) {
-//   for (auto ele : precMappings) {
+//   for (auto ele : prec_mappings) {
 //     if (ele.second == cudt) {
 //       set(ele.first);
 //     }
@@ -36,7 +36,7 @@ mblasHipOperation & mblasHipOperation::operator = (const mblasHipOperation& mdt)
 //   return convertToHip(this);
 // }
 
-const std::map<mblasOperation, hipblasOperation_t> mblasHipOperation::precMappings = {
+const std::map<mblasOperation, hipblasOperation_t> mblasHipOperation::prec_mappings = {
     {MBLAS_OP_N,    HIPBLAS_OP_N},
     {MBLAS_OP_T,    HIPBLAS_OP_T},
     {MBLAS_OP_C,    HIPBLAS_OP_C},

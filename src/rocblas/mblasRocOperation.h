@@ -5,7 +5,7 @@
 
 class mblasRocOperation: public mblasOperation {
  private:
-  static const std::map<mblasOperation, rocblas_operation> precMappings;
+  static const std::map<mblasOperation, rocblas_operation> prec_mappings;
  public:
   // Constructors
   static rocblas_operation convertToRocm(mblasRocOperation data);

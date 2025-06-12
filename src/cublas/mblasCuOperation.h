@@ -6,11 +6,11 @@
 
 class mblasCuOperation: public mblasOperation {
  private:
-  static const std::map<mblasOperation, cublasOperation_t> precMappings;
+  static const std::map<mblasOperation, cublasOperation_t> prec_mappings;
  public:
-  static cublasOperation_t convertToCuda(mblasCuOperation data);
-  static cublasOperation_t convertToCuda(const mblasCuOperation *data);
-  cublasOperation_t convertToCuda();
+  static cublasOperation_t convert_to_cuda(mblasCuOperation data);
+  static cublasOperation_t convert_to_cuda(const mblasCuOperation *data);
+  cublasOperation_t convert_to_cuda();
   //void operator = (const cublasOperation_t cudt);
   //mblasCuOperation& operator = (const mblasCuOperation mdt);
   //mblasCuOperation & operator = (const mblasCuOperation mdt);
@@ -22,5 +22,5 @@ class mblasCuOperation: public mblasOperation {
   mblasCuOperation() : mblasOperation() {}
   mblasCuOperation(mblasOperationEnum y) : mblasOperation(y) {}
 
-  std::string toString() const override { return mblasOperation::toString("CUBLAS"); }
+  std::string to_string() const override { return mblasOperation::to_string("CUBLAS"); }
 };

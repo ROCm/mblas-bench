@@ -14,12 +14,12 @@ __global__ void float_to_fp16(float *input, size_t num_elements, __half *output)
 
 __global__ void float_to_fp8(float *input, size_t num_elements,
                            __hip_fp8_storage_t *output, __hip_fp8_interpretation_t interp);
-void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x,
+void copy_and_convert(mblasDataType precision, void *host_a, void *devA, int x,
                     int y, int batchsz);
-//void copyAndConvert(hipblasDatatype_t precision, void *hostA, void *devA, int x,
+//void copy_and_convert(hipblasDatatype_t precision, void *host_a, void *devA, int x,
 //                    int y, int batchsz);
-void *convertScalar(mblasDataType precision, void *scalar);
-//void *convertScalar(hipblasDatatype_t precision, void *scalar);
+void *convert_scalar(mblasDataType precision, void *scalar);
+//void *convert_scalar(hipblasDatatype_t precision, void *scalar);
 void copyAndConvertScalar(mblasDataType scalarPrecision, void *hostScalar,
                           void *devScalar);
 //void copyAndConvertScalar(hipblasDatatype_t scalarPrecision, void *hostScalar,

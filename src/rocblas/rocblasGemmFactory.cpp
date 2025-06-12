@@ -3,6 +3,6 @@
 #include <rocblasGemm.h>
 #include <rocblasGemmFactory.h>
 
-void rocblasGemmFactory::createGemm(cxxopts::ParseResult result) {
+void rocblasGemmFactory::create_gemm(cxxopts::ParseResult result) {
   gemm = new rocblasGemm(result);
 }

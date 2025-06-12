@@ -3,10 +3,10 @@
 #include <cublasGemm.h>
 #include <cublasGemmFactory.h>
 
-//genericGemm* cublasGemmFactory::createGemm(cxxopts::ParseResult result) const {
+//genericGemm* cublasGemmFactory::create_gemm(cxxopts::ParseResult result) const {
 //  return new cublasGemm(result);
 //}
 
-void cublasGemmFactory::createGemm(cxxopts::ParseResult result) {
+void cublasGemmFactory::create_gemm(cxxopts::ParseResult result) {
   gemm = new cublasGemm(result);
 }

@@ -4,5 +4,5 @@
 
 class cublasLtGemmFactory : public genericGemmFactory {
  public:
-  void createGemm(cxxopts::ParseResult) override;
+  void create_gemm(cxxopts::ParseResult) override;
 };

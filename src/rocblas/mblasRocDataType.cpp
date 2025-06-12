@@ -5,7 +5,7 @@ rocblas_datatype mblasRocDataType::convertToHip(mblasRocDataType data)  { return
 
 rocblas_datatype mblasRocDataType::convertToHip(const mblasRocDataType *data) {
   try {
-    return precMappings.at(*data);
+    return prec_mappings.at(*data);
   } catch (std::out_of_range &e) {
     std::cout << "Failed to convert to Rocblas Datatype " << data->toString() << std::endl;
     throw e;
@@ -18,7 +18,7 @@ mblasRocDataType::operator rocblas_datatype() const {
 }
 
 // void mblasRocDataType::operator = (const hipDataType cudt) {
-//   for (auto ele : precMappings) {
+//   for (auto ele : prec_mappings) {
 //     if (ele.second == cudt) {
 //       set(ele.first);
 //     }
@@ -42,7 +42,7 @@ mblasRocDataType & mblasRocDataType::operator = (const mblasRocDataType& mdt) {
 //   return *this;
 // }
 
-const std::map<mblasDataType, rocblas_datatype> mblasRocDataType::precMappings = {
+const std::map<mblasDataType, rocblas_datatype> mblasRocDataType::prec_mappings = {
     {MBLAS_R_16F,  rocblas_datatype_f16_r},
     {MBLAS_C_16F,  rocblas_datatype_f16_c},
     {MBLAS_R_16BF, rocblas_datatype_bf16_r},

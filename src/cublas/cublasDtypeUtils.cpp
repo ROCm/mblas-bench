@@ -12,7 +12,7 @@ static size_t roundoff(size_t  x, size_t granul) {
   return granul * ((x + (granul - 1)) / granul);
 }
 
-bool matchGemmType(mblasDataType precision, std::string function, mblasDataType desiredPrec, std::vector<string> acceptable) {
+bool match_gemm_type(mblasDataType precision, std::string function, mblasDataType desiredPrec, std::vector<string> acceptable) {
   if (precision != desiredPrec) {
     return false;
   }

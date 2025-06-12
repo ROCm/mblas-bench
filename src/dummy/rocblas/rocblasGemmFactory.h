@@ -4,7 +4,7 @@
 
 class rocblasGemmFactory : public genericGemmFactory {
  public:
-  void createGemm(cxxopts::ParseResult) override {
+  void create_gemm(cxxopts::ParseResult) override {
     throw std::runtime_error("Support for rocblas backend not compiled");
   }
 };

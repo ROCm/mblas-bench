@@ -88,7 +88,7 @@ mblasComputeType::mblasComputeType(std::string instr) {
   }
 }
 
-std::string mblasComputeType::toString(std::string prefix) const {
+std::string mblasComputeType::to_string(std::string prefix) const {
   for (auto ele : computeDType) {
     if (ele.second == value && ele.first.find(prefix) != std::string::npos) {
       return ele.first;

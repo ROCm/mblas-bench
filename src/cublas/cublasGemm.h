@@ -45,9 +45,9 @@ struct cublasgemmInst {
     Only used for Batched variant of gemms
     Unused for others
   */
-  void **ptrDevA;
-  void **ptrDevB;
-  void **ptrDevC;
+  void **ptr_dev_a;
+  void **ptr_dev_b;
+  void **ptr_dev_c;
   void **ptr_host_a;
   void **ptr_host_b;
   void **ptr_host_c;
@@ -58,9 +58,9 @@ struct cublasgemmInst {
 
 class cublasGemm : public genericGemm {
  private:
-  void *hostA;
-  void *hostB;
-  void *hostC;
+  void *host_a;
+  void *host_b;
+  void *host_c;
 
   // // Device array.  These are where the memory is stored on GPU
   // void *devA;
@@ -72,9 +72,9 @@ class cublasGemm : public genericGemm {
   //   Only used for Batched variant of gemms
   //   Unused for others
   // */
-  // void **ptrDevA;
-  // void **ptrDevB;
-  // void **ptrDevC;
+  // void **ptr_dev_a;
+  // void **ptr_dev_b;
+  // void **ptr_dev_c;
   // void **ptr_host_a;
   // void **ptr_host_b;
   // void **ptr_host_c;
@@ -94,27 +94,27 @@ class cublasGemm : public genericGemm {
   mblasCuDataType b_type;
   mblasCuDataType c_type;
 
-  int workspaceSz = 128 * 1024 * 1024;
+  int workspace_size = 128 * 1024 * 1024;
 
   static std::vector<gemmPrecType> gemmExSupported;
   static std::vector<TgemmPrecType> TgemmExSupported;
-  std::vector<cublasgemmInst> matPtrs;
+  std::vector<cublasgemmInst> mat_ptrs;
   std::vector<std::vector<cudaEvent_t *> *> eventPtr;
 
  private:
-  void initPrecMap();
+  void init_prec_map();
   // cudaDataType_t precisionStringToDType(std::string stringPrecision);
-  // void parseMType(std::string a, std::string b, std::string c);
-  void parseMType(std::string computeTStr, std::string scalarTStr,
+  // void parse_problem_type(std::string a, std::string b, std::string c);
+  void parse_problem_type(std::string computeTStr, std::string scalarTStr,
                   std::string aStr, std::string bStr, std::string cStr);
-  void parseDevIters(std::string);
+  void parse_dev_iters(std::string);
   cublasOperation_t setOp(std::string);
   void alloc_host();
   void alloc_dev(cublasgemmInst *);
   void fill_host();
-  void copyHostToDev(cublasgemmInst *);
-  void runThreaded(void (cublasGemm::*func)(cublasgemmInst *));
-  std::tuple<double, double, double> calculateFOM(double totalTime_ms);
+  void copy_host_to_dev(cublasgemmInst *);
+  void run_threaded(void (cublasGemm::*func)(cublasgemmInst *));
+  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
 
 
   double testGemmExBatched();
@@ -122,7 +122,7 @@ class cublasGemm : public genericGemm {
 
   // Parameter names are included in function definitions for refrence only
   template <typename T>
-  void testTgemm(std::function<cublasStatus_t(
+  void test_Tgemm(std::function<cublasStatus_t(
                      cublasHandle_t handle, cublasOperation_t transa,
                      cublasOperation_t transb, int m, int n, int k,
                      const T *alpha, const T *A, int lda, const T *B, int ldb,
@@ -160,8 +160,8 @@ class cublasGemm : public genericGemm {
   void testGemmEx(cublasgemmInst *mat);
  public:
   cublasGemm(cxxopts::ParseResult result);
-  std::string prepareArray();
+  std::string prepare_array();
   double test();
-  std::string getResultString();
-  virtual void freeMem();
+  std::string get_result_string();
+  virtual void free_mem();
 };

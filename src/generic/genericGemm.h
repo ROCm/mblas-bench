@@ -80,15 +80,15 @@ class genericGemm {
 
   // virtual void setSize();
   // virtual void setTypes();
-  int setLd(std::string ld, std::string OP, int x, int y);
-  std::pair<int, int> setRowCol(std::string OP, int d1, int d2);
+  int set_ld(std::string ld, std::string OP, int x, int y);
+  std::pair<int, int> set_row_col(std::string OP, int d1, int d2);
 
-  virtual std::string prepareArray() = 0;
+  virtual std::string prepare_array() = 0;
 
   virtual double test() = 0;
 
-  virtual std::string getResultString() = 0;
-  virtual void freeMem() = 0;
+  virtual std::string get_result_string() = 0;
+  virtual void free_mem() = 0;
   void set_init_params();
 
   void set_flush_batch_count(uint64_t & a_offset, uint64_t & b_offset, uint64_t & c_offset, uint64_t & d_offset,
