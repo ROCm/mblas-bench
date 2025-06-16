@@ -5,7 +5,7 @@
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
-#if (CUDART_VERSION >= 12080)
+#if (ENABLE_CUDA_FP4)
 #include <cuda_fp4.h>
 #endif 
 #include "cublasCreateAllocate.h"
