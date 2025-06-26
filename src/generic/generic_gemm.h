@@ -38,8 +38,9 @@ class generic_gemm {
   long long int stride_c;
   long long int stride_d;
 
-  bool strided;
-  bool batched;
+  bool strided = false;
+  bool batched = false;
+  bool pure_batched = false;
 
   int iters;
   int cold_iters;
@@ -89,10 +90,11 @@ class generic_gemm {
 
   virtual std::string get_result_string() = 0;
   virtual void free_mem() = 0;
+
+  static long long int fix_stride(long long int stride, long rows_a, long cols_a, std::string matrix_id);
   void set_init_params();
 
-  void set_flush_batch_count(uint64_t & a_offset, uint64_t & b_offset, uint64_t & c_offset, uint64_t & d_offset,
-                        int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
+  void set_flush_batch_count(int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
                         int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing, 
                         bool inplace);
 

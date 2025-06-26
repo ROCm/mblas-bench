@@ -53,18 +53,28 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
 
   iters = result["iters"].as<int>();
   cold_iters = result["cold_iters"].as<int>();
-  batch_count = 1;
-  if (function.find("Batched") != string::npos || function.find("batched") != string::npos) {
-    batched = true;
-  }
+
   batch_count = result["batch_count"].as<int>();
-  if (function.find("Strided") != string::npos || function.find("strided") != string::npos) {
-    strided = true;
+  if (function.find("Batched") != string::npos || function.find("batched") != string::npos || batch_count > 1 ) {
+    batched = true;
+    pure_batched = true;
   }
-  stride_a = result["stride_a"].as<long long int>();
-  stride_b = result["stride_b"].as<long long int>();
-  stride_c = result["stride_c"].as<long long int>();
-  stride_d = result["stride_d"].as<long long int>();
+  if (function.find("Strided") != string::npos || function.find("strided") != string::npos || (function.find("matmul") != string::npos && batch_count > 1)) {
+    // all batched matmuls are strided
+    strided = true;
+    batched = true;
+    pure_batched = false;
+  }
+  //stride_a = result["stride_a"].as<long long int>();
+  //stride_b = result["stride_b"].as<long long int>();
+  //stride_c = result["stride_c"].as<long long int>();
+  //stride_d = result["stride_d"].as<long long int>();
+  if (strided) {
+    stride_a = fix_stride(result["stride_a"].as<long long int>(), rows_mem_a, cols_mem_a, "A");
+    stride_b = fix_stride(result["stride_b"].as<long long int>(), rows_mem_b, cols_mem_b, "B");
+    stride_c = fix_stride(result["stride_c"].as<long long int>(), rows_mem_c, cols_mem_c, "C");
+    stride_d = fix_stride(result["stride_d"].as<long long int>(), rows_mem_d, cols_mem_d, "D");
+  } 
 
   flush_batch_count = result["flush_batch_count"].as<int>();
   flush_memory_size = result["flush_memory_size"].as<int>();
@@ -104,6 +114,21 @@ int generic_gemm::set_ld(std::string ld, std::string OP, int x, int y) {
   }
 }
 
+long long int generic_gemm::fix_stride(long long int stride, long rows_x, long cols_x, std::string matrix_id) {
+  long long rows_x_long = rows_x;
+  long long cols_x_long = cols_x;
+  long long stride_x = rows_x * cols_x;
+  if (stride == 0) {
+    std::cout << "Note: Matrix " << matrix_id << "'s stride automatically set to " << stride_x << std::endl;
+    return stride_x;
+  } else if (stride < stride_x) {
+    std::cout << "Note: Matrix " << matrix_id << "'s stride of " << stride << " is too small, overridden to " << stride_x << std::endl;
+    return stride_x;
+  }
+  return stride;
+
+}
+
 std::pair<int, int> generic_gemm::set_row_col(std::string OP, int d1, int d2) {
   if (OP == "N") {
     return std::pair<int, int>(d1, d2);
@@ -112,13 +137,13 @@ std::pair<int, int> generic_gemm::set_row_col(std::string OP, int d1, int d2) {
   }
 }
 
-void generic_gemm::set_flush_batch_count(uint64_t & a_offset, uint64_t & b_offset, uint64_t & c_offset, uint64_t & d_offset,
+void generic_gemm::set_flush_batch_count(
                       int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
                       int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing,
                       bool inplace) {
   // test
   uint64_t single_block_size = calculate_offsets(rows_mem_a, cols_mem_a, rows_mem_b, cols_mem_b, rows_mem_c, cols_mem_c, rows_mem_d, cols_mem_d, 
-                    a_offset, b_offset, c_offset, d_offset, a_type_size, b_type_size, c_type_size, d_type_size,
+                    a_type_size, b_type_size, c_type_size, d_type_size,
                     a_type_packing, b_type_packing, c_type_packing, d_type_packing, batch_count, inplace);
   uint64_t flush_memory_size_bytes = (uint64_t)flush_memory_size * 1024 * 1024;
   if (flush_memory_size == 0) {

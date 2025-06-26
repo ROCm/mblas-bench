@@ -58,9 +58,12 @@ struct cublasgemmInst {
 
 class cublas_gemm : public generic_gemm {
  private:
-  void *host_a;
-  void *host_b;
-  void *host_c;
+  //void *host_a;
+  //void *host_b;
+  //void *host_c;
+  void **ptr_host_a;
+  void **ptr_host_b;
+  void **ptr_host_c;
 
   // // Device array.  These are where the memory is stored on GPU
   // void *devA;

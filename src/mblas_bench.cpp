@@ -90,24 +90,24 @@ int main(int argc, char **argv) {
             cxxopts::value<string>()->default_value(""));
   opp_adder("stride_a",
             "Specific stride of strided_batched matrix A, is only applicable "
-            "to strided batchedBLAS-2 and BLAS-3: second dimension * leading "
-            "dimension.  (Default value is: 16384)",
-            cxxopts::value<long long int>()->default_value("16384"));
+            "to strided batched gemm and matmuls: second dimension * leading "
+            "dimension.  A value of 0 means automatic based on memory size",
+            cxxopts::value<long long int>()->default_value("0"));
   opp_adder("stride_b",
             "Specific stride of strided_batched matrix B, is only applicable "
-            "to strided batchedBLAS-2 and BLAS-3: second dimension * leading "
-            "dimension.  (Default value is: 16384)",
-            cxxopts::value<long long int>()->default_value("16384"));
+            "to strided batched gemm and matmuls: second dimension * leading "
+            "dimension.  A value of 0 means automatic based on memory size",
+            cxxopts::value<long long int>()->default_value("0"));
   opp_adder("stride_c",
             "Specific stride of strided_batched matrix C, is only applicable "
-            "to strided batchedBLAS-2 and BLAS-3: second dimension * leading "
-            "dimension.  (Default value is: 16384)",
-            cxxopts::value<long long int>()->default_value("16384"));
+            "to strided batched gemm and matmuls: second dimension * leading "
+            "dimension.  A value of 0 means automatic based on memory size",
+            cxxopts::value<long long int>()->default_value("0"));
   opp_adder("stride_d",
             "Specific stride of strided_batched matrix D, is only applicable "
-            "to strided batchedBLAS_EX: second dimension * leading dimension.  "
-            "(Default value is: 16384)",
-            cxxopts::value<long long int>()->default_value("16384"));
+            "to strided batched gemm and matmuls: second dimension * leading "
+            "dimension.  A value of 0 means automatic based on memory size",
+            cxxopts::value<long long int>()->default_value("0"));
   opp_adder("a_type",
             "Precision of matrix A. Options:" + supPrec + ". " +
                 "Defaults to the value of -r/--precision",

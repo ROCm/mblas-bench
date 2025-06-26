@@ -186,6 +186,14 @@ cublas_gemm::cublas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
   beta = type_call_host<allocSetScalar>(precision, sbeta.c_str(), sbetai.c_str());
   // std::cout << *((float *)alpha) << std::endl;
   // std::cout << *((float *)beta) << std::endl;
+  set_flush_batch_count( 
+      type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
+      type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(c_type), 
+      get_packing_count(a_type), 
+      get_packing_count(b_type), 
+      get_packing_count(c_type), 
+      get_packing_count(c_type), 
+      true);
 }
 
 string cublas_gemm::prepare_array() {
@@ -236,103 +244,104 @@ void cublas_gemm::run_threaded(void (cublas_gemm::*func)(cublasgemmInst *)) {
 }
 
 void cublas_gemm::alloc_host() {
-  // auto resultA = std::async(allocate_host_array, a_type, m, k, batch_count);
-  // auto resultB = std::async(allocate_host_array, b_type, k, n, batch_count);
-  // auto resultC = std::async(allocate_host_array, c_type, n, m, batch_count);
-  // host_a = resultA.get();
-  // host_b = resultB.get();
-  // host_c = resultC.get();
-  host_a = allocate_host_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-  host_b = allocate_host_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-  host_c = allocate_host_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+  ptr_host_a =
+      (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(a_type));
+  ptr_host_b =
+      (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(b_type));
+  ptr_host_c =
+      (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(c_type));
+
+  for (int i = 0; i < flush_batch_count; i++) {
+    ptr_host_a[i] = allocate_host_array(a_type, rows_mem_a, cols_mem_a, batch_count);
+    ptr_host_b[i] = allocate_host_array(b_type, rows_mem_b, cols_mem_b, batch_count);
+    ptr_host_c[i] = allocate_host_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+  }
 }
 
 void cublas_gemm::alloc_dev(cublasgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
-  mat->devA = allocate_dev_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-  mat->devB = allocate_dev_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-  mat->devC = allocate_dev_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+
+  mat->ptr_dev_a =
+      (void **)malloc(batch_count * flush_batch_count * type_call_dev<sizeofCUDTP>(a_type));
+  mat->ptr_dev_b =
+      (void **)malloc(batch_count * flush_batch_count * type_call_dev<sizeofCUDTP>(b_type));
+  mat->ptr_dev_c =
+      (void **)malloc(batch_count * flush_batch_count * type_call_dev<sizeofCUDTP>(c_type));
+
+  for (int i = 0; i < flush_batch_count; i++) {
+    mat->ptr_dev_a[i] = allocate_dev_array(a_type, rows_mem_a, cols_mem_a, batch_count);
+    mat->ptr_dev_b[i] = allocate_dev_array(b_type, rows_mem_b, cols_mem_b, batch_count);
+    mat->ptr_dev_c[i] = allocate_dev_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+  }
+
   mat->wSZ = workspace_size;
   cudaMalloc(&mat->devWork, mat->wSZ);
 }
 
 void cublas_gemm::fill_host() {
-  // Some random functions treat the matrix as a vectors, some require a matrix
-  // vector<thread> threads;
-  // threads.push_back(thread(initHostH, a_type, initialization, host_a, m, k,
-  // lda,
-  //                         batch_count, stride_a, 2.f, false));
-  // threads.push_back(thread(initHostH, b_type, initialization, host_b, k, n,
-  // ldb,
-  //                         batch_count, stride_b, 3.f, true));
-  // threads.push_back(thread(initHostH, c_type, initialization, host_c, m, n,
-  // ldc,
-  //                         batch_count, stride_c, 0.f, false));
-  // for (auto &thread : threads) {
-  //  thread.join();
-  //}
-  type_call_host<initHost>(a_type, initialization, host_a, rows_a, cols_a, lda,
-                         batch_count, stride_a, control_a, constant_a, filename_a);
-  type_call_host<initHost>(b_type, initialization, host_b, rows_b, cols_b, ldb,
-                         batch_count, stride_b, control_b, constant_b, filename_b);
-  type_call_host<initHost>(c_type, initialization, host_c, rows_c, cols_c, ldc,
-                         batch_count, stride_c, control_c, constant_c, filename_c);
-  // initHostH(a_type, initialization, host_a, rows_a, cols_a, lda,
-  //           batch_count, stride_a, control_a, constant_a, filename_a);
-  // initHostH(b_type, initialization, host_b, rows_b, cols_b, ldb,
-  //           batch_count, stride_b, control_b, constant_b, filename_b);
-  // initHostH(c_type, initialization, host_c, rows_c, cols_c, ldc,
-  //                        batch_count, stride_c, control_c, constant_c, filename_c);
+  for (int i = 0; i < flush_batch_count; i++){
+    type_call_host<initHost>(a_type, initialization, ptr_host_a[i], rows_a, cols_a, lda,
+                           batch_count, stride_a, control_a, constant_a, filename_a);
+    type_call_host<initHost>(b_type, initialization, ptr_host_b[i], rows_b, cols_b, ldb,
+                           batch_count, stride_b, control_b, constant_b, filename_b);
+    type_call_host<initHost>(c_type, initialization, ptr_host_c[i], rows_c, cols_c, ldc,
+                           batch_count, stride_c, control_c, constant_c, filename_c);
+    // D is just output, don't need to init
+  }
 }
 
 void cublas_gemm::copy_host_to_dev(cublasgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
-  copy_and_convert(a_type, host_a, mat->devA, rows_mem_a, cols_mem_a, batch_count);
-  copy_and_convert(b_type, host_b, mat->devB, rows_mem_b, cols_mem_b, batch_count);
-  copy_and_convert(c_type, host_c, mat->devC, rows_mem_c, cols_mem_c, batch_count);
-  if (batched && !strided) {
-    // Perform some pointer arithmetic to calculate the arrays we pass to the
-    // gpu
-    mat->ptr_host_a =
-        (void **)malloc(batch_count * type_call_host<sizeofCUDTP>(a_type));
-    mat->ptr_host_b =
-        (void **)malloc(batch_count * type_call_host<sizeofCUDTP>(b_type));
-    mat->ptr_host_c =
-        (void **)malloc(batch_count * type_call_host<sizeofCUDTP>(c_type));
-    check_cuda(
-        cudaMalloc(&mat->ptr_dev_a, batch_count * type_call_host<sizeofCUDTP>(a_type)));
-    check_cuda(
-        cudaMalloc(&mat->ptr_dev_b, batch_count * type_call_host<sizeofCUDTP>(b_type)));
-    check_cuda(
-        cudaMalloc(&mat->ptr_dev_c, batch_count * type_call_host<sizeofCUDTP>(c_type)));
-    //type_call_dev<batchedPtrMagic>(a_type, mat->ptr_host_a, mat->ptr_dev_a, mat->devA,
-    //                            batch_count, rows_mem_a, cols_mem_a);
-    //type_call_dev<batchedPtrMagic>(b_type, mat->ptr_host_b, mat->ptr_dev_b, mat->devB,
-    //                            batch_count, rows_mem_b, cols_mem_b);
-    //type_call_dev<batchedPtrMagic>(c_type, mat->ptr_host_c, mat->ptr_dev_c, mat->devC,
-    //                            batch_count, rows_mem_c, cols_mem_c);
+
+  for (int i = 0; i < flush_batch_count; i++) {
+    copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], rows_mem_a, cols_mem_a, batch_count);
+    copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count);
+    copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], rows_mem_c, cols_mem_c, batch_count);
   }
+
+  //if (batched && !strided) {
+  //  // Perform some pointer arithmetic to calculate the arrays we pass to the
+  //  // gpu
+  //  mat->ptr_host_a =
+  //      (void **)malloc(batch_count * type_call_host<sizeofCUDTP>(a_type));
+  //  mat->ptr_host_b =
+  //      (void **)malloc(batch_count * type_call_host<sizeofCUDTP>(b_type));
+  //  mat->ptr_host_c =
+  //      (void **)malloc(batch_count * type_call_host<sizeofCUDTP>(c_type));
+  //  check_cuda(
+  //      cudaMalloc(&mat->ptr_dev_a, batch_count * type_call_host<sizeofCUDTP>(a_type)));
+  //  check_cuda(
+  //      cudaMalloc(&mat->ptr_dev_b, batch_count * type_call_host<sizeofCUDTP>(b_type)));
+  //  check_cuda(
+  //      cudaMalloc(&mat->ptr_dev_c, batch_count * type_call_host<sizeofCUDTP>(c_type)));
+  //  //type_call_dev<batchedPtrMagic>(a_type, mat->ptr_host_a, mat->ptr_dev_a, mat->devA,
+  //  //                            batch_count, rows_mem_a, cols_mem_a);
+  //  //type_call_dev<batchedPtrMagic>(b_type, mat->ptr_host_b, mat->ptr_dev_b, mat->devB,
+  //  //                            batch_count, rows_mem_b, cols_mem_b);
+  //  //type_call_dev<batchedPtrMagic>(c_type, mat->ptr_host_c, mat->ptr_dev_c, mat->devC,
+  //  //                            batch_count, rows_mem_c, cols_mem_c);
+  //}
 }
 
 void cublas_gemm::free_mem() {
   free(alpha);
   free(beta);
-  free(host_a);
-  free(host_b);
-  free(host_c);
+  free(ptr_host_a);
+  free(ptr_host_b);
+  free(ptr_host_c);
   for (auto mat : mat_ptrs) {
-    cudaFree(mat.devA);
-    cudaFree(mat.devB);
-    cudaFree(mat.devC);
+    cudaFree(mat.ptr_dev_a);
+    cudaFree(mat.ptr_dev_b);
+    cudaFree(mat.ptr_dev_c);
     cudaFree(mat.devWork);
-    if (batched && !strided) {
-      free(mat.ptr_host_a);
-      free(mat.ptr_host_b);
-      free(mat.ptr_host_c);
-      cudaFree(mat.ptr_dev_a);
-      cudaFree(mat.ptr_dev_b);
-      cudaFree(mat.ptr_dev_c);
-    }
+    //if (batched && !strided) {
+    //  free(mat.ptr_host_a);
+    //  free(mat.ptr_host_b);
+    //  free(mat.ptr_host_c);
+    //  cudaFree(mat.ptr_dev_a);
+    //  cudaFree(mat.ptr_dev_b);
+    //  cudaFree(mat.ptr_dev_c);
+    //}
   }
 }
 
@@ -371,32 +380,33 @@ double cublas_gemm::test() {
           thread(&cublas_gemm::test_Tgemm<cuComplex>, this, cgemm3m_var, &mat));
     }
     // TgemmBatched
-    else if (function == "cublasDgemmBatched" && precision == mblas_data_type::MBLAS_R_64F) {
-      std::function<decltype(cublasDgemmBatched)> dgemm_var =
-          cublasDgemmBatched;
-      threads.push_back(
-          thread(&cublas_gemm::testTgemmBatched<double>, this, dgemm_var, &mat));
-    } else if (function == "cublasSgemmBatched" && precision == mblas_data_type::MBLAS_R_32F) {
-      std::function<decltype(cublasSgemmBatched)> sgemm_var =
-          cublasSgemmBatched;
-      threads.push_back(
-          thread(&cublas_gemm::testTgemmBatched<float>, this, sgemm_var, &mat));
-    } else if (function == "cublasHgemmBatched" && precision == mblas_data_type::MBLAS_R_16F) {
-      std::function<decltype(cublasHgemmBatched)> hgemm_var =
-          cublasHgemmBatched;
-      threads.push_back(
-          thread(&cublas_gemm::testTgemmBatched<__half>, this, hgemm_var, &mat));
-    } else if (function == "cublasZgemmBatched" && precision == mblas_data_type::MBLAS_C_64F) {
-      std::function<decltype(cublasZgemmBatched)> zgemm_var =
-          cublasZgemmBatched;
-      threads.push_back(thread(&cublas_gemm::testTgemmBatched<cuDoubleComplex>,
-                               this, zgemm_var, &mat));
-    } else if (function == "cublasCgemmBatched" && precision == mblas_data_type::MBLAS_C_32F) {
-      std::function<decltype(cublasCgemmBatched)> cgemm_var =
-          cublasCgemmBatched;
-      threads.push_back(thread(&cublas_gemm::testTgemmBatched<cuComplex>, this,
-                               cgemm_var, &mat));
-    }
+    // Disabled due to batched & rotating tensors not being implemented at the same time
+    // else if (function == "cublasDgemmBatched" && precision == mblas_data_type::MBLAS_R_64F) {
+    //   std::function<decltype(cublasDgemmBatched)> dgemm_var =
+    //       cublasDgemmBatched;
+    //   threads.push_back(
+    //       thread(&cublas_gemm::testTgemmBatched<double>, this, dgemm_var, &mat));
+    // } else if (function == "cublasSgemmBatched" && precision == mblas_data_type::MBLAS_R_32F) {
+    //   std::function<decltype(cublasSgemmBatched)> sgemm_var =
+    //       cublasSgemmBatched;
+    //   threads.push_back(
+    //       thread(&cublas_gemm::testTgemmBatched<float>, this, sgemm_var, &mat));
+    // } else if (function == "cublasHgemmBatched" && precision == mblas_data_type::MBLAS_R_16F) {
+    //   std::function<decltype(cublasHgemmBatched)> hgemm_var =
+    //       cublasHgemmBatched;
+    //   threads.push_back(
+    //       thread(&cublas_gemm::testTgemmBatched<__half>, this, hgemm_var, &mat));
+    // } else if (function == "cublasZgemmBatched" && precision == mblas_data_type::MBLAS_C_64F) {
+    //   std::function<decltype(cublasZgemmBatched)> zgemm_var =
+    //       cublasZgemmBatched;
+    //   threads.push_back(thread(&cublas_gemm::testTgemmBatched<cuDoubleComplex>,
+    //                            this, zgemm_var, &mat));
+    // } else if (function == "cublasCgemmBatched" && precision == mblas_data_type::MBLAS_C_32F) {
+    //   std::function<decltype(cublasCgemmBatched)> cgemm_var =
+    //       cublasCgemmBatched;
+    //   threads.push_back(thread(&cublas_gemm::testTgemmBatched<cuComplex>, this,
+    //                            cgemm_var, &mat));
+    // }
     // TgemmStridedBatched
     else if (function == "cublasDgemmStridedBatched" &&
              precision == mblas_data_type::MBLAS_R_64F) {
@@ -449,9 +459,9 @@ double cublas_gemm::test() {
     // gemmEx
     else if (strided && function == "cublasGemmExStridedBatched") {
       // Call the Gemm strided batched deployment script
-    } else if (batched && function == "cublasGemmExBatched") {
+    } /* else if (batched && function == "cublasGemmExBatched") {
       // Call the Gemm batched code
-    } else if (function == "cublasGemmEx" || function == "gemm_ex" || function == "gemm_ex3") {
+    } */ else if (function == "cublasGemmEx" || function == "gemm_ex" || function == "gemm_ex3") {
       threads.push_back(thread(&cublas_gemm::testGemmEx, this, &mat));
     }
   }
@@ -543,16 +553,11 @@ void cublas_gemm::test_Tgemm(
   check_cublas(cublasSetStream(handle, stream));
   // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
 
-  T *alphaP = static_cast<T *>(alpha);
-  T *betaP = static_cast<T *>(beta);
-  T *devAP = static_cast<T *>(mat->devA);
-  T *devBP = static_cast<T *>(mat->devB);
-  T *devCP = static_cast<T *>(mat->devC);
-
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc);
+    int flush_index = rep % flush_batch_count;
+    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, (T *) mat->ptr_dev_b[flush_index], ldb,
+                (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc);
 
     // Check for errors during the gemm run
     check_cublas(stat);
@@ -569,8 +574,9 @@ void cublas_gemm::test_Tgemm(
   */
   cudaEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc);
+    int flush_index = rep % flush_batch_count;
+    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, (T *) mat->ptr_dev_b[flush_index], ldb,
+                (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc);
   }
   cudaEventRecord(stop, stream);
   cudaEventSynchronize(stop);
@@ -586,65 +592,66 @@ void cublas_gemm::test_Tgemm(
       calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
 }
 
-template <typename T>
-void cublas_gemm::testTgemmBatched(
-    std::function<cublasStatus_t(cublasContext *, cublasOperation_t,
-                                 cublasOperation_t, int, int, int, T const *,
-                                 T const *const *, int, T const *const *, int,
-                                 T const *, T *const *, int, int)>
-        func,
-    cublasgemmInst *mat) {
-  cublasStatus_t stat;
-  cublasHandle_t handle;
-  cudaStream_t stream;
-  check_cuda(cudaSetDevice(mat->devIDX));
-  check_cublas(cublasCreate(&handle));
-  check_cuda(cudaStreamCreate(&stream));
-  check_cublas(cublasSetStream(handle, stream));
-  // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
-
-  T *alphaP = static_cast<T *>(alpha);
-  T *betaP = static_cast<T *>(beta);
-  T **devAP = reinterpret_cast<T **>(mat->ptr_dev_a);
-  T **devBP = reinterpret_cast<T **>(mat->ptr_dev_b);
-  T **devCP = reinterpret_cast<T **>(mat->ptr_dev_c);
-
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc, batch_count);
-
-    // Check for errors during the gemm run
-    check_cublas(stat);
-    check_cuda(cudaGetLastError());
-  }
-  cudaStreamSynchronize(stream);
-
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-
-  /*
-    Run and time the performance test
-  */
-  cudaEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, devBP, ldb,
-                betaP, devCP, ldc, batch_count);
-  }
-  cudaEventRecord(stop, stream);
-  cudaEventSynchronize(stop);
-
-  // Check for errors during the performance test
-  check_cublas(stat);
-  check_cuda(cudaGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  cudaEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
-}
+// Disabled due to batched & rotating tensors not being implemented at the same time
+// template <typename T>
+// void cublas_gemm::testTgemmBatched(
+//     std::function<cublasStatus_t(cublasContext *, cublasOperation_t,
+//                                  cublasOperation_t, int, int, int, T const *,
+//                                  T const *const *, int, T const *const *, int,
+//                                  T const *, T *const *, int, int)>
+//         func,
+//     cublasgemmInst *mat) {
+//   cublasStatus_t stat;
+//   cublasHandle_t handle;
+//   cudaStream_t stream;
+//   check_cuda(cudaSetDevice(mat->devIDX));
+//   check_cublas(cublasCreate(&handle));
+//   check_cuda(cudaStreamCreate(&stream));
+//   check_cublas(cublasSetStream(handle, stream));
+//   // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
+// 
+//   T *alphaP = static_cast<T *>(alpha);
+//   T *betaP = static_cast<T *>(beta);
+//   T **devAP = reinterpret_cast<T **>(mat->ptr_dev_a);
+//   T **devBP = reinterpret_cast<T **>(mat->ptr_dev_b);
+//   T **devCP = reinterpret_cast<T **>(mat->ptr_dev_c);
+// 
+//   // Cold iters
+//   for (int rep = 0; rep < cold_iters; rep++) {
+//     stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, devBP, ldb,
+//                 betaP, devCP, ldc, batch_count);
+// 
+//     // Check for errors during the gemm run
+//     check_cublas(stat);
+//     check_cuda(cudaGetLastError());
+//   }
+//   cudaStreamSynchronize(stream);
+// 
+//   cudaEvent_t start, stop;
+//   cudaEventCreate(&start);
+//   cudaEventCreate(&stop);
+// 
+//   /*
+//     Run and time the performance test
+//   */
+//   cudaEventRecord(start, stream);
+//   for (int rep = 0; rep < iters; rep++) {
+//     stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, devBP, ldb,
+//                 betaP, devCP, ldc, batch_count);
+//   }
+//   cudaEventRecord(stop, stream);
+//   cudaEventSynchronize(stop);
+// 
+//   // Check for errors during the performance test
+//   check_cublas(stat);
+//   check_cuda(cudaGetLastError());
+// 
+//   // Calculate and report GFlops
+//   float elapsedTime_ms;
+//   cudaEventElapsedTime(&elapsedTime_ms, start, stop);
+//   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
+//       calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+// }
 
 template <typename T>
 void cublas_gemm::testTgemmStridedBatched(
@@ -663,16 +670,11 @@ void cublas_gemm::testTgemmStridedBatched(
   check_cublas(cublasSetStream(handle, stream));
   // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
 
-  T *alphaP = static_cast<T *>(alpha);
-  T *betaP = static_cast<T *>(beta);
-  T *devAP = static_cast<T *>(mat->devA);
-  T *devBP = static_cast<T *>(mat->devB);
-  T *devCP = static_cast<T *>(mat->devC);
-
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, stride_a,
-                devBP, ldb, stride_b, betaP, devCP, ldc, stride_c, batch_count);
+    int flush_index = rep % flush_batch_count;
+    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, stride_a,
+                (T *) mat->ptr_dev_b[flush_index], ldb, stride_b, (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc, stride_c, batch_count);
 
     // Check for errors during the gemm run
     check_cublas(stat);
@@ -689,8 +691,9 @@ void cublas_gemm::testTgemmStridedBatched(
   */
   cudaEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, devAP, lda, stride_a,
-                devBP, ldb, stride_b, betaP, devCP, ldc, stride_c, batch_count);
+    int flush_index = rep % flush_batch_count;
+    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, stride_a,
+                (T *) mat->ptr_dev_b[flush_index], ldb, stride_b, (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc, stride_c, batch_count);
   }
   cudaEventRecord(stop, stream);
   cudaEventSynchronize(stop);
@@ -723,16 +726,11 @@ void cublas_gemm::testTGemmEx(
   check_cublas(cublasSetStream(handle, stream));
   // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
 
-  T *alphaP = static_cast<T *>(alpha);
-  T *betaP = static_cast<T *>(beta);
-  // T *devAP = static_cast<T *>(mat->devA);
-  // T *devBP = static_cast<T *>(mat->devB);
-  // T *devCP = static_cast<T *>(mat->devC);
-
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, mat->devA, a_type, lda,
-                mat->devB, b_type, ldb, betaP, mat->devC, c_type, ldc);
+    int flush_index = rep % flush_batch_count;
+    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, mat->ptr_dev_a[flush_index], a_type, lda,
+                mat->ptr_dev_b[flush_index], b_type, ldb, (T *) beta, mat->ptr_dev_c[flush_index], c_type, ldc);
 
     // Check for errors during the gemm run
     check_cublas(stat);
@@ -749,8 +747,9 @@ void cublas_gemm::testTGemmEx(
   */
   cudaEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alphaP, mat->devA, a_type, lda,
-                mat->devB, b_type, ldb, betaP, mat->devC, c_type, ldc);
+    int flush_index = rep % flush_batch_count;
+    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, mat->ptr_dev_a[flush_index], a_type, lda,
+                mat->ptr_dev_b[flush_index], b_type, ldb, (T *) beta, mat->ptr_dev_c[flush_index], c_type, ldc);
   }
   cudaEventRecord(stop, stream);
   cudaEventSynchronize(stop);
@@ -778,8 +777,9 @@ void cublas_gemm::testGemmEx(cublasgemmInst *mat) {
   // cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH);
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
-    stat = cublasGemmEx(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alpha, mat->devA,
-                        a_type, lda, mat->devB, b_type, ldb, beta, mat->devC,
+    int flush_index = rep % flush_batch_count;
+    stat = cublasGemmEx(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alpha, mat->ptr_dev_a[flush_index],
+                        a_type, lda, mat->ptr_dev_b[flush_index], b_type, ldb, beta, mat->ptr_dev_c[flush_index],
                         c_type, ldc, compute, CUBLAS_GEMM_DEFAULT);
 
     // Check for errors during the gemm run
@@ -797,8 +797,9 @@ void cublas_gemm::testGemmEx(cublasgemmInst *mat) {
   */
   cudaEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
-    stat = cublasGemmEx(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alpha, mat->devA,
-                        a_type, lda, mat->devB, b_type, ldb, beta, mat->devC,
+    int flush_index = rep % flush_batch_count;
+    stat = cublasGemmEx(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alpha, mat->ptr_dev_a[flush_index],
+                        a_type, lda, mat->ptr_dev_b[flush_index], b_type, ldb, beta, mat->ptr_dev_c[flush_index],
                         c_type, ldc, compute, CUBLAS_GEMM_DEFAULT);
   }
   cudaEventRecord(stop, stream);

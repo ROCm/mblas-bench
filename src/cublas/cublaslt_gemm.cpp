@@ -53,9 +53,11 @@ std::vector<matmul_prec_type> cublaslt_gemm::matmul_supported = {
   {mblas_compute_type::MBLAS_COMPUTE_32F_FAST_16F,     mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F},
   {mblas_compute_type::MBLAS_COMPUTE_32F_FAST_16BF,    mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F},
   {mblas_compute_type::MBLAS_COMPUTE_32F_FAST_TF32,    mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F},
+  {mblas_compute_type::MBLAS_COMPUTE_32F_EMULATED_16BFX9,    mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F,   mblas_data_type::MBLAS_R_32F,       mblas_data_type::MBLAS_R_32F},
   {mblas_compute_type::MBLAS_COMPUTE_32F_FAST_16F,     mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_ANY},
   {mblas_compute_type::MBLAS_COMPUTE_32F_FAST_16BF,    mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_ANY},
   {mblas_compute_type::MBLAS_COMPUTE_32F_FAST_TF32,    mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_ANY},
+  {mblas_compute_type::MBLAS_COMPUTE_32F_EMULATED_16BFX9,    mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_C_32F,   mblas_data_type::MBLAS_C_32F,       mblas_data_type::MBLAS_ANY},
   {mblas_compute_type::MBLAS_COMPUTE_64F,              mblas_data_type::MBLAS_R_64F,   mblas_data_type::MBLAS_R_64F,       mblas_data_type::MBLAS_R_64F,       mblas_data_type::MBLAS_R_64F,   mblas_data_type::MBLAS_R_64F,       mblas_data_type::MBLAS_R_64F},
   {mblas_compute_type::MBLAS_COMPUTE_64F_PEDANTIC,     mblas_data_type::MBLAS_R_64F,   mblas_data_type::MBLAS_R_64F,       mblas_data_type::MBLAS_R_64F,       mblas_data_type::MBLAS_R_64F,   mblas_data_type::MBLAS_R_64F,       mblas_data_type::MBLAS_R_64F},
   {mblas_compute_type::MBLAS_COMPUTE_64F,              mblas_data_type::MBLAS_C_64F,   mblas_data_type::MBLAS_C_64F,       mblas_data_type::MBLAS_C_64F,       mblas_data_type::MBLAS_C_64F,   mblas_data_type::MBLAS_C_64F,       mblas_data_type::MBLAS_ANY},
@@ -252,8 +254,7 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
   beta = type_call_host<allocSetScalar>(precision, sbeta.c_str(), sbetai.c_str());
   // std::cout << *((float *)alpha) << std::endl;
   // std::cout << *((float *)beta) << std::endl;
-  uint64_t a_offset, b_offset, c_offset, d_offset;
-  set_flush_batch_count(a_offset, b_offset, c_offset, d_offset, 
+  set_flush_batch_count( 
       type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
       type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(d_type), 
       get_packing_count(a_type), 
@@ -316,36 +317,6 @@ void cublaslt_gemm::run_threaded(void (cublaslt_gemm::*func)(cublaslt_gemm_inst 
 }
 
 void cublaslt_gemm::alloc_host() {
-  // auto resultA = std::async(allocate_host_array, a_type, m, k, batch_count);
-  // auto resultB = std::async(allocate_host_array, b_type, k, n, batch_count);
-  // auto resultC = std::async(allocate_host_array, c_type, n, m, batch_count);
-  // host_a = resultA.get();
-  // host_b = resultB.get();
-  // host_c = resultC.get();
-  //host_a = allocate_host_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-  //host_b = allocate_host_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-  //host_c = allocate_host_array(c_type, rows_mem_c, cols_mem_c, batch_count);
-  // Calculate size
-  // total_block_size_host = calculate_offsets( 
-  //   rows_mem_a, cols_mem_a, rows_mem_b, cols_mem_b, rows_mem_c, cols_mem_c, rows_mem_d, cols_mem_d,
-  //   a_offset_host, b_offset_host, c_offset_host, d_offset_host,
-  //   type_call_host<sizeofCUDT>(a_type),
-  //   type_call_host<sizeofCUDT>(b_type),
-  //   type_call_host<sizeofCUDT>(c_type),
-  //   type_call_host<sizeofCUDT>(d_type),
-  //   get_packing_count(a_type),
-  //   get_packing_count(b_type),
-  //   get_packing_count(c_type),
-  //   get_packing_count(d_type),
-  //   batch_count, inplace
-  //  );
-  // // Allocate big block of memory
-  // dataHost = (void *)malloc(total_block_size_host * flush_batch_count);
-
-  // Generate pointers 
-  //if (batched && !strided) {
-  // Perform some pointer arithmetic to calculate the arrays we pass to the
-  // gpu
   ptr_host_a =
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(a_type));
   ptr_host_b =
@@ -438,20 +409,6 @@ void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::fill_host() {
-  // Some random functions treat the matrix as a vectors, some require a matrix
-  // vector<thread> threads;
-  // threads.push_back(thread(initHostH, a_type, initialization, host_a, m, k,
-  // lda,
-  //                         batch_count, stride_a, 1.f, false));
-  // threads.push_back(thread(initHostH, b_type, initialization, host_b, k, n,
-  // ldb,
-  //                         batch_count, stride_b, 2.f, true));
-  // threads.push_back(thread(initHostH, c_type, initialization, host_c, m, n,
-  // ldc,
-  //                         batch_count, stride_c, 0.f, false));
-  // for (auto &thread : threads) {
-  //  thread.join();
-  //}
   for (int i = 0; i < flush_batch_count; i++){
     type_call_host<initHost>(a_type, initialization, ptr_host_a[i], rows_a, cols_a, lda,
                            batch_count, stride_a, control_a, constant_a, filename_a);
@@ -589,7 +546,6 @@ void cublaslt_gemm::free_mem() {
   free(ptr_host_b);
   free(ptr_host_c);
   free(ptr_host_d);
-  free(dataHost);
   for (auto mat : mat_ptrs) {
     cudaFree(mat.ptr_dev_a);
     cudaFree(mat.ptr_dev_b);
