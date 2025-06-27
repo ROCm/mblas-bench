@@ -21,6 +21,7 @@ find_package(rocblas REQUIRED)
 find_package(hipblas REQUIRED)
 find_package(hipblaslt REQUIRED)
 find_package(Threads REQUIRED) 
+find_package(OpenMP REQUIRED)
 
 
 add_library(mblasrocm SHARED
@@ -58,5 +59,8 @@ target_link_libraries(mblasrocm PRIVATE
     roc::hipblas
     roc::hipblaslt
     Threads::Threads
+    OpenMP::OpenMP_CXX
+    -lpthread
+    -fopenmp
     mblasgeneric
 )

@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "third_party/cxxopts.hpp"
+#include "genericSetup.h"
 
 using std::string;
 

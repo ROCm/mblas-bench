@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
 #set(CMAKE_CXX_COMPILER "/usr/local/cuda/bin/nvcc")
 set(CUDAHOSTCXX g++)
-set(CMAKE_CUDA_COMPILER nvcc)
+set(CMAKE_CUDA_COMPILER /usr/local/cuda/bin/nvcc)
 #unset(CMAKE_CXX_COMPILER)
 #set(CMAKE_CXX_STANDARD 17)
 unset(CMAKE_CXX_STANDARD)

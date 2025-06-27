@@ -78,11 +78,16 @@ target_link_libraries(mblas-bench PUBLIC
     -lstdc++
     -lm
     -lpthread
+    -fopenmp
 )
 
 if (WITH_ROCM)
     target_link_libraries(mblas-bench PRIVATE
     mblasrocm
+        -lstdc++
+        -lm
+        -lpthread
+        -fopenmp
     )
 endif()
 

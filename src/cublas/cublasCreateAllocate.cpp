@@ -15,6 +15,7 @@
 
 #include "cudaError.h"
 #include "genericInit.h"
+#include "genericSetup.h"
 
 void *allocateHostArr(mblasDataType type, long x, long y, int batch) {
   int typesize = typeCallHost<sizeofCUDT>(type);
