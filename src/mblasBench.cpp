@@ -139,6 +139,18 @@ int main(int argc, char **argv) {
             "Number of matrices. Only applicable to batched and "
             "strided_batched routines  (Default value is: 1)",
             cxxopts::value<int>()->default_value("1"));
+  opp_adder("flush_batch_count",
+            "number of copies of arrays to allocate for cache flushing in timing code."
+            "Functions are called iters times in a timing loop. If the problem memory "
+            "footprint is small enough, then arrays will be cached. If you specify "
+            "flush_batch_count you cannot also specify flush_memory_size or rotating",
+            cxxopts::value<int>()->default_value("1"));
+  opp_adder("flush_memory_size,rotating",
+            "bytes of memory that will be occupied by arrays. Used only in "
+            "timing code for cache flushing. Set to greater than cache size so arrays "
+            "are flushed from cache before they are reused."
+            "If you specify flush_memory_size or rotating you cannot also specify flush_batch_count",
+            cxxopts::value<int>()->default_value("0"));
   // opp_adder("block_count",
   //           "Number of memory blocks for arrays. Each benchmarking iteration "
   //           "will use the next block of memory (or loop to the first block)",
