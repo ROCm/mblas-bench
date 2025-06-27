@@ -82,39 +82,39 @@ void copyAndConvert(mblasDataType precision, void *hostA, void *devA, int x, int
   }
 }
 
-void copyAndConvert(hipblasDatatype_t precision, void *hostA, void *devA, int x, int y, int batchsz)
-{
-
-  long hostsz = typeCallHost<sizeofCUDT>(precision);
-  long devsz = typeCallDev<sizeofCUDT>(precision);
-  if (precision == HIPBLAS_R_16F)
-  {
-    // Allocate memory in the device for host precision (float)
-    void *tmpA = allocateHDevArr(precision, x, y, batchsz);
-    checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
-                       hipMemcpyHostToDevice));
-    long num_elements = batchsz * x * y;
-    long block_size = 256;
-    long num_blocks = (num_elements + block_size - 1) / block_size;
-    floatToFp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
-    hipFree(tmpA);
-  }
-  else if (precision == HIPBLAS_R_16B)
-  {
-    // Allocate memory in the device for host precision (float)
-    void *tmpA = allocateHDevArr(precision, x, y, batchsz);
-    checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
-                       hipMemcpyHostToDevice));
-    long num_elements = batchsz * x * y;
-    long block_size = 256;
-    long num_blocks = (num_elements + block_size - 1) / block_size;
-    floatToBfloat16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
-    hipFree(tmpA);
-  } else {
-    checkHip(hipMemcpy(devA, hostA, (long)batchsz * x * y * hostsz,
-                       hipMemcpyHostToDevice));
-  }
-}
+//void copyAndConvert(hipblasDatatype_t precision, void *hostA, void *devA, int x, int y, int batchsz)
+//{
+//
+//  long hostsz = typeCallHost<sizeofCUDT>(precision);
+//  long devsz = typeCallDev<sizeofCUDT>(precision);
+//  if (precision == HIPBLAS_R_16F)
+//  {
+//    // Allocate memory in the device for host precision (float)
+//    void *tmpA = allocateHDevArr(precision, x, y, batchsz);
+//    checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+//                       hipMemcpyHostToDevice));
+//    long num_elements = batchsz * x * y;
+//    long block_size = 256;
+//    long num_blocks = (num_elements + block_size - 1) / block_size;
+//    floatToFp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
+//    hipFree(tmpA);
+//  }
+//  else if (precision == HIPBLAS_R_16B)
+//  {
+//    // Allocate memory in the device for host precision (float)
+//    void *tmpA = allocateHDevArr(precision, x, y, batchsz);
+//    checkHip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+//                       hipMemcpyHostToDevice));
+//    long num_elements = batchsz * x * y;
+//    long block_size = 256;
+//    long num_blocks = (num_elements + block_size - 1) / block_size;
+//    floatToBfloat16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
+//    hipFree(tmpA);
+//  } else {
+//    checkHip(hipMemcpy(devA, hostA, (long)batchsz * x * y * hostsz,
+//                       hipMemcpyHostToDevice));
+//  }
+//}
 
 void *convertScalar(mblasDataType precision, void *scalar)
 {
@@ -138,17 +138,17 @@ void *convertScalar(mblasDataType precision, void *scalar)
   }
 }
 
-void *convertScalar(hipblasDatatype_t precision, void *scalar)
-{
-
-  if (precision == HIPBLAS_R_16F)
-  {
-    float scalarVal = *static_cast<float *>(scalar);
-    free(scalar);
-    __half *hscalar = (__half *)malloc(sizeof(__half));
-    *hscalar = __float2half(scalarVal);
-    return (void *)hscalar;
-  } else {
-    return scalar;
-  }
-}
+//void *convertScalar(hipblasDatatype_t precision, void *scalar)
+//{
+//
+//  if (precision == HIPBLAS_R_16F)
+//  {
+//    float scalarVal = *static_cast<float *>(scalar);
+//    free(scalar);
+//    __half *hscalar = (__half *)malloc(sizeof(__half));
+//    *hscalar = __float2half(scalarVal);
+//    return (void *)hscalar;
+//  } else {
+//    return scalar;
+//  }
+//}

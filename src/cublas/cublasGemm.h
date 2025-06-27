@@ -48,9 +48,9 @@ struct cublasgemmInst {
   void **ptrDevA;
   void **ptrDevB;
   void **ptrDevC;
-  void **ptrHostA;
-  void **ptrHostB;
-  void **ptrHostC;
+  void **ptr_host_a;
+  void **ptr_host_b;
+  void **ptr_host_c;
   void *devWork;
   long wSZ;
   cublasgemmInst(int devID) { devIDX = devID; }
@@ -75,9 +75,9 @@ class cublasGemm : public genericGemm {
   // void **ptrDevA;
   // void **ptrDevB;
   // void **ptrDevC;
-  // void **ptrHostA;
-  // void **ptrHostB;
-  // void **ptrHostC;
+  // void **ptr_host_a;
+  // void **ptr_host_b;
+  // void **ptr_host_c;
 
   void *alpha;
   void *beta;
@@ -109,9 +109,9 @@ class cublasGemm : public genericGemm {
                   std::string aStr, std::string bStr, std::string cStr);
   void parseDevIters(std::string);
   cublasOperation_t setOp(std::string);
-  void allocHost();
-  void allocDev(cublasgemmInst *);
-  void fillHost();
+  void alloc_host();
+  void alloc_dev(cublasgemmInst *);
+  void fill_host();
   void copyHostToDev(cublasgemmInst *);
   void runThreaded(void (cublasGemm::*func)(cublasgemmInst *));
   std::tuple<double, double, double> calculateFOM(double totalTime_ms);
