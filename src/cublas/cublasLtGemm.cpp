@@ -10,6 +10,7 @@
 #include <string>
 #include <thread>
 
+#include "genericSetup.h"
 #include "cublasConvert.h"
 #include "cublasCreateAllocate.h"
 #include "cublasDtypeUtils.h"
@@ -86,6 +87,15 @@ std::vector<matmulPrecType> cublasLtGemm::matmulSupported = {
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_16F,       mblasDataType::MBLAS_R_16F},
   {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_8F_E5M2,   mblasDataType::MBLAS_R_8F_E4M3,   mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_32F,       mblasDataType::MBLAS_R_16BF},
+#if (CUDART_VERSION >= 12800)
+  // FP4 Kernels
+  // Compute type                   Scale Type    A Type            B Type            C Type        D Type            Bias Type
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16BF,   mblasDataType::MBLAS_R_4F_E2M1,       mblasDataType::MBLAS_R_16BF},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16BF,   mblasDataType::MBLAS_R_16BF,       mblasDataType::MBLAS_R_16BF},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_4F_E2M1,       mblasDataType::MBLAS_R_16F},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_16F,   mblasDataType::MBLAS_R_16F,       mblasDataType::MBLAS_R_16F},
+  {mblasComputeType::MBLAS_COMPUTE_32F,              mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_4F_E2M1,   mblasDataType::MBLAS_R_32F,   mblasDataType::MBLAS_R_32F,       mblasDataType::MBLAS_R_16BF},
+#endif
   // Mixed precision complex kernels
   // Compute type                   Scale Type    A Type            B Type            C Type        D Type            Bias Type
   {mblasComputeType::MBLAS_COMPUTE_32F ,             mblasDataType::MBLAS_C_32F,   mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_C_16F,   mblasDataType::MBLAS_C_16F,       mblasDataType::MBLAS_ANY},
@@ -139,6 +149,28 @@ void cublasLtGemm::parseMType(string computeTStr, string scalarTStr,
     c_type = mblasCuDataType(cStr);
     d_type = mblasCuDataType(dStr);
   }
+
+#if (CUDART_VERSION >= 12800)
+  use_scaling = a_type.isFp4() || b_type.isFp4() || c_type.isFp4() || d_type.isFp4();
+  if (use_scaling)
+  {
+    // Determine scale types (calculated from a,b,c,d type)
+    a_scale_type = a_type.get_scale_type();
+    b_scale_type = b_type.get_scale_type();
+    c_scale_type = c_type.get_scale_type();
+    d_scale_type = d_type.get_scale_type();
+    // Scale modes
+    a_scale_mode = a_type.get_scale_mode();
+    b_scale_mode = b_type.get_scale_mode();
+    c_scale_mode = c_type.get_scale_mode();
+    d_scale_mode = d_type.get_scale_mode();
+    // Calculate lengths
+    a_scale_size = get_scale_tensor_size(m, k, a_scale_mode);
+    b_scale_size = get_scale_tensor_size(k, n, b_scale_mode);
+    c_scale_size = get_scale_tensor_size(m, n, c_scale_mode);
+    d_scale_size = get_scale_tensor_size(m, n, d_scale_mode);
+  }
+#endif
 }
 
 void cublasLtGemm::validateParameters() {
@@ -460,18 +492,47 @@ void cublasLtGemm::prepareMatrix(cublasltgemmInst *mat) {
       mat->descOP, CUBLASLT_MATMUL_DESC_TRANSA, &transACU, sizeof(transACU)));
   checkCublas(cublasLtMatmulDescSetAttribute(
       mat->descOP, CUBLASLT_MATMUL_DESC_TRANSB, &transBCU, sizeof(transBCU)));
+#if (CUDART_VERSION >= 12800)
+  if (use_scaling) {
+    // set block scaling mode
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
+    //cublasLtMatmulMatrixScale_t d_scale_mode = CUBLASLT_MATMUL
+    //checkCublas(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &DOutScaleMode, sizeof(DOutScaleMode)));
 
+    // set scaling factors
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a, sizeof(mat->scale_dev_a)));
+    checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_B_SCALE_POINTER, &mat->scale_dev_b, sizeof(mat->scale_dev_b)));
+
+    if (d_type.isFp4()) {
+      checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &d_scale_mode, sizeof(d_scale_mode)));
+      checkCublas(cublasLtMatmulDescSetAttribute(mat->descOP, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &mat->scale_dev_d, sizeof(mat->scale_dev_d)));
+    }
+    //checkCublas(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &d_out_scale, sizeof(d_out_scale)));
+  }
+#endif
   checkCublas(
-      cublasLtMatrixLayoutCreate(&mat->descA, a_type, rowsA, colsA, lda));
+      cublasLtMatrixLayoutCreate(&mat->descA, a_type, rows_a, cols_a, lda));
   checkCublas(
-      cublasLtMatrixLayoutCreate(&mat->descB, b_type, rowsB, colsB, ldb));
+      cublasLtMatrixLayoutCreate(&mat->descB, b_type, rows_b, cols_b, ldb));
   checkCublas(
-      cublasLtMatrixLayoutCreate(&mat->descC, c_type, rowsC, colsC, ldc));
+      cublasLtMatrixLayoutCreate(&mat->descC, c_type, rows_c, cols_c, ldc));
   if (!inplace) {
     checkCublas(
-        cublasLtMatrixLayoutCreate(&mat->descD, d_type, rowsD, colsD, ldd));
+        cublasLtMatrixLayoutCreate(&mat->descD, d_type, rows_d, cold_d, ldd));
   } else {
     mat->descD = mat->descC;
+  }
+  if (batch_count > 1) {
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descA, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_count, sizeof(batch_count)));
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descB, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_count, sizeof(batch_count)));
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descC, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_count, sizeof(batch_count)));
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descD, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_count, sizeof(batch_count)));
+
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descA, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride_a, sizeof(stride_a)));
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descB, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride_b, sizeof(stride_b)));
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descC, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride_c, sizeof(stride_c)));
+    checkCublas(cublasLtMatrixLayoutSetAttribute(mat->descD, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride_d, sizeof(stride_d)));
   }
 
   checkCublas(cublasLtMatmulPreferenceCreate(&mat->pref));

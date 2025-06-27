@@ -7,6 +7,7 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <omp.h>
 
 // Rand int gen
 template <typename T>
@@ -40,7 +41,7 @@ inline T normalFloatGen(std::normal_distribution<double> &ndist,
 }
 
 template <typename T>
-void fillRandHostBlasgemm(void *ptr, int rows_A, int cols_A, int ld, int batch,
+void fillRandHostBlasgemm(void *ptr, long rows_A, long cols_A, long ld, int batch,
                           long long int stride) {
   int a = 1;
   T *A = (T *)ptr;
@@ -50,7 +51,7 @@ void fillRandHostBlasgemm(void *ptr, int rows_A, int cols_A, int ld, int batch,
 }
 
 template <typename T>
-void fillRandHostConstant(void *ptr, int rows_A, int cols_A, int ld, int batch,
+void fillRandHostConstant(void *ptr, long rows_A, long cols_A, long ld, int batch,
                           long long int stride, float constant) {
   int a = 1;
   T *A = (T *)ptr;
@@ -60,22 +61,24 @@ void fillRandHostConstant(void *ptr, int rows_A, int cols_A, int ld, int batch,
 }
 
 template <typename T>
-void fillRandHostRandIntAS(void *ptr, int rows_A, int cols_A, int ld, int batch,
-                           long long int stride, bool alternating) {
-  std::random_device r;
-  std::seed_seq seed{r(), r(), r(), r(), r(), r(), r(), r()};
-  std::mt19937 gen(seed);
-  std::uniform_int_distribution<int> uniform_dist(1, 10);
+void fillRandHostRandIntAS(void *ptr, long rows_A, long cols_A, long ld, int batch,
+                           long long int stride, bool alternating, int random_dev_seed) {
   T *A = (T *)ptr;
-  T dummy;
-  for (size_t i_batch = 0; i_batch < batch; i_batch++) {
-    for (size_t j = 0; j < cols_A; ++j) {
-      size_t offset = j * ld + i_batch * stride;
-      for (size_t i = 0; i < rows_A; ++i) {
-        if ((!alternating) || (j % 2 ^ i % 2)) {
-          A[i + offset] = randIntGen(uniform_dist, gen, dummy);
-        } else {
-          A[i + offset] = randIntGenN(uniform_dist, gen, dummy);
+  #pragma omp parallel shared(A)
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    std::uniform_int_distribution<int> uniform_dist(1, 10);
+    T dummy;
+    #pragma omp parallel for collapse(3) 
+    for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+      for (size_t j = 0; j < cols_A; ++j) {
+        for (size_t i = 0; i < rows_A; ++i) {
+          if ((!alternating) || (j % 2 ^ i % 2)) {
+            A[i + j * ld + i_batch * stride] = randIntGen(uniform_dist, gen, dummy);
+          } else {
+            A[i + j * ld + i_batch * stride] = randIntGenN(uniform_dist, gen, dummy);
+          }
         }
       }
     }
@@ -83,17 +86,18 @@ void fillRandHostRandIntAS(void *ptr, int rows_A, int cols_A, int ld, int batch,
 }
 
 template <typename T>
-void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
+void fillRandHostTrigFloat(void *ptr, long rows_A, long cols_A, long ld, int batch,
                            long long int stride, bool isSin) {
   T *A = (T *)ptr;
+  #pragma omp parallel for shared(A) collapse(3)
   for (size_t i_batch = 0; i_batch < batch; i_batch++) {
     for (size_t j = 0; j < cols_A; ++j) {
-      size_t offset = j * ld + i_batch * stride;
+      // size_t offset = j * ld + i_batch * stride;
       for (size_t i = 0; i < rows_A; ++i) {
         if (isSin) {
-          A[i + offset] = T(sin(i + offset));
+          A[i + j * ld + i_batch * stride] = T(sin(i + j * ld + i_batch * stride));
         } else {
-          A[i + offset] = T(cos(i + offset));
+          A[i + j * ld + i_batch * stride] = T(cos(i + j * ld + i_batch * stride));
         }
       }
     }
@@ -101,7 +105,7 @@ void fillRandHostTrigFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
 }
 
 template <typename T>
-void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
+void fillRandHostFromCSV(void *ptr, long rows_A, long cols_A, long ld, int batch,
                          long long int stride, std::string filename) {
   std::ifstream file(filename);
   std::vector<std::vector<T>> result;
@@ -134,7 +138,7 @@ void fillRandHostFromCSV(void *ptr, int rows_A, int cols_A, int ld, int batch,
 }
 
 template <typename T>
-void fillRandHostNormalFloat(void *ptr, int rows_A, int cols_A, int ld, int batch,
+void fillRandHostNormalFloat(void *ptr, long rows_A, long cols_A, long ld, int batch,
                              long long int stride) {
   std::random_device r;
   std::seed_seq seed{r(), r(), r(), r(), r(), r(), r(), r()};
@@ -154,20 +158,21 @@ void fillRandHostNormalFloat(void *ptr, int rows_A, int cols_A, int ld, int batc
 
 template <typename T>
 struct initHost {
-  void operator()(std::string initialization, void *ptr, int rows_A, int cols_A,
-                  int ld, int batch, long long int stride, bool control = false,
+  void operator()(std::string initialization, void *ptr, long rows_A, long cols_A,
+                  long ld, int batch, long long int stride, bool control = false,
                   float constant = 0.f, std::string filename = "");
 };
 
 template <typename T>
-void initHost<T>::operator()(std::string initialization, void *ptr, int rows_A,
-                             int cols_A, int ld, int batch,
+void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
+                             long cols_A, long ld, int batch,
                              long long int stride, bool control,
                              float constant, std::string filename) {
   if (!filename.empty()) {
     fillRandHostFromCSV<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
   } else if (initialization == "rand_int") {
-    fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
+    std::random_device r;
+    fillRandHostRandIntAS<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
   } else if (initialization == "trig_float") {
     fillRandHostTrigFloat<T>(ptr, rows_A, cols_A, ld, batch, stride, control);
   } else if (initialization == "normal_float") {

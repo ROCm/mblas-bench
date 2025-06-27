@@ -35,10 +35,19 @@ struct cublasltgemmInst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
-  void *devA;
-  void *devB;
-  void *devC;
-  void *devD;
+  void *dataDev;
+  //void **devA;
+  //void **devB;
+  //void **devC;
+  //void **devD;
+  void **ptrDevA;
+  void **ptrDevB;
+  void **ptrDevC;
+  void **ptrDevD;
+  void *scale_dev_a;
+  void *scale_dev_b;
+  void *scale_dev_c;
+  void *scale_dev_d;
   cublasLtMatmulDesc_t descOP;
   cublasLtMatrixLayout_t descA;
   cublasLtMatrixLayout_t descB;
@@ -51,16 +60,34 @@ struct cublasltgemmInst {
   cublasltgemmInst(int devID) { devIDX = devID; }
 };
 
+struct scale_size {
+  long rows;
+  long cols;
+  inline size_t get_size() {
+    return rows*cols;
+  }
+  scale_size(std::pair<size_t,size_t> size) : rows(size.first), cols(size.second) {}
+  scale_size(){};
+};
+
 class cublasLtGemm : public genericGemm {
  private:
-  void *hostA;
-  void *hostB;
-  void *hostC;
+  void *dataHost;
+  void **ptr_host_a;
+  void **ptr_host_b;
+  void **ptr_host_c;
+  void **ptr_host_d;
+
+  void *scale_host_a;
+  void *scale_host_b;
+  void *scale_host_c;
+  void *scale_host_d;
 
   void *alpha;
   void *beta;
 
   bool inplace = false;
+  bool use_scaling = false;
   mblasCuOperation transA;
   mblasCuOperation transB;
 
@@ -71,7 +98,36 @@ class cublasLtGemm : public genericGemm {
   mblasCuDataType b_type;
   mblasCuDataType c_type;
   mblasCuDataType d_type;
+
+  mblasCuDataType a_scale_type;
+  mblasCuDataType b_scale_type;
+  mblasCuDataType c_scale_type;
+  mblasCuDataType d_scale_type;
   mblasCuDataType bias_type;
+
+  scale_size a_scale_size;
+  scale_size b_scale_size;
+  scale_size c_scale_size;
+  scale_size d_scale_size;
+
+#if (CUDART_VERSION >= 12800)
+  cublasLtMatmulMatrixScale_t a_scale_mode;
+  cublasLtMatmulMatrixScale_t b_scale_mode;
+  cublasLtMatmulMatrixScale_t c_scale_mode;
+  cublasLtMatmulMatrixScale_t d_scale_mode;
+#endif
+  uint64_t a_offset_host;
+  uint64_t b_offset_host;
+  uint64_t c_offset_host;
+  uint64_t d_offset_host;
+
+  uint64_t a_offset_dev;
+  uint64_t b_offset_dev;
+  uint64_t c_offset_dev;
+  uint64_t d_offset_dev;
+
+  uint64_t total_block_size_host;
+  uint64_t total_block_size_dev;
 
   int workspaceSz = 64 * 1024 * 1024;
 
@@ -86,9 +142,9 @@ class cublasLtGemm : public genericGemm {
                   std::string dStr);
   void validateParameters();
   void parseDevIters(std::string);
-  void allocHost();
-  void allocDev(cublasltgemmInst *);
-  void fillHost();
+  void alloc_host();
+  void alloc_dev(cublasltgemmInst *);
+  void fill_host();
   void copyHostToDev(cublasltgemmInst *);
   void prepareMatrix(cublasltgemmInst *);
   void noTuning(cublasltgemmInst *);

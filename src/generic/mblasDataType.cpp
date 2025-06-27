@@ -45,6 +45,11 @@ const std::map<std::string, mblasDataTypeEnum> mblasDataType::precDType = {
     {"MBLAS_C_64U",  mblasDataTypeEnum::MBLAS_C_64U},
     {"MBLAS_R_8F_E4M3", mblasDataTypeEnum::MBLAS_R_8F_E4M3},
     {"MBLAS_R_8F_E5M2", mblasDataTypeEnum::MBLAS_R_8F_E5M2},
+    {"MBLAS_R_8F_UE4M3", mblasDataTypeEnum::MBLAS_R_8F_UE4M3},
+    {"MBLAS_R_8F_UE8M0", mblasDataTypeEnum::MBLAS_R_8F_UE8M0},
+    {"MBLAS_R_6F_E2M3", mblasDataTypeEnum::MBLAS_R_6F_E2M3},
+    {"MBLAS_R_6F_E3M2", mblasDataTypeEnum::MBLAS_R_6F_E3M2},
+    {"MBLAS_R_4F_E2M1", mblasDataTypeEnum::MBLAS_R_4F_E2M1},
     // CUDA
     {"CUDA_R_16F",  mblasDataTypeEnum::MBLAS_R_16F},
     {"CUDA_C_16F",  mblasDataTypeEnum::MBLAS_C_16F},
@@ -76,6 +81,11 @@ const std::map<std::string, mblasDataTypeEnum> mblasDataType::precDType = {
     {"CUDA_C_64U",  mblasDataTypeEnum::MBLAS_C_64U},
     {"CUDA_R_8F_E4M3", mblasDataTypeEnum::MBLAS_R_8F_E4M3},
     {"CUDA_R_8F_E5M2", mblasDataTypeEnum::MBLAS_R_8F_E5M2},
+    {"CUDA_R_8F_UE4M3", mblasDataTypeEnum::MBLAS_R_8F_UE4M3},
+    {"CUDA_R_8F_UE8M0", mblasDataTypeEnum::MBLAS_R_8F_UE8M0},
+    {"CUDA_R_6F_E2M3", mblasDataTypeEnum::MBLAS_R_6F_E2M3},
+    {"CUDA_R_6F_E3M2", mblasDataTypeEnum::MBLAS_R_6F_E3M2},
+    {"CUDA_R_4F_E2M1", mblasDataTypeEnum::MBLAS_R_4F_E2M1},
     // HIP
     {"HIP_R_16F",  mblasDataTypeEnum::MBLAS_R_16F},
     {"HIP_C_16F",  mblasDataTypeEnum::MBLAS_C_16F},
@@ -171,6 +181,13 @@ bool mblasDataType::isReal() const {
 
 bool mblasDataType::isFp8() const {
   if (value == MBLAS_R_8F_E4M3 || value == MBLAS_R_8F_E5M2) {
+    return true;
+  }
+  return false;
+}
+
+bool mblasDataType::isFp4() const {
+  if (value == MBLAS_R_4F_E2M1) {
     return true;
   }
   return false;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cuda_runtime.h>
+//#include <cublas.h>
+#include <cublasLt.h>
 #include "mblasDataType.h"
 
 class mblasCuDataType: public mblasDataType {
@@ -20,4 +22,9 @@ class mblasCuDataType: public mblasDataType {
   mblasCuDataType(mblasDataTypeEnum y) : mblasDataType(y) {}
 
   std::string toString() const override { return mblasDataType::toString("CUDA"); }
+  mblasCuDataType get_scale_type();
+
+#if (CUDART_VERSION >= 12800)
+  cublasLtMatmulMatrixScale_t get_scale_mode();
+#endif
 };

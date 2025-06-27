@@ -26,10 +26,29 @@ using std::vector;
 
 // clang-format off
 std::vector<matmulPrecType> hipblasLtGemm::matmulSupported = {
-  // Compute type           Scale Type      A Type          B Type          C Type          D Type          Bias Type
-  {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F},
-  {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F},
-  {MBLAS_COMPUTE_32F,   MBLAS_R_32F,  MBLAS_R_16BF,  MBLAS_R_16BF,  MBLAS_R_16BF,  MBLAS_R_16BF,  MBLAS_R_16BF},
+  // Compute type                 Scale Type    A Type        B Type        C Type        D Type        Bias Type
+  {MBLAS_COMPUTE_32F,             MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F},
+  {MBLAS_COMPUTE_32F_FAST_TF32,   MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F},
+  {MBLAS_COMPUTE_32F,             MBLAS_R_32F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F,  MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F,             MBLAS_R_32F,  MBLAS_R_16F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F,  MBLAS_R_32F},
+  {MBLAS_COMPUTE_32F,             MBLAS_R_32F,  MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32I,             MBLAS_R_32I,  MBLAS_R_8I,   MBLAS_R_8I,   MBLAS_R_8I,   MBLAS_R_8I,   MBLAS_ANY},
+};
+
+std::vector<matmulPrecTypeF8> hipblasLtGemm::matmulSupportedF8 = {
+  // Scale Type  C Type           D Type            Bias Type
+  {MBLAS_R_32F,  MBLAS_R_16F,     MBLAS_R_16F,      MBLAS_R_16F },
+  {MBLAS_R_32F,  MBLAS_R_16BF,    MBLAS_R_16BF,     MBLAS_R_16BF},
+  {MBLAS_R_32F,  MBLAS_R_32F,     MBLAS_R_32F,      MBLAS_R_16BF},
+  {MBLAS_R_32F,  MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3,  MBLAS_R_16F },
+  {MBLAS_R_32F,  MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2,  MBLAS_R_16F },
+  // FP32 bias variants
+  // Scale Type  C Type           D Type            Bias Type
+  {MBLAS_R_32F,  MBLAS_R_16F,     MBLAS_R_16F,      MBLAS_R_32F },
+  {MBLAS_R_32F,  MBLAS_R_16BF,    MBLAS_R_16BF,     MBLAS_R_32F },
+  {MBLAS_R_32F,  MBLAS_R_32F,     MBLAS_R_32F,      MBLAS_R_32F },
+  {MBLAS_R_32F,  MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3,  MBLAS_R_32F },
+  {MBLAS_R_32F,  MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2,  MBLAS_R_32F },
 };
 // clang-format on
 
@@ -85,19 +104,28 @@ void hipblasLtGemm::validateParameters() {
       compute, scalar, a_type, b_type, c_type, d_type, mblasHipDataType(MBLAS_ANY)};
   auto result =
       std::find(begin(matmulSupported), end(matmulSupported), selType);
-  if (result == end(matmulSupported)) {
-    // Unable to find matching config, not supported
-    string errorString =
-        "Invalid GEMM specification for MatMul.  Combination of parameters "
-        "not supported"
-        "\nCompute type: " +
-        compute.toString() + "\nScalar type: " + scalar.toString() +
-        "\nA type: " + a_type.toString() +
-        "\nB type: " + b_type.toString() +
-        "\nC type: " + c_type.toString() +
-        "\nD type: " + d_type.toString();
-    throw std::invalid_argument(errorString);
+  if (result != end(matmulSupported)) {
+    return;
+  } else if (compute == mblasHipComputeType::MBLAS_COMPUTE_32F && a_type.isFp8() && b_type.isFp8()) {
+    // Special FP8 type filtering
+    matmulPrecTypeF8 selTypeF8 = {
+        scalar, c_type, d_type, mblasHipDataType(MBLAS_ANY)};
+    auto result = std::find(begin(matmulSupportedF8), end(matmulSupportedF8), selTypeF8);
+    if (result != end(matmulSupportedF8)) {
+      return;
+    }
   }
+  // Unable to find matching config, not supported
+  string errorString =
+      "Invalid GEMM specification for MatMul.  Combination of parameters "
+      "not supported"
+      "\nCompute type: " +
+      compute.toString() + "\nScalar type: " + scalar.toString() +
+      "\nA type: " + a_type.toString() +
+      "\nB type: " + b_type.toString() +
+      "\nC type: " + c_type.toString() +
+      "\nD type: " + d_type.toString();
+  throw std::invalid_argument(errorString);
   // Validate that FP8 kernels will use TN format only
   // GEMM fails if not
   // if ((isFp8(a_type) || isFp8(b_type) || isFp8(c_type) || isFp8(d_type)) &&

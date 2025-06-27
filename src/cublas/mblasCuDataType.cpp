@@ -41,6 +41,26 @@ mblasCuDataType::operator cudaDataType() const {
   return convertToCuda(this);
 }
 
+mblasCuDataType mblasCuDataType::get_scale_type() {
+  if (*this == MBLAS_R_8F_E4M3 || *this == MBLAS_R_8F_E5M2) {
+    return mblasDataTypeEnum::MBLAS_R_8F_UE8M0;
+  } else if (*this == MBLAS_R_4F_E2M1 ) {
+    return mblasDataTypeEnum::MBLAS_R_8F_UE4M3;
+  }
+  return mblasDataTypeEnum::MBLAS_R_32F;
+}
+
+#if (CUDART_VERSION >= 12800)
+cublasLtMatmulMatrixScale_t mblasCuDataType::get_scale_mode() {
+  if (*this == MBLAS_R_8F_E4M3 || *this == MBLAS_R_8F_E5M2) {
+    return CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
+  } else if (*this == MBLAS_R_4F_E2M1 ) {
+    return CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+  }
+  return CUBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F;
+}
+#endif
+
 const std::map<mblasDataType, cudaDataType> mblasCuDataType::precMappings = {
     {MBLAS_R_16F,  CUDA_R_16F},
     {MBLAS_C_16F,  CUDA_C_16F},
@@ -72,4 +92,11 @@ const std::map<mblasDataType, cudaDataType> mblasCuDataType::precMappings = {
     {MBLAS_C_64U,  CUDA_C_64U},
     {MBLAS_R_8F_E4M3, CUDA_R_8F_E4M3},
     {MBLAS_R_8F_E5M2, CUDA_R_8F_E5M2},
+#if (CUDART_VERSION >= 12800)
+    {MBLAS_R_8F_UE4M3, CUDA_R_8F_UE4M3},
+    {MBLAS_R_8F_UE8M0, CUDA_R_8F_UE8M0},
+    {MBLAS_R_6F_E2M3, CUDA_R_6F_E2M3},
+    {MBLAS_R_6F_E3M2, CUDA_R_6F_E3M2},
+    {MBLAS_R_4F_E2M1, CUDA_R_4F_E2M1},
+#endif
 };

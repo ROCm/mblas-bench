@@ -14,6 +14,9 @@ class mblasDataType {
     static const mblasDataType MBLAS_R_16F,     MBLAS_C_16F;
     static const mblasDataType MBLAS_R_16BF,    MBLAS_C_16BF;
     static const mblasDataType MBLAS_R_8F_E4M3, MBLAS_R_8F_E5M2;
+    static const mblasDataType MBLAS_R_8F_UE4M3, MBLAS_R_8F_UE8M0;
+    static const mblasDataType MBLAS_R_6F_E2M3, MBLAS_R_6F_E3M2;
+    static const mblasDataType MBLAS_R_4F_E2M1;
     static const mblasDataType MBLAS_R_64I,     MBLAS_C_64I;
     static const mblasDataType MBLAS_R_64U,     MBLAS_C_64U;
     static const mblasDataType MBLAS_R_32I,     MBLAS_C_32I;
@@ -51,6 +54,7 @@ class mblasDataType {
     virtual std::string toString() const { return toString("MBLAS"); }
     bool isReal() const;
     bool isFp8() const;
+    bool isFp4() const;
     void setScalar(std::string scalarstr, mblasDataType precision, mblasComputeType& compute);
 };
 
@@ -59,6 +63,9 @@ constexpr const mblasDataType mblasDataType::MBLAS_R_32F{mblasDataTypeEnum::MBLA
 constexpr const mblasDataType mblasDataType::MBLAS_R_16F{mblasDataTypeEnum::MBLAS_R_16F},         mblasDataType::MBLAS_C_16F{mblasDataTypeEnum::MBLAS_C_16F};
 constexpr const mblasDataType mblasDataType::MBLAS_R_16BF{mblasDataTypeEnum::MBLAS_R_16BF},       mblasDataType::MBLAS_C_16BF{mblasDataTypeEnum::MBLAS_C_16BF};
 constexpr const mblasDataType mblasDataType::MBLAS_R_8F_E4M3{mblasDataTypeEnum::MBLAS_R_8F_E4M3}, mblasDataType::MBLAS_R_8F_E5M2{mblasDataTypeEnum::MBLAS_R_8F_E5M2};
+constexpr const mblasDataType mblasDataType::MBLAS_R_8F_UE4M3{mblasDataTypeEnum::MBLAS_R_8F_UE4M3}, mblasDataType::MBLAS_R_8F_UE8M0{mblasDataTypeEnum::MBLAS_R_8F_UE8M0};
+constexpr const mblasDataType mblasDataType::MBLAS_R_6F_E2M3{mblasDataTypeEnum::MBLAS_R_6F_E2M3}, mblasDataType::MBLAS_R_6F_E3M2{mblasDataTypeEnum::MBLAS_R_6F_E3M2};
+constexpr const mblasDataType mblasDataType::MBLAS_R_4F_E2M1{mblasDataTypeEnum::MBLAS_R_4F_E2M1};
 constexpr const mblasDataType mblasDataType::MBLAS_R_64I{mblasDataTypeEnum::MBLAS_R_64I},         mblasDataType::MBLAS_C_64I{mblasDataTypeEnum::MBLAS_C_64I};
 constexpr const mblasDataType mblasDataType::MBLAS_R_64U{mblasDataTypeEnum::MBLAS_R_64U},         mblasDataType::MBLAS_C_64U{mblasDataTypeEnum::MBLAS_C_64U};
 constexpr const mblasDataType mblasDataType::MBLAS_R_32I{mblasDataTypeEnum::MBLAS_R_32I},         mblasDataType::MBLAS_C_32I{mblasDataTypeEnum::MBLAS_C_32I};

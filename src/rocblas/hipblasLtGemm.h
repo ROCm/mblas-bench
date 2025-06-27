@@ -29,15 +29,33 @@ struct matmulPrecType {
   }
 };
 
+struct matmulPrecTypeF8 {
+  mblasHipDataType scalar;
+  mblasHipDataType c_type;
+  mblasHipDataType d_type;
+  mblasHipDataType bias_type;
+  bool operator==(const matmulPrecTypeF8 rhs) const {
+    return rhs.scalar == scalar &&
+           rhs.c_type == c_type && rhs.d_type == d_type &&
+           // Omitting bias type is acceptable
+           (rhs.bias_type == bias_type ||
+            rhs.bias_type == mblasHipDataType(MBLAS_ANY));
+  }
+};
+
 struct hipblasLtGemmInst {
   int devIDX;
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
-  void *devA;
-  void *devB;
-  void *devC;
-  void *devD;
+  //void *devA;
+  //void *devB;
+  //void *devC;
+  //void *devD;
+  void **ptrDevA;
+  void **ptrDevB;
+  void **ptrDevC;
+  void **ptrDevD;
   hipblasLtMatmulDesc_t descOP;
   hipblasLtMatrixLayout_t descA;
   hipblasLtMatrixLayout_t descB;
@@ -52,9 +70,14 @@ struct hipblasLtGemmInst {
 
 class hipblasLtGemm : public genericGemm {
  private:
-  void *hostA;
-  void *hostB;
-  void *hostC;
+  // void *hostA;
+  // void *hostB;
+  // void *hostC;
+
+  void **ptr_host_a;
+  void **ptr_host_b;
+  void **ptr_host_c;
+  void **ptr_host_d;
 
   void *alpha;
   void *beta;
@@ -75,6 +98,7 @@ class hipblasLtGemm : public genericGemm {
   int workspaceSz = 64 * 1024 * 1024;
 
   static std::vector<matmulPrecType> matmulSupported;
+  static std::vector<matmulPrecTypeF8> matmulSupportedF8;
   std::vector<hipblasLtGemmInst> matPtrs;
 
  private:
@@ -85,9 +109,9 @@ class hipblasLtGemm : public genericGemm {
                   std::string dStr);
   void validateParameters();
   void parseDevIters(std::string);
-  void allocHost();
-  void allocDev(hipblasLtGemmInst *);
-  void fillHost();
+  void alloc_host();
+  void alloc_dev(hipblasLtGemmInst *);
+  void fill_host();
   void copyHostToDev(hipblasLtGemmInst *);
   void prepareMatrix(hipblasLtGemmInst *);
   void noTuning(hipblasLtGemmInst *);
