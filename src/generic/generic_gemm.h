@@ -6,37 +6,55 @@
 enum class scaling_type {None, Scalar, Vector, Block};
 class generic_gemm {
  protected:
+  struct matrix_desc {
+    int rows;
+    int cols;
+    int rows_mem;
+    int cols_mem;
+    long long int stride;
+    bool control;
+    float constant;
+    float scale_factor;
+    scaling_type scale_mode = scaling_type::None;
+    std::string init;
+  };
+
+  matrix_desc a_desc;
+  matrix_desc b_desc;
+  matrix_desc c_desc;
+  matrix_desc d_desc;
+
   int m;
   int n;
   int k;
 
-  int rows_a;
-  int cols_a;
-  int rows_b;
-  int cols_b;
-  int rows_c;
-  int cols_c;
-  int rows_d;
-  int cold_d;
+  int & rows_a = a_desc.rows;
+  int & cols_a = a_desc.cols;
+  int & rows_b = b_desc.rows;
+  int & cols_b = b_desc.cols;
+  int & rows_c = c_desc.rows;
+  int & cols_c = c_desc.cols;
+  int & rows_d = d_desc.rows;
+  int & cols_d = d_desc.cols;
 
-  int rows_mem_a;
-  int cols_mem_a;
-  int rows_mem_b;
-  int cols_mem_b;
-  int rows_mem_c;
-  int cols_mem_c;
-  int rows_mem_d;
-  int cols_mem_d;
+  int & rows_mem_a = a_desc.rows_mem;
+  int & cols_mem_a = a_desc.cols;
+  int & rows_mem_b = b_desc.rows_mem;
+  int & cols_mem_b = b_desc.cols;
+  int & rows_mem_c = c_desc.rows_mem;
+  int & cols_mem_c = c_desc.cols;
+  int & rows_mem_d = d_desc.rows_mem;
+  int & cols_mem_d = d_desc.cols_mem;
 
   int lda;
   int ldb;
   int ldc;
   int ldd;
 
-  long long int stride_a;
-  long long int stride_b;
-  long long int stride_c;
-  long long int stride_d;
+  long long int & stride_a = a_desc.stride;
+  long long int & stride_b = b_desc.stride;
+  long long int & stride_c = c_desc.stride;
+  long long int & stride_d = d_desc.stride;
 
   bool strided = false;
   bool batched = false;
@@ -49,20 +67,25 @@ class generic_gemm {
   int flush_batch_count;
   int flush_memory_size;
 
-  bool control_a = false;
-  bool control_b = false;
-  bool control_c = false;
-  bool control_d = false;
+  bool control_a = a_desc.control;
+  bool control_b = b_desc.control;
+  bool control_c = c_desc.control;
+  bool control_d = d_desc.control;
 
-  float constant_a;
-  float constant_b;
-  float constant_c;
-  float constant_d;
+  float constant_a = a_desc.constant;
+  float constant_b = b_desc.constant;
+  float constant_c = c_desc.constant;
+  float constant_d = d_desc.constant;
 
-  float scale_factor_a;
-  float scale_factor_b;
-  float scale_factor_c;
-  float scale_factor_d;
+  float scale_factor_a = a_desc.scale_factor;
+  float scale_factor_b = b_desc.scale_factor;
+  float scale_factor_c = c_desc.scale_factor;
+  float scale_factor_d = d_desc.scale_factor;
+
+  scaling_type scale_mode_a = a_desc.scale_mode;
+  scaling_type scale_mode_b = b_desc.scale_mode;
+  scaling_type scale_mode_c = c_desc.scale_mode;
+  scaling_type scale_mode_d = d_desc.scale_mode;
 
   std::string filename_a;
   std::string filename_b;
@@ -81,6 +104,7 @@ class generic_gemm {
   std::string function;
 
   std::string initialization;
+  std::string scale_init;
 
  public:
   generic_gemm(cxxopts::ParseResult);
@@ -99,6 +123,8 @@ class generic_gemm {
 
   static long long int fix_stride(long long int stride, long rows_a, long cols_a, std::string matrix_id);
   void set_init_params();
+  static scaling_type set_scale_mode(std::string input);
+  static std::string set_init(matrix_desc desc, std::string init, std::string mx_init);
 
   void set_flush_batch_count(int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
                         int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing, 
