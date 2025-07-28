@@ -164,6 +164,15 @@ int main(int argc, char **argv) {
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
             "hpl, blasgemm",
             cxxopts::value<string>()->default_value("rand_int"));
+  opp_adder("mx_init",
+            "Initialize any MX datatypes with this initialization strategy."
+            "Defaults to the value of initialization"
+            "Options: rand_int, trig_float, normal_float, hpl, blasgemm",
+            cxxopts::value<string>()->default_value(""));
+  opp_adder("scale_init",
+            "Initialize the block scaling factors with a particular distribution "
+            "Options: constant, normal_float",
+            cxxopts::value<string>()->default_value("constant"));
   opp_adder("filename_a",
             "Intialize matrix A with contents of a csv file",
             cxxopts::value<string>()->default_value(""));

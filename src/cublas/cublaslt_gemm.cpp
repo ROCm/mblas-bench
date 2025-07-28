@@ -368,11 +368,17 @@ void cublaslt_gemm::fill_host() {
                            batch_count, stride_c, control_c, constant_c, filename_c);
     // D is just output, don't need to init
   }
-  if (use_scaling) {
-    type_call_host<initHost>(a_scale_type, string("constant"), scale_host_a, a_scale_size.rows, a_scale_size.cols, 1, 1, 0LL, false, scale_factor_a, string(""));
-    type_call_host<initHost>(b_scale_type, string("constant"), scale_host_b, b_scale_size.rows, b_scale_size.cols, 1, 1, 0LL, false, scale_factor_b, string(""));
-    type_call_host<initHost>(c_scale_type, string("constant"), scale_host_c, c_scale_size.rows, c_scale_size.cols, 1, 1, 0LL, false, scale_factor_c, string(""));
-    type_call_host<initHost>(d_scale_type, string("constant"), scale_host_d, d_scale_size.rows, d_scale_size.cols, 1, 1, 0LL, false, scale_factor_d, string(""));
+  if (a_desc.scale_mode == scaling_type::Block) {
+    type_call_host<initHost>(a_scale_type, scale_init, scale_host_a, a_scale_size.rows, a_scale_size.cols, 1, 1, 0LL, false, scale_factor_a, string(""));
+  }
+  if (b_desc.scale_mode == scaling_type::Block) {
+    type_call_host<initHost>(b_scale_type, scale_init, scale_host_b, b_scale_size.rows, b_scale_size.cols, 1, 1, 0LL, false, scale_factor_b, string(""));
+  }
+  if (c_desc.scale_mode == scaling_type::Block) {
+    type_call_host<initHost>(c_scale_type, scale_init, scale_host_c, c_scale_size.rows, c_scale_size.cols, 1, 1, 0LL, false, scale_factor_c, string(""));
+  }
+  if (d_desc.scale_mode == scaling_type::Block) {
+    type_call_host<initHost>(d_scale_type, scale_init, scale_host_d, d_scale_size.rows, d_scale_size.cols, 1, 1, 0LL, false, scale_factor_d, string(""));
   }
 }
 
