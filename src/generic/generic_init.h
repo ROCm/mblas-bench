@@ -89,7 +89,7 @@ void fill_rand_host_rand_int_alternating(void *ptr, long rows_A, long cols_A, lo
 
 template <typename T>
 void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, int batch,
-                             long long int stride) {
+                             long long int stride, float mean = 0.0f, float std_dev = 1.0f) {
   T *A = (T *)ptr;
   std::random_device r;
   int random_dev_seed = r();
@@ -97,13 +97,14 @@ void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, i
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
     std::mt19937 gen(seed);
-    std::normal_distribution normal_dist(5.0, 2.0);
+    std::normal_distribution normal_dist(mean, std_dev);
     T dummy;
     #pragma omp for collapse(3) 
     for (size_t i_batch = 0; i_batch < batch; i_batch++) {
       for (size_t j = 0; j < cols_A; ++j) {
         for (size_t i = 0; i < rows_A; ++i) {
-          A[i + j * ld + i_batch * stride] = normal_float_gen(normal_dist, gen, dummy);
+          //A[i + j * ld + i_batch * stride] = normal_float_gen(normal_dist, gen, dummy);
+          A[i + j * ld + i_batch * stride] = T(normal_dist(gen));
         }
       }
     }
@@ -170,11 +171,15 @@ struct initHost {
                   float constant = 0.f, std::string filename = "");
 };
 
+// Helper function to detect and parse normal distribution patterns
+bool parseNormalDistribution(const std::string& initialization, float& mean, float& std_dev);
+
 template <typename T>
 void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
                              long cols_A, long ld, int batch,
                              long long int stride, bool control,
                              float constant, std::string filename) {
+  float mean, std_dev;
   if (!filename.empty()) {
     fill_rand_host_csv<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
   } else if (initialization == "rand_int") {
@@ -182,8 +187,10 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
     fill_rand_host_rand_int_alternating<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
   } else if (initialization == "trig_float") {
     fill_rand_host_trig_float<T>(ptr, rows_A, cols_A, ld, batch, stride, control, constant);
-  } else if (initialization == "normal_float") {
-    fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride);
+  } else if (parseNormalDistribution(initialization, mean, std_dev)) {
+    // Can be "normal_float", "norm_float", or "norm_dist"
+    std::cout << "mean: " << mean << "\tstd: " << std_dev << std::endl;
+    fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride, mean, std_dev);
   } else if (initialization == "hpl") {
   } else if (initialization == "blasgemm") {
     fill_rand_host_blasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
@@ -191,4 +198,3 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
     fill_rand_host_constant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
   }
 }
-
