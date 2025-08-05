@@ -32,20 +32,20 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   ldd = set_ld(lddS, "N", m, 0);
 
   // Set matrix dimensions
-  std::tie(a_desc.rows, a_desc.cols) = set_row_col(tA, m, k);
-  std::tie(b_desc.rows, b_desc.cols) = set_row_col(tB, k, n);
-  std::tie(c_desc.rows, c_desc.cols) = set_row_col("N", m, n);
-  std::tie(d_desc.rows, d_desc.cols) = set_row_col("N", m, n);
+  std::tie(a_props.rows, a_props.cols) = set_row_col(tA, m, k);
+  std::tie(b_props.rows, b_props.cols) = set_row_col(tB, k, n);
+  std::tie(c_props.rows, c_props.cols) = set_row_col("N", m, n);
+  std::tie(d_props.rows, d_props.cols) = set_row_col("N", m, n);
 
   // Set memory dimensions
-  a_desc.rows_mem = lda;
-  b_desc.rows_mem = ldb;
-  c_desc.rows_mem = ldc;
-  d_desc.rows_mem = ldd;
-  std::tie(std::ignore, a_desc.cols_mem) = set_row_col(tA, m, k);
-  std::tie(std::ignore, b_desc.cols_mem) = set_row_col(tB, k, n);
-  std::tie(std::ignore, c_desc.cols_mem) = set_row_col("N", m, n);
-  std::tie(std::ignore, d_desc.cols_mem) = set_row_col("N", m, n);
+  a_props.rows_mem = lda;
+  b_props.rows_mem = ldb;
+  c_props.rows_mem = ldc;
+  d_props.rows_mem = ldd;
+  std::tie(std::ignore, a_props.cols_mem) = set_row_col(tA, m, k);
+  std::tie(std::ignore, b_props.cols_mem) = set_row_col(tB, k, n);
+  std::tie(std::ignore, c_props.cols_mem) = set_row_col("N", m, n);
+  std::tie(std::ignore, d_props.cols_mem) = set_row_col("N", m, n);
 
   strided = false;
   batched = false;
@@ -91,8 +91,8 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   constant_d = result["constant_d"].as<float>();
 
   scale_mode_a = set_scale_mode(result["scale_mode_a"].as<string>());
-  scale_mode_b = set_scale_mode(result["scale_mode_c"].as<string>());
-  scale_mode_c = set_scale_mode(result["scale_mode_b"].as<string>());
+  scale_mode_b = set_scale_mode(result["scale_mode_b"].as<string>());
+  scale_mode_c = set_scale_mode(result["scale_mode_c"].as<string>());
   scale_mode_d = set_scale_mode(result["scale_mode_d"].as<string>());
 
   scale_factor_a = result["scale_factor_a"].as<float>();
@@ -100,10 +100,10 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   scale_factor_c = result["scale_factor_c"].as<float>();
   scale_factor_d = result["scale_factor_d"].as<float>();
 
-  a_desc.init = set_init(a_desc, result["initialization"].as<string>(), result["mx_init"].as<string>());
-  b_desc.init = set_init(c_desc, result["initialization"].as<string>(), result["mx_init"].as<string>());
-  c_desc.init = set_init(b_desc, result["initialization"].as<string>(), result["mx_init"].as<string>());
-  d_desc.init = set_init(d_desc, result["initialization"].as<string>(), result["mx_init"].as<string>());
+  a_props.init = set_init(a_props, result["initialization"].as<string>(), result["mx_init"].as<string>());
+  b_props.init = set_init(c_props, result["initialization"].as<string>(), result["mx_init"].as<string>());
+  c_props.init = set_init(b_props, result["initialization"].as<string>(), result["mx_init"].as<string>());
+  d_props.init = set_init(d_props, result["initialization"].as<string>(), result["mx_init"].as<string>());
 
   // Set init control information
   if (initialization == "rand_int") {
@@ -176,37 +176,39 @@ void generic_gemm::set_flush_batch_count(
 scaling_type generic_gemm::set_scale_mode(string value) {
   // Is this a digit or a word?
   bool is_number = std::find_if(value.begin(), value.end(), ::isdigit) != value.end();
+  scaling_type out = scaling_type::None;
   if (is_number) {
     switch (std::stoi(value)) {
       //0 = none, 1 = scalar, 2 = vector, 3 = block,
       case 0:
-        return scaling_type::None;
+        out = scaling_type::None;
         break;
       case 1: 
-        return scaling_type::Scalar;
+        out = scaling_type::Scalar;
         break;
       case 2:
-        return scaling_type::Vector;
+        out = scaling_type::Vector;
         break;
       case 3:
-        return scaling_type::Block;
+        out = scaling_type::Block;
         break;
     }
   } else {
-    string lower_val;
-    std::transform(value.begin(), value.end(), lower_val.begin(),
-    [](unsigned char c){ return std::tolower(c); });
+    string lower_val = value;
+    //std::transform(value.begin(), value.end(), lower_val.begin(),
+    //[](unsigned char c){ return std::tolower(c); });
+    std::transform(lower_val.begin(), lower_val.end(), lower_val.begin(), ::tolower);
     if (lower_val == "none") {
-      return scaling_type::None;
+      out = scaling_type::None;
     } else if (lower_val == "scalar") {
-      return scaling_type::Scalar;
+      out = scaling_type::Scalar;
     } else if (lower_val == "vector") {
-      return scaling_type::Vector;
+      out = scaling_type::Vector;
     } else if (lower_val == "block") {
-      return scaling_type::Block;
+      out = scaling_type::Block;
     }
   }
-  return scaling_type::None;
+  return out;
 }
 
 
@@ -227,3 +229,15 @@ std::string generic_gemm::set_init(matrix_desc desc, std::string init, std::stri
 //    if ()
 //  }
 //}
+
+std::string scaling_string(scaling_type input){
+  if (input == scaling_type::None) {
+    return "None";
+  } else if (input == scaling_type::Scalar) {
+    return "Scalar";
+  } else if (input == scaling_type::Vector) {
+    return "Vector";
+  } else if (input == scaling_type::Block) {
+    return "Block";
+  }
+}

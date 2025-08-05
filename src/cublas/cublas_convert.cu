@@ -66,7 +66,10 @@ __global__ void float_to_fp4(float2 *input, size_t num_elements,
 
 void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, long x, long y, int batchsz)
 {
-
+  if (batchsz * x * y == 0) {
+    // Matrix not used, don't copy
+    return;
+  }
   long hostsz = type_call_host<sizeofCUDT>(precision);
   long devsz = type_call_dev<sizeofCUDT>(precision);
   if (precision == mblas_data_type::MBLAS_C_16F || precision == mblas_data_type::MBLAS_R_16F)

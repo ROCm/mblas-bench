@@ -119,6 +119,34 @@ void cublaslt_gemm::parse_dev_iters(std::string deviceStr) {
   }
 }
 
+std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublaslt_gemm::configure_scaling(matrix_desc desc, mblas_cuda_data_type type, string matrix_id) {
+  mblas_cuda_data_type scale_type;
+  cublasLtMatmulMatrixScale_t scale_mode;
+  scale_size scale_size;
+  if (desc.scale_mode == scaling_type::Block){
+    // Determine scale types (calculated from a,b,c,d type)
+    scale_type = type.get_scale_type();
+
+    // Scale modes
+    scale_mode = type.get_scale_mode();
+
+    // Calculate lengths
+    scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (type.is_fp4()) {
+    string errorString =
+        "Non-block scaled fp4 is not supported in cublaslt"
+        "Matrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    std::cerr << scaling_string(desc.scale_mode) << std::endl;
+    throw std::invalid_argument(errorString);
+  } else {
+    scale_size.rows = 0;
+    scale_size.cols = 0;
+  }
+    
+  return std::make_tuple(scale_type, scale_mode, scale_size);
+}
+
 void cublaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
                               string aStr, string bStr, string cStr,
                               string dStr) {
@@ -154,25 +182,10 @@ void cublaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
 
 #if (ENABLE_CUDA_FP4)
   use_scaling = a_type.is_fp4() || b_type.is_fp4() || c_type.is_fp4() || d_type.is_fp4();
-  if (use_scaling)
-  {
-    // Determine scale types (calculated from a,b,c,d type)
-    a_scale_type = a_type.get_scale_type();
-    b_scale_type = b_type.get_scale_type();
-    c_scale_type = c_type.get_scale_type();
-    d_scale_type = d_type.get_scale_type();
-    // Scale modes
-    a_scale_mode = a_type.get_scale_mode();
-    b_scale_mode = b_type.get_scale_mode();
-    c_scale_mode = c_type.get_scale_mode();
-    d_scale_mode = d_type.get_scale_mode();
-    // Calculate lengths
-    a_scale_size = get_scale_tensor_size(m, k, a_scale_mode);
-    b_scale_size = get_scale_tensor_size(k, n, b_scale_mode);
-    c_scale_size = get_scale_tensor_size(m, n, c_scale_mode);
-    d_scale_size = get_scale_tensor_size(m, n, d_scale_mode);
-
-  }
+  std::tie(a_scale_type, a_scale_mode, a_scale_size) = configure_scaling(a_props, a_type, "A");
+  std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
+  std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
+  std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
 #endif
 }
 
@@ -316,13 +329,25 @@ void cublaslt_gemm::alloc_host() {
     ptr_host_d[i] = allocate_host_array(d_type, rows_mem_d, cols_mem_d, batch_count);
   }
 
-  if (use_scaling) {
+  //if (use_scaling) {
+  //  scale_host_a = malloc(a_scale_size.get_size()*type_call_host<sizeofCUDT>(a_scale_type));
+  //  scale_host_b = malloc(b_scale_size.get_size()*type_call_host<sizeofCUDT>(b_scale_type));
+  //  scale_host_c = malloc(c_scale_size.get_size()*type_call_host<sizeofCUDT>(c_scale_type));
+  //  scale_host_d = malloc(d_scale_size.get_size()*type_call_host<sizeofCUDT>(d_scale_type));
+  //}
+
+  if (a_props.scale_mode == scaling_type::Block) {
     scale_host_a = malloc(a_scale_size.get_size()*type_call_host<sizeofCUDT>(a_scale_type));
+  }
+  if (b_props.scale_mode == scaling_type::Block) {
     scale_host_b = malloc(b_scale_size.get_size()*type_call_host<sizeofCUDT>(b_scale_type));
+  }
+  if (c_props.scale_mode == scaling_type::Block) {
     scale_host_c = malloc(c_scale_size.get_size()*type_call_host<sizeofCUDT>(c_scale_type));
+  }
+  if (d_props.scale_mode == scaling_type::Block) {
     scale_host_d = malloc(d_scale_size.get_size()*type_call_host<sizeofCUDT>(d_scale_type));
   }
-
 }
 
 void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
@@ -350,10 +375,22 @@ void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
 
   mat->wSZ = workspace_size;
   cudaMalloc(&mat->devWork, mat->wSZ);
-  if (use_scaling) {
+  // if (use_scaling) {
+  //   cudaMalloc(&mat->scale_dev_a, a_scale_size.get_size()*type_call_dev<sizeofCUDT>(a_scale_type));
+  //   cudaMalloc(&mat->scale_dev_b, b_scale_size.get_size()*type_call_dev<sizeofCUDT>(b_scale_type));
+  //   cudaMalloc(&mat->scale_dev_c, c_scale_size.get_size()*type_call_dev<sizeofCUDT>(c_scale_type));
+  //   cudaMalloc(&mat->scale_dev_d, d_scale_size.get_size()*type_call_dev<sizeofCUDT>(d_scale_type));
+  // }
+  if (a_props.scale_mode == scaling_type::Block) {
     cudaMalloc(&mat->scale_dev_a, a_scale_size.get_size()*type_call_dev<sizeofCUDT>(a_scale_type));
+  }
+  if (b_props.scale_mode == scaling_type::Block) {
     cudaMalloc(&mat->scale_dev_b, b_scale_size.get_size()*type_call_dev<sizeofCUDT>(b_scale_type));
+  }
+  if (c_props.scale_mode == scaling_type::Block) {
     cudaMalloc(&mat->scale_dev_c, c_scale_size.get_size()*type_call_dev<sizeofCUDT>(c_scale_type));
+  }
+  if (d_props.scale_mode == scaling_type::Block) {
     cudaMalloc(&mat->scale_dev_d, d_scale_size.get_size()*type_call_dev<sizeofCUDT>(d_scale_type));
   }
 }
@@ -368,16 +405,16 @@ void cublaslt_gemm::fill_host() {
                            batch_count, stride_c, control_c, constant_c, filename_c);
     // D is just output, don't need to init
   }
-  if (a_desc.scale_mode == scaling_type::Block) {
+  if (a_props.scale_mode == scaling_type::Block) {
     type_call_host<initHost>(a_scale_type, scale_init, scale_host_a, a_scale_size.rows, a_scale_size.cols, 1, 1, 0LL, false, scale_factor_a, string(""));
   }
-  if (b_desc.scale_mode == scaling_type::Block) {
+  if (b_props.scale_mode == scaling_type::Block) {
     type_call_host<initHost>(b_scale_type, scale_init, scale_host_b, b_scale_size.rows, b_scale_size.cols, 1, 1, 0LL, false, scale_factor_b, string(""));
   }
-  if (c_desc.scale_mode == scaling_type::Block) {
+  if (c_props.scale_mode == scaling_type::Block) {
     type_call_host<initHost>(c_scale_type, scale_init, scale_host_c, c_scale_size.rows, c_scale_size.cols, 1, 1, 0LL, false, scale_factor_c, string(""));
   }
-  if (d_desc.scale_mode == scaling_type::Block) {
+  if (d_props.scale_mode == scaling_type::Block) {
     type_call_host<initHost>(d_scale_type, scale_init, scale_host_d, d_scale_size.rows, d_scale_size.cols, 1, 1, 0LL, false, scale_factor_d, string(""));
   }
 }
@@ -407,22 +444,23 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
   check_cublas(cublasLtMatmulDescSetAttribute(
       mat->desc_op, CUBLASLT_MATMUL_DESC_TRANSB, &transBCU, sizeof(transBCU)));
 #if (ENABLE_CUDA_FP4)
-  if (use_scaling) {
-    // set block scaling mode
+  // set block scaling mode
+  // set scaling factors
+  if (a_props.scale_mode == scaling_type::Block) {
     check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
-    check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
-    //cublasLtMatmulMatrixScale_t d_scale_mode = CUBLASLT_MATMUL
-    //check_cublas(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &DOutScaleMode, sizeof(DOutScaleMode)));
-
-    // set scaling factors
     check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a, sizeof(mat->scale_dev_a)));
+  }
+  if (b_props.scale_mode == scaling_type::Block) {
+    check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
     check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_B_SCALE_POINTER, &mat->scale_dev_b, sizeof(mat->scale_dev_b)));
-
-    if (d_type.is_fp4()) {
-      check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &d_scale_mode, sizeof(d_scale_mode)));
-      check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &mat->scale_dev_d, sizeof(mat->scale_dev_d)));
-    }
-    //check_cublas(cublasLtMatmulDescSetAttribute(operationDesc, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &d_out_scale, sizeof(d_out_scale)));
+  }
+  if (c_props.scale_mode == scaling_type::Block) {
+    check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_C_SCALE_MODE, &c_scale_mode, sizeof(c_scale_mode)));
+    check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_C_SCALE_POINTER, &mat->scale_dev_c, sizeof(mat->scale_dev_c)));
+  }
+  if (d_props.scale_mode == scaling_type::Block) {
+    check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &d_scale_mode, sizeof(d_scale_mode)));
+    check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &mat->scale_dev_d, sizeof(mat->scale_dev_d)));
   }
 #endif
   check_cublas(
@@ -433,7 +471,7 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
       cublasLtMatrixLayoutCreate(&mat->desc_c, c_type, rows_c, cols_c, ldc));
   if (!inplace) {
     check_cublas(
-        cublasLtMatrixLayoutCreate(&mat->desc_d, d_type, rows_d, cold_d, ldd));
+        cublasLtMatrixLayoutCreate(&mat->desc_d, d_type, rows_d, cols_d, ldd));
   } else {
     mat->desc_d = mat->desc_c;
   }
