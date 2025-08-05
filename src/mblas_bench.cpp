@@ -13,7 +13,7 @@
 //#include "cublas_gemm.h"
 //#include "cublaslt_gemm.h"
 #include <generic_gemm_factory.h>
-#include <rocblas_gemm_factory.h>
+//#include <rocblas_gemm_factory.h>
 #include <hipblaslt_gemm_factory.h>
 #include <cublas_gemm_factory.h>
 #include <cublaslt_gemm_factory.h>
@@ -254,8 +254,8 @@ int main(int argc, char **argv) {
     // hipblaslt
     // gemm = new hipblaslt_gemm(result);
     gemm = new hipblaslt_gemm_factory();
-  } else if (driver == "rocblas-bench" || driver == "rocblas") {
-    gemm = new rocblas_gemm_factory();
+ // } else if (driver == "rocblas-bench" || driver == "rocblas") {
+ //   gemm = new rocblas_gemm_factory();
   } else {
     cerr << "Driver \"" << driver << "\" not supported" << endl;
     return 1;
