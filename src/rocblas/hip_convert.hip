@@ -11,7 +11,7 @@
 __global__ void float_to_bf16(float *input, size_t num_elements,
                                 hip_bfloat16 *output)
 {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  long idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elements)
   {
     output[idx] = __float2bfloat16(input[idx]);
@@ -20,7 +20,7 @@ __global__ void float_to_bf16(float *input, size_t num_elements,
 
 __global__ void float_to_fp16(float *input, size_t num_elements, __half *output)
 {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  long idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elements)
   {
     output[idx] = __float2half(input[idx]);
@@ -30,7 +30,7 @@ __global__ void float_to_fp16(float *input, size_t num_elements, __half *output)
 __global__ void float_to_fp8(float *input, size_t num_elements,
                            __hip_fp8_storage_t *output, __hip_fp8_interpretation_t interp)
 {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  long idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < num_elements)
   {
     output[idx] = __hip_cvt_float_to_fp8(input[idx], __HIP_SATFINITE, interp);
@@ -48,7 +48,7 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
 //   }
 // }
 
-void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, int x, int y, int batchsz)
+void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x, long y, int batchsz)
 {
 
   long hostsz = type_call_host<sizeofCUDT>(precision);
@@ -63,6 +63,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, int x,
     long block_size = 256;
     long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_fp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
+    check_hip(hipGetLastError());
     hipFree(tmpA);
   }
   else if (precision == mblas_data_type(MBLAS_C_16BF) || precision == mblas_data_type(MBLAS_R_16BF))
@@ -75,6 +76,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, int x,
     long block_size = 256;
     long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_bf16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
+    check_hip(hipGetLastError());
     hipFree(tmpA);
   } 
   else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 || precision == mblas_data_type::MBLAS_R_8F_E5M2 )
@@ -89,11 +91,11 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, int x,
     __hip_fp8_interpretation_t interp;
     if (precision == mblas_data_type::MBLAS_R_8F_E4M3)
     {
-      interp = __HIP_E4M3_FNUZ;
+      interp = __HIP_E4M3;
     }
     else if (precision == mblas_data_type::MBLAS_R_8F_E5M2)
     {
-      interp = __HIP_E5M2_FNUZ;
+      interp = __HIP_E5M2;
     }
     float_to_fp8<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA, interp);
     check_hip(hipGetLastError());
