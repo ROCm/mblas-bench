@@ -4,6 +4,7 @@
 
 #include "cxxopts.hpp"
 enum class scaling_type {None, Scalar, Vector, Block};
+std::string scaling_string(scaling_type input);
 class generic_gemm {
  protected:
   struct matrix_desc {
@@ -19,42 +20,42 @@ class generic_gemm {
     std::string init;
   };
 
-  matrix_desc a_desc;
-  matrix_desc b_desc;
-  matrix_desc c_desc;
-  matrix_desc d_desc;
+  matrix_desc a_props;
+  matrix_desc b_props;
+  matrix_desc c_props;
+  matrix_desc d_props;
 
   int m;
   int n;
   int k;
 
-  int & rows_a = a_desc.rows;
-  int & cols_a = a_desc.cols;
-  int & rows_b = b_desc.rows;
-  int & cols_b = b_desc.cols;
-  int & rows_c = c_desc.rows;
-  int & cols_c = c_desc.cols;
-  int & rows_d = d_desc.rows;
-  int & cols_d = d_desc.cols;
+  int & rows_a = a_props.rows;
+  int & cols_a = a_props.cols;
+  int & rows_b = b_props.rows;
+  int & cols_b = b_props.cols;
+  int & rows_c = c_props.rows;
+  int & cols_c = c_props.cols;
+  int & rows_d = d_props.rows;
+  int & cols_d = d_props.cols;
 
-  int & rows_mem_a = a_desc.rows_mem;
-  int & cols_mem_a = a_desc.cols;
-  int & rows_mem_b = b_desc.rows_mem;
-  int & cols_mem_b = b_desc.cols;
-  int & rows_mem_c = c_desc.rows_mem;
-  int & cols_mem_c = c_desc.cols;
-  int & rows_mem_d = d_desc.rows_mem;
-  int & cols_mem_d = d_desc.cols_mem;
+  int & rows_mem_a = a_props.rows_mem;
+  int & cols_mem_a = a_props.cols;
+  int & rows_mem_b = b_props.rows_mem;
+  int & cols_mem_b = b_props.cols;
+  int & rows_mem_c = c_props.rows_mem;
+  int & cols_mem_c = c_props.cols;
+  int & rows_mem_d = d_props.rows_mem;
+  int & cols_mem_d = d_props.cols_mem;
 
   int lda;
   int ldb;
   int ldc;
   int ldd;
 
-  long long int & stride_a = a_desc.stride;
-  long long int & stride_b = b_desc.stride;
-  long long int & stride_c = c_desc.stride;
-  long long int & stride_d = d_desc.stride;
+  long long int & stride_a = a_props.stride;
+  long long int & stride_b = b_props.stride;
+  long long int & stride_c = c_props.stride;
+  long long int & stride_d = d_props.stride;
 
   bool strided = false;
   bool batched = false;
@@ -67,25 +68,25 @@ class generic_gemm {
   int flush_batch_count;
   int flush_memory_size;
 
-  bool control_a = a_desc.control;
-  bool control_b = b_desc.control;
-  bool control_c = c_desc.control;
-  bool control_d = d_desc.control;
+  bool & control_a = a_props.control;
+  bool & control_b = b_props.control;
+  bool & control_c = c_props.control;
+  bool & control_d = d_props.control;
 
-  float constant_a = a_desc.constant;
-  float constant_b = b_desc.constant;
-  float constant_c = c_desc.constant;
-  float constant_d = d_desc.constant;
+  float & constant_a = a_props.constant;
+  float & constant_b = b_props.constant;
+  float & constant_c = c_props.constant;
+  float & constant_d = d_props.constant;
 
-  float scale_factor_a = a_desc.scale_factor;
-  float scale_factor_b = b_desc.scale_factor;
-  float scale_factor_c = c_desc.scale_factor;
-  float scale_factor_d = d_desc.scale_factor;
+  float & scale_factor_a = a_props.scale_factor;
+  float & scale_factor_b = b_props.scale_factor;
+  float & scale_factor_c = c_props.scale_factor;
+  float & scale_factor_d = d_props.scale_factor;
 
-  scaling_type scale_mode_a = a_desc.scale_mode;
-  scaling_type scale_mode_b = b_desc.scale_mode;
-  scaling_type scale_mode_c = c_desc.scale_mode;
-  scaling_type scale_mode_d = d_desc.scale_mode;
+  scaling_type & scale_mode_a = a_props.scale_mode;
+  scaling_type & scale_mode_b = b_props.scale_mode;
+  scaling_type & scale_mode_c = c_props.scale_mode;
+  scaling_type & scale_mode_d = d_props.scale_mode;
 
   std::string filename_a;
   std::string filename_b;
@@ -131,3 +132,4 @@ class generic_gemm {
                         bool inplace);
 
 };
+
