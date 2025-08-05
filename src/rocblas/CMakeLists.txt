@@ -25,8 +25,8 @@ find_package(OpenMP REQUIRED)
 
 
 add_library(mblasrocm SHARED
-    rocblas_gemm.cpp
-    rocblas_gemm_factory.cpp
+	#    rocblas_gemm.cpp
+	#rocblas_gemm_factory.cpp
     hipblaslt_gemm.cpp
     hipblaslt_gemm_factory.cpp
     hip_convert.hip
@@ -36,9 +36,9 @@ add_library(mblasrocm SHARED
     mblas_hip_data_type.cpp
     mblas_hipblas_compute_type.cpp
     mblas_hipblas_operation.cpp
-    mblas_rocblas_data_type.cpp
-    mblas_rocblas_compute_type.cpp
-    mblas_rocblas_operation.cpp
+    #mblas_rocblas_data_type.cpp
+    #mblas_rocblas_compute_type.cpp
+    #mblas_rocblas_operation.cpp
 )
 target_compile_options(mblasrocm PRIVATE -Wno-unused-result)
 
@@ -53,7 +53,7 @@ target_include_directories(mblasrocm PRIVATE
 target_link_libraries(mblasrocm PRIVATE
 	hip::device
     hip::host
-    roc::rocblas
+    #roc::rocblas
     roc::hipblas
     roc::hipblaslt
     Threads::Threads
