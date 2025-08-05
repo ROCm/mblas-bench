@@ -6,12 +6,12 @@ set(CMAKE_CXX_COMPILER "/opt/rocm/bin/hipcc")
 set(CMAKE_HIP_COMPILER "/opt/rocm/bin/amdclang++")
 set(CMAKE_CXX_STANDARD 17)
 project(mblas_bench LANGUAGES CXX HIP)
-set(CMAKE_HIP_FLAGS "-fPIC -fgpu-rdc -w -D__HIP_PLATFORM_AMD__")
+set(CMAKE_HIP_FLAGS "-fPIC -fgpu-rdc -w -D__HIP_PLATFORM_AMD__ --offload-arch=gfx950")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set the GPU to compile for
 #set(GPU_TARGETS "gfx908:sramecc+:xnack-" CACHE STRING "GPU targets to compile for")
-set(GPU_TARGETS "gfx90a,gfx942" CACHE STRING "GPU targets to compile for")
+set(GPU_TARGETS "gfx90a,gfx942,gfx950" CACHE STRING "GPU targets to compile for")
 # Search for rocm in common locations
 list(PREPEND CMAKE_PREFIX_PATH /opt/rocm)
 set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
