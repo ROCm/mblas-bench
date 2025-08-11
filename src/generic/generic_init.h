@@ -171,15 +171,20 @@ struct initHost {
                   float constant = 0.f, std::string filename = "");
 };
 
-// Helper function to detect and parse normal distribution patterns
-bool parseNormalDistribution(const std::string& initialization, float& mean, float& std_dev);
+// Generic helper function to detect and parse parameterized initialization patterns
+template<typename... Args>
+bool parse_parameterized_init(const std::string& initialization, 
+                           const std::vector<std::string>& patterns,
+                           Args&... default_and_output_params);
 
 template <typename T>
 void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
                              long cols_A, long ld, int batch,
                              long long int stride, bool control,
                              float constant, std::string filename) {
-  float mean, std_dev;
+  // Norm defaults
+  float mean = 0.0;
+  float std_dev = 1.0;
   if (!filename.empty()) {
     fill_rand_host_csv<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
   } else if (initialization == "rand_int") {
@@ -187,9 +192,10 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
     fill_rand_host_rand_int_alternating<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
   } else if (initialization == "trig_float") {
     fill_rand_host_trig_float<T>(ptr, rows_A, cols_A, ld, batch, stride, control, constant);
-  } else if (parseNormalDistribution(initialization, mean, std_dev)) {
+  //} else if (parseNormalDistribution(initialization, mean, std_dev)) {
+  } else if (parse_parameterized_init(initialization, 
+            {"normal_float", "norm_float", "norm_dist"}, mean, std_dev)) {
     // Can be "normal_float", "norm_float", or "norm_dist"
-    std::cout << "mean: " << mean << "\tstd: " << std_dev << std::endl;
     fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride, mean, std_dev);
   } else if (initialization == "hpl") {
   } else if (initialization == "blasgemm") {
@@ -197,4 +203,61 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
   } else if (initialization == "constant") {
     fill_rand_host_constant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
   }
+}
+
+// Helper function to parse a single parameter from string to the target type
+template<typename T>
+bool parse_parameter(const std::string& param_str, T& value) {
+  try {
+    if constexpr (std::is_same_v<T, float>) {
+      value = std::stof(param_str);
+    } else if constexpr (std::is_same_v<T, double>) {
+      value = std::stod(param_str);
+    } else if constexpr (std::is_same_v<T, int>) {
+      value = std::stoi(param_str);
+    } else if constexpr (std::is_same_v<T, long>) {
+      value = std::stol(param_str);
+    } else if constexpr (std::is_same_v<T, long long>) {
+      value = std::stoll(param_str);
+    } else {
+      // For other types, try to use assignment from double
+      value = static_cast<T>(std::stod(param_str));
+    }
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+
+// Generic helper function to detect and parse parameterized initialization patterns
+template<typename... Args>
+bool parse_parameterized_init(const std::string& initialization, 
+                             const std::vector<std::string>& patterns,
+                             Args&... default_and_output_params) {
+  for (const auto& pattern : patterns) {
+    if (initialization.find(pattern) == 0) {
+      // Pattern found, now check for parameters
+      if (initialization.length() > pattern.length() && initialization[pattern.length()] == '_') {
+        // Parse additional parameters like "pattern_param1_param2_param3"
+        std::string params = initialization.substr(pattern.length() + 1);
+        std::istringstream ss(params);
+        std::vector<std::string> param_strs;
+        std::string param;
+        
+        // Split parameters by underscore
+        while (std::getline(ss, param, '_')) {
+          if (!param.empty()) {
+            param_strs.push_back(param);
+          }
+        }
+        
+        // Parse parameters using fold expression (C++17)
+        size_t index = 0;
+        ((index < param_strs.size() ? parse_parameter(param_strs[index++], default_and_output_params) : false), ...);
+      }
+      // Pattern matched (with or without parameters)
+      return true;
+    }
+  }
+  return false;
 }
