@@ -279,11 +279,11 @@ void cublas_gemm::alloc_dev(cublasgemmInst *mat) {
 
 void cublas_gemm::fill_host() {
   for (int i = 0; i < flush_batch_count; i++){
-    type_call_host<initHost>(a_type, initialization, ptr_host_a[i], rows_a, cols_a, lda,
+    type_call_host<initHost>(a_type, a_props.init, ptr_host_a[i], rows_a, cols_a, lda,
                            batch_count, stride_a, control_a, constant_a, filename_a);
-    type_call_host<initHost>(b_type, initialization, ptr_host_b[i], rows_b, cols_b, ldb,
+    type_call_host<initHost>(b_type, b_props.init, ptr_host_b[i], rows_b, cols_b, ldb,
                            batch_count, stride_b, control_b, constant_b, filename_b);
-    type_call_host<initHost>(c_type, initialization, ptr_host_c[i], rows_c, cols_c, ldc,
+    type_call_host<initHost>(c_type, c_props.init, ptr_host_c[i], rows_c, cols_c, ldc,
                            batch_count, stride_c, control_c, constant_c, filename_c);
     // D is just output, don't need to init
   }
