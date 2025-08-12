@@ -97,14 +97,34 @@ void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, i
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
     std::mt19937 gen(seed);
-    std::normal_distribution normal_dist(mean, std_dev);
-    T dummy;
+    std::normal_distribution<T> normal_dist(mean, std_dev);
     #pragma omp for collapse(3) 
     for (size_t i_batch = 0; i_batch < batch; i_batch++) {
       for (size_t j = 0; j < cols_A; ++j) {
         for (size_t i = 0; i < rows_A; ++i) {
-          //A[i + j * ld + i_batch * stride] = normal_float_gen(normal_dist, gen, dummy);
-          A[i + j * ld + i_batch * stride] = T(normal_dist(gen));
+          A[i + j * ld + i_batch * stride] = normal_dist(gen);
+        }
+      }
+    }
+  }
+}
+
+template <typename T>
+void fill_rand_host_uniform(void *ptr, long rows_A, long cols_A, long ld, int batch,
+                           long long int stride, float min_val = 0.0f, float max_val = 1.0f) {
+  T *A = (T *)ptr;
+  std::random_device r;
+  int random_dev_seed = r();
+  #pragma omp parallel shared(A) 
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<T> uniform_dist(min_val, max_val);
+    #pragma omp for collapse(3) 
+    for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+      for (size_t j = 0; j < cols_A; ++j) {
+        for (size_t i = 0; i < rows_A; ++i) {
+          A[i + j * ld + i_batch * stride] = uniform_dist(gen);
         }
       }
     }
@@ -185,23 +205,45 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
   // Norm defaults
   float mean = 0.0;
   float std_dev = 1.0;
-  if (!filename.empty()) {
+  // Uniform defaults
+  float min_val = 0.0;
+  float max_val = 1.0;
+  
+  if (initialization == "csv" && !filename.empty()) {
     fill_rand_host_csv<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
   } else if (initialization == "rand_int") {
     std::random_device r;
     fill_rand_host_rand_int_alternating<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
   } else if (initialization == "trig_float") {
     fill_rand_host_trig_float<T>(ptr, rows_A, cols_A, ld, batch, stride, control, constant);
-  //} else if (parseNormalDistribution(initialization, mean, std_dev)) {
   } else if (parse_parameterized_init(initialization, 
             {"normal_float", "norm_float", "norm_dist"}, mean, std_dev)) {
     // Can be "normal_float", "norm_float", or "norm_dist"
-    fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride, mean, std_dev);
-  } else if (initialization == "hpl") {
+    if constexpr (std::is_floating_point_v<T>) {
+      //std::cout << "mean: " << mean << " std_dev: " << std_dev << std::endl;
+      fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride, mean, std_dev);
+    } else {
+      std::string error_string = "Error: normal distribution not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  } else if (parse_parameterized_init(initialization, 
+            {"uniform_dist", "uniform"}, min_val, max_val)) {
+    // Can be "uniform_dist" or "uniform"
+    if constexpr (std::is_floating_point_v<T>) {
+      //std::cout << "min_val: " << min_val << " max_val: " << max_val << std::endl;
+      fill_rand_host_uniform<T>(ptr, rows_A, cols_A, ld, batch, stride, min_val, max_val);
+    } else {
+      std::string error_string = "Error: uniform distribution not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  //} else if (initialization == "hpl") {
   } else if (initialization == "blasgemm") {
     fill_rand_host_blasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
   } else if (initialization == "constant") {
     fill_rand_host_constant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
+  } else {
+    std::string error_string = "Error: \"" + initialization + "\" not supported";
+    throw std::invalid_argument(error_string);
   }
 }
 
