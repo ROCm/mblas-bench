@@ -70,6 +70,17 @@ enum mblas_operation_enum {
   MBLAS_OP_NULL = 15,
 };
 
+enum matrix_id {
+  A = 0,
+  B = 1,
+  C = 2,
+  D = 3,
+  A_scale = 4,
+  B_scale = 5,
+  C_scale = 6,
+  D_scale = 7,
+};
+
 // Used for establishing a link between precision and compute
 const std::map<mblas_data_type_enum, mblas_compute_type_enum> precToCompute = {
     {MBLAS_R_64F, MBLAS_COMPUTE_64F},
