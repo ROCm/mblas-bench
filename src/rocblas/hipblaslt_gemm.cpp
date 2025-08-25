@@ -396,6 +396,14 @@ double hipblaslt_gemm::test() {
                                  }) /
                  mat_ptrs.size();
 
+  // Optionally, copy data back from the GPU to the CPU
+  if (filename_d != "") {
+    std::cout << "Writing D to " << filename_d << std::endl;
+    auto mat = mat_ptrs.begin();
+    int i = 0;
+    copy_from_device(d_type, ptr_host_d[i], mat->ptr_dev_d[i], rows_mem_d, cols_mem_d, batch_count);
+    type_call_host<write_host>(d_type, ptr_host_d[i], rows_d, cols_d, ldd, batch_count, stride_d, filename_d);
+  }
   return gflop_per_second;
 }
 

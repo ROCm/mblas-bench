@@ -159,6 +159,37 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   }
 }
 
+void copy_from_device(mblas_cuda_data_type precision, void *host_a, void *devA, long x, long y, int batchsz) {
+
+  if (batchsz * x * y == 0) {
+    // Matrix not used, don't copy
+    return;
+  }
+  long hostsz = type_call_host<sizeofCUDT>(precision);
+  long devsz = type_call_dev<sizeofCUDT>(precision);
+  if (precision == mblas_data_type::MBLAS_C_16F || precision == mblas_data_type::MBLAS_R_16F)
+  {
+    return;
+  }
+  else if (precision == mblas_data_type::MBLAS_C_16BF || precision == mblas_data_type::MBLAS_R_16BF)
+  {
+    return;
+  }
+  else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 || precision == mblas_data_type::MBLAS_R_8F_E5M2 || precision == mblas_data_type::MBLAS_R_8F_UE4M3)
+  {
+    return;
+  }
+  else if (precision == mblas_data_type::MBLAS_R_4F_E2M1)
+  {
+    return;
+  }
+  else
+  {
+    check_cuda(cudaMemcpy(host_a, devA, (long)batchsz * x * y * hostsz,
+                         cudaMemcpyDeviceToHost));
+  }
+}
+
 void *convert_scalar(mblas_cuda_data_type precision, void *scalar)
 {
 

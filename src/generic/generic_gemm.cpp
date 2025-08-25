@@ -84,6 +84,7 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   filename_a = result["filename_a"].as<string>();
   filename_b = result["filename_b"].as<string>();
   filename_c = result["filename_c"].as<string>();
+  filename_d = result["filename_d"].as<string>();
 
   constant_a = result["constant_a"].as<float>();
   constant_b = result["constant_b"].as<float>();

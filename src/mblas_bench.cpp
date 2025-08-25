@@ -182,6 +182,9 @@ int main(int argc, char **argv) {
   opp_adder("filename_c",
             "Intialize matrix C with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
+  opp_adder("filename_d",
+            "Write output matrix D to a csv file",
+            cxxopts::value<string>()->default_value(""));
   opp_adder("constant_a",
             "Constant value used for the A matrix."
             "In constant init mode, this value is used as the value to initialized"

@@ -14,6 +14,7 @@ __global__ void float_to_bf16(float *input, size_t num_elements,
 
 __global__ void float_to_fp16(float *input, size_t num_elements, __half *output);
 
+void copy_from_device(mblas_cuda_data_type precision, void *host_a, void *devA, long x, long y, int batchsz);
 void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, long x,
                     long y, int batchsz);
 void * convert_scalar(mblas_cuda_data_type precision, void *scalar);
