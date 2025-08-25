@@ -217,14 +217,10 @@ scaling_type generic_gemm::set_scale_mode(string value) {
 
 std::string generic_gemm::set_init(matrix_desc desc, std::string init, std::string mx_init) {
   // Set init if datatype is using
-  std::cout << mx_init << std::endl;
-  std::cout << scaling_string(desc.scale_mode) << std::endl;
   if (mx_init == "" || desc.scale_mode != scaling_type::Block) {
     // Default to regular init if mx_init isn't specified or the scaling mode isn't block
-    std::cout << "init" << std::endl;
     return init;
   }
-  std::cout << "mx_init" << std::endl;
   return mx_init;
 
 }
