@@ -146,7 +146,7 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
     scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F; 
     //long scaling_vec_len = (matrix_id == "B") ? desc.cols : desc.rows;
     //long scaling_vec_len = (matrix_id == "A") ? desc.cols : desc.rows;
-    std::cout << ((matrix_id == "B") ? n : m) << std::endl;
+    //std::cout << ((matrix_id == "B") ? n : m) << std::endl;
     long scaling_vec_len = (matrix_id == "B") ? n : m;
     scale_size = std::make_pair<size_t, size_t>(1, scaling_vec_len);
     scale_type = MBLAS_R_32F;
@@ -500,7 +500,6 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
       cublasLtMatrixLayoutCreate(&mat->desc_b, b_type, rows_b, cols_b, ldb));
   check_cublas(
       cublasLtMatrixLayoutCreate(&mat->desc_c, c_type, rows_c, cols_c, ldc));
-  std::cout << "Inplace: " << inplace << std::endl;
   if (!inplace) {
     check_cublas(
         cublasLtMatrixLayoutCreate(&mat->desc_d, d_type, rows_d, cols_d, ldd));
