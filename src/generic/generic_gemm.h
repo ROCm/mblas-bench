@@ -100,7 +100,8 @@ class generic_gemm {
 
   std::string initialization;
   std::string scale_init;
-
+  
+  long random_seed;
  public:
   generic_gemm(cxxopts::ParseResult);
 

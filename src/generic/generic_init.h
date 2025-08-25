@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <omp.h>
+#include "mblas_data.h"
 
 // Rand int gen
 template <typename T>
@@ -64,11 +65,11 @@ void fill_rand_host_constant(void *ptr, long rows_A, long cols_A, long ld, int b
 
 template <typename T>
 void fill_rand_host_rand_int_alternating(void *ptr, long rows_A, long cols_A, long ld, int batch,
-                           long long int stride, bool alternating, int random_dev_seed) {
+                           long long int stride, long random_dev_seed, bool alternating) {
   T *A = (T *)ptr;
   #pragma omp parallel shared(A) 
   {
-    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::seed_seq seed{random_dev_seed, (long)omp_get_thread_num()};
     std::mt19937 gen(seed);
     std::uniform_int_distribution<int> uniform_dist(1, 10);
     T dummy;
@@ -89,13 +90,13 @@ void fill_rand_host_rand_int_alternating(void *ptr, long rows_A, long cols_A, lo
 
 template <typename T>
 void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, int batch,
-                             long long int stride, float mean = 0.0f, float std_dev = 1.0f) {
+                             long long int stride, long random_dev_seed, float mean = 0.0f, float std_dev = 1.0f) {
   T *A = (T *)ptr;
-  std::random_device r;
-  int random_dev_seed = r();
+  //std::random_device r;
+  //int random_dev_seed = r();
   #pragma omp parallel shared(A) 
   {
-    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::seed_seq seed{random_dev_seed, (long)omp_get_thread_num()};
     std::mt19937 gen(seed);
     std::normal_distribution<T> normal_dist(mean, std_dev);
     #pragma omp for collapse(3) 
@@ -111,13 +112,13 @@ void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, i
 
 template <typename T>
 void fill_rand_host_uniform(void *ptr, long rows_A, long cols_A, long ld, int batch,
-                           long long int stride, float min_val = 0.0f, float max_val = 1.0f) {
+                           long long int stride, long random_dev_seed, float min_val = 0.0f, float max_val = 1.0f) {
   T *A = (T *)ptr;
-  std::random_device r;
-  int random_dev_seed = r();
+  //std::random_device r;
+  //int random_dev_seed = r();
   #pragma omp parallel shared(A) 
   {
-    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::seed_seq seed{random_dev_seed, (long)omp_get_thread_num()};
     std::mt19937 gen(seed);
     std::uniform_real_distribution<T> uniform_dist(min_val, max_val);
     #pragma omp for collapse(3) 
@@ -183,12 +184,46 @@ void fill_rand_host_csv(void *ptr, long rows_A, long cols_A, long ld, int batch,
   }
 }
 
+template <typename T>
+void write_host_csv(void *ptr, long rows_A, long cols_A, long ld, int batch, long long int stride, std::string filename) {
+  // Write the contents of a matrix to a CSV file
+  int i = 0;
+  std::ios::sync_with_stdio(false);
+  std::ofstream output_csv(filename);
+  T *D = (T *)ptr;
+  output_csv << std::hexfloat;
+  for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+    for (size_t j = 0; j < cols_A; ++j) {
+      size_t offset = j * ld + i_batch * stride;
+      for (size_t i = 0; i < rows_A; ++i) {
+        output_csv << D[i + j * ld + i_batch * stride] << ",";
+      }
+      output_csv << std::endl;
+    }
+  }
+  output_csv.close();
+}
+
+template <typename T>
+struct write_host {
+  void operator()(void *ptr, long rows_A, long cols_A,
+                  long ld, int batch, long long int stride, std::string filename = "");
+};
+
+template <typename T>
+void write_host<T>::operator()(void *ptr, long rows_A,
+                             long cols_A, long ld, int batch,
+                             long long int stride,
+                             std::string filename) {
+  // Write output
+  write_host_csv<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
+}
 
 template <typename T>
 struct initHost {
   void operator()(std::string initialization, void *ptr, long rows_A, long cols_A,
                   long ld, int batch, long long int stride, bool control = false,
-                  float constant = 0.f, std::string filename = "");
+                  float constant = 0.f, std::string filename = "", long random_seed = 0, matrix_id mat_id = A);
 };
 
 // Generic helper function to detect and parse parameterized initialization patterns
@@ -201,19 +236,41 @@ template <typename T>
 void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
                              long cols_A, long ld, int batch,
                              long long int stride, bool control,
-                             float constant, std::string filename) {
+                             float constant, std::string filename, long random_seed, matrix_id mat_id) {
   // Norm defaults
   float mean = 0.0;
   float std_dev = 1.0;
   // Uniform defaults
   float min_val = 0.0;
   float max_val = 1.0;
-  
+  if (random_seed == 0) {
+    // Truly random seed
+    std::random_device r;
+    random_seed = r();
+  } else {
+    std::cout << "Matrix " << mat_id << std::endl;
+    switch(mat_id) {
+      case A:
+        random_seed += 0;
+        break;
+      case B:
+        random_seed += 1;
+        break;
+      case C:
+        random_seed += 2;
+        break;
+      case D:
+        random_seed += 3;
+        break;
+      default:
+        random_seed += 4;
+        break;
+    }
+  }
   if (initialization == "csv" && !filename.empty()) {
     fill_rand_host_csv<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
   } else if (initialization == "rand_int") {
-    std::random_device r;
-    fill_rand_host_rand_int_alternating<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
+    fill_rand_host_rand_int_alternating<T>(ptr, rows_A, cols_A, ld, batch, stride, random_seed, control);
   } else if (initialization == "trig_float") {
     fill_rand_host_trig_float<T>(ptr, rows_A, cols_A, ld, batch, stride, control, constant);
   } else if (parse_parameterized_init(initialization, 
@@ -221,7 +278,7 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
     // Can be "normal_float", "norm_float", or "norm_dist"
     if constexpr (std::is_floating_point_v<T>) {
       //std::cout << "mean: " << mean << " std_dev: " << std_dev << std::endl;
-      fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride, mean, std_dev);
+      fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride, random_seed, mean, std_dev);
     } else {
       std::string error_string = "Error: normal distribution not supported for non-floating-point types";
       throw std::invalid_argument(error_string);
@@ -231,7 +288,7 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
     // Can be "uniform_dist" or "uniform"
     if constexpr (std::is_floating_point_v<T>) {
       //std::cout << "min_val: " << min_val << " max_val: " << max_val << std::endl;
-      fill_rand_host_uniform<T>(ptr, rows_A, cols_A, ld, batch, stride, min_val, max_val);
+      fill_rand_host_uniform<T>(ptr, rows_A, cols_A, ld, batch, stride, random_seed, min_val, max_val);
     } else {
       std::string error_string = "Error: uniform distribution not supported for non-floating-point types";
       throw std::invalid_argument(error_string);

@@ -238,6 +238,8 @@ int main(int argc, char **argv) {
             cxxopts::value<int>()->default_value("2"));
   opp_adder("driver", "Backend to run the GEMM test with",
             cxxopts::value<string>()->default_value("rocblas"));
+  opp_adder("random_seed", "Random seed to use for init, 0 means generate it randomly",
+            cxxopts::value<long>()->default_value("0"));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);

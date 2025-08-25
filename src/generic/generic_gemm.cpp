@@ -111,6 +111,7 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   } else if (initialization == "trig_float") {
     control_a = true;
   }
+  random_seed = result["random_seed"].as<long>();
 }
 
 int generic_gemm::set_ld(std::string ld, std::string OP, int x, int y) {
