@@ -312,7 +312,7 @@ void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
       hipblasLtMatrixLayoutCreate(&mat->desc_c, c_type, rows_c, cols_c, ldc));
   if (!inplace) {
     check_hipblas(
-        hipblasLtMatrixLayoutCreate(&mat->desc_d, d_type, rows_d, cold_d, ldd));
+        hipblasLtMatrixLayoutCreate(&mat->desc_d, d_type, rows_d, cols_d, ldd));
   } else {
     mat->desc_d = mat->desc_c;
   }
