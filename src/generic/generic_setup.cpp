@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <cstdint>
 
 /*
  * Round's a variable up to the nearest number divisible by 16
