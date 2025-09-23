@@ -55,10 +55,13 @@ void fill_rand_host_blasgemm(void *ptr, long rows_A, long cols_A, long ld, int b
 template <typename T>
 void fill_rand_host_constant(void *ptr, long rows_A, long cols_A, long ld, int batch,
                           long long int stride, float constant) {
-  int a = 1;
   T *A = (T *)ptr;
-  for (size_t i = 0; i < rows_A * cols_A * batch; i++) {
-    A[i] = (T)(constant);
+  for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+    for (size_t j = 0; j < cols_A; ++j) {
+      for (size_t i = 0; i < rows_A; ++i) {
+        A[i + j * ld + i_batch * stride] = (T)(constant);
+      }
+    }
   }
 }
 
