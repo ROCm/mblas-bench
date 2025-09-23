@@ -431,16 +431,16 @@ void cublaslt_gemm::fill_host() {
     // D is just output, don't need to init
   }
   if (a_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(a_scale_type, scale_init, scale_host_a, a_scale_size.rows, a_scale_size.cols, 1, 1, 0LL, false, scale_factor_a, string(""));
+    type_call_host<initHost>(a_scale_type, scale_init, scale_host_a, a_scale_size.rows, a_scale_size.cols, a_scale_size.rows, 1, 0LL, false, scale_factor_a, string(""));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(b_scale_type, scale_init, scale_host_b, b_scale_size.rows, b_scale_size.cols, 1, 1, 0LL, false, scale_factor_b, string(""));
+    type_call_host<initHost>(b_scale_type, scale_init, scale_host_b, b_scale_size.rows, b_scale_size.cols, b_scale_size.rows, 1, 0LL, false, scale_factor_b, string(""));
   }
   if (c_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(c_scale_type, scale_init, scale_host_c, c_scale_size.rows, c_scale_size.cols, 1, 1, 0LL, false, scale_factor_c, string(""));
+    type_call_host<initHost>(c_scale_type, scale_init, scale_host_c, c_scale_size.rows, c_scale_size.cols, c_scale_size.rows, 1, 0LL, false, scale_factor_c, string(""));
   }
   if (d_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(d_scale_type, scale_init, scale_host_d, d_scale_size.rows, d_scale_size.cols, 1, 1, 0LL, false, scale_factor_d, string(""));
+    type_call_host<initHost>(d_scale_type, scale_init, scale_host_d, d_scale_size.rows, d_scale_size.cols, d_scale_size.rows, 1, 0LL, false, scale_factor_d, string(""));
   }
 }
 
