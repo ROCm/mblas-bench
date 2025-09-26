@@ -604,7 +604,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   /*
     Run and time the performance test
   */
-  auto& freq_monitor = cuda_frequency::monitor();
+  auto freq_monitor = cuda_frequency::monitor();
   freq_monitor.set_device_id(mat->devIDX);
   
   freq_monitor.start();

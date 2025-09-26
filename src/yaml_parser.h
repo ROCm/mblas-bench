@@ -1,9 +1,11 @@
 #pragma once
+
 #include "third_party/cxxopts.hpp"
 #include <string>
 #include <vector>
 #include <optional>
 #include <regex>
+#include <fstream>
 
 std::optional<cxxopts::ParseResult> parse_line(const std::string& line, const cxxopts::ParseResult& default_opts)
 {
@@ -12,20 +14,22 @@ std::optional<cxxopts::ParseResult> parse_line(const std::string& line, const cx
     // {key1: value1, key2: value2, ...}
     
     // Check if the line is commented out or empty
-    std::string trimmed_line = std::regex_replace(line, std::regex(R"(^\s+|\s+$)"), "");
+    std::string trimmed_line = line;
+    trimmed_line.erase(0, trimmed_line.find_first_not_of(" \t\n\r"));
     if (trimmed_line.empty() || trimmed_line[0] == '#') {
         return std::nullopt; // Ignore comments and empty lines
     }
 
     // Extract the content within braces
-    std::regex yaml_regex(R"(\s*\{([^}]*)\}\s*)");
-    std::smatch match;
-    if (!std::regex_match(line, match, yaml_regex)) {
+    size_t start = trimmed_line.find('{') + 1;
+    size_t end = trimmed_line.find('}') - 1;
+    if (start == std::string::npos || end == std::string::npos || start >= end) {
         return std::nullopt; // Not a valid YAML line
     }
+    trimmed_line = trimmed_line.substr(start, end - start + 1);
 
     // Parse key-value pairs
-    std::string content = match[1].str();
+    std::string content = trimmed_line; //match[1].str();
     std::regex pair_regex(R"(\s*([^:]+)\s*:\s*([^,]+)\s*,?)");
     auto pairs_begin = std::sregex_iterator(content.begin(), content.end(), pair_regex);
     auto pairs_end = std::sregex_iterator();
@@ -34,7 +38,8 @@ std::optional<cxxopts::ParseResult> parse_line(const std::string& line, const cx
         std::smatch pair_match = *i;
         std::string key = std::regex_replace(pair_match[1].str(), std::regex(R"(^\s+|\s+$)"), "");
         std::string value = std::regex_replace(pair_match[2].str(), std::regex(R"(^\s+|\s+$)"), "");
-        result[key] = value;
+        std::cout << "Parsed key: " << key << ", value: " << value << std::endl;
+        // result[key] = value;
     }
     return result;
 }

@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
             cxxopts::value<string>()->default_value("rocblas"));
   opp_adder("yaml",
             "Use YAML file as problem input. Command line options will be overridden by YAML file input",
-            cxxopts::value<bool>()->default_value(""));
+            cxxopts::value<string>()->default_value(""));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
@@ -242,29 +242,7 @@ int main(int argc, char **argv) {
     exit(0);
   }
 
-  generic_gemm_factory *gemm;
-  // Select backend implementation
-  string driver = s_to_lower(result["driver"].as<string>());
-  string function = s_to_lower(result["function"].as<string>());
-
-  if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
-    // Since regular cublas has no matmul, we can safely assume the user means
-    // cublaslt
-    gemm = new cublaslt_gemm_factory();
-  } else if (driver == "cublas-bench" || driver == "cublas") {
-    gemm = new cublas_gemm_factory();
-  } else if (driver == "hipblaslt" || (driver == "rocblas" && function == "matmul")) {
-    // Since regular rocblas has no matmul, we can safely assume the user means
-    // hipblaslt
-    // gemm = new hipblaslt_gemm(result);
-    gemm = new hipblaslt_gemm_factory();
-  } else if (driver == "rocblas-bench" || driver == "rocblas") {
-    gemm = new rocblas_gemm_factory();
-  } else {
-    cerr << "Driver \"" << driver << "\" not supported" << endl;
-    return 1;
-  }
-
+  
   std::vector<cxxopts::ParseResult> input_problems;
   if (result.count("yaml")) {
     string yaml_file = result["yaml"].as<string>();
@@ -277,21 +255,46 @@ int main(int argc, char **argv) {
     input_problems.push_back(result);
   }
 
-  for (auto &result: input_problems){
-    
-    gemm->create_gemm(result);
-    string header = gemm->prepare_array();
-    cout << header << flush;
-    gemm->test();
-    cout << std::fixed;
+  for (auto &result: input_problems)
+  {
 
-    string results = gemm->get_result_string();
-    cout << results << flush;
+    generic_gemm_factory *gemm;
+    // Select backend implementation
+    string driver = s_to_lower(result["driver"].as<string>());
+    string function = s_to_lower(result["function"].as<string>());
 
-    gemm->free_mem();
+    if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
+      // Since regular cublas has no matmul, we can safely assume the user means
+      // cublaslt
+      gemm = new cublaslt_gemm_factory();
+    } else if (driver == "cublas-bench" || driver == "cublas") {
+      gemm = new cublas_gemm_factory();
+    } else if (driver == "hipblaslt" || (driver == "rocblas" && function == "matmul")) {
+      // Since regular rocblas has no matmul, we can safely assume the user means
+      // hipblaslt
+      // gemm = new hipblaslt_gemm(result);
+      gemm = new hipblaslt_gemm_factory();
+    } else if (driver == "rocblas-bench" || driver == "rocblas") {
+      gemm = new rocblas_gemm_factory();
+    } else {
+      cerr << "Driver \"" << driver << "\" not supported" << endl;
+      return 1;
+    }
+
+
+  //   gemm->create_gemm(result);
+  //   string header = gemm->prepare_array();
+  //   cout << header << flush;
+  //   gemm->test();
+  //   cout << std::fixed;
+
+  //   string results = gemm->get_result_string();
+  //   cout << results << flush;
+
+  //   gemm->free_mem();
   }
 
-  delete gemm;
+  // delete gemm;
 
   return 0;
 }
