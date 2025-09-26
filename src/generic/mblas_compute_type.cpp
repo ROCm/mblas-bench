@@ -51,13 +51,6 @@ const std::map<std::string, mblas_compute_type_enum> mblas_compute_type::compute
     {"HIPBLAS_COMPUTE_64F_PEDANTIC", MBLAS_COMPUTE_64F_PEDANTIC},
     {"HIPBLAS_COMPUTE_32I", MBLAS_COMPUTE_32I},
     {"HIPBLAS_COMPUTE_32I_PEDANTIC", MBLAS_COMPUTE_32I_PEDANTIC},
-    {"rocblas_compute_type_f32", MBLAS_COMPUTE_32F},
-    {"rocblas_compute_type_f8_f8_f32", MBLAS_COMPUTE_32F_8F_8F},
-    {"rocblas_compute_type_f8_bf8_f32", MBLAS_COMPUTE_32F_8F_8BF},
-    {"rocblas_compute_type_bf8_f8_f32", MBLAS_COMPUTE_32F_8BF_8F},
-    {"rocblas_compute_type_bf8_bf8_f32", MBLAS_COMPUTE_32F_8BF_8BF},
-    {"rocblas_compute_type_invalid", MBLAS_COMPUTE_NULL}
-
 };
 
 
