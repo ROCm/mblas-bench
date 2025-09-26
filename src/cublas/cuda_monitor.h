@@ -20,7 +20,7 @@
 #include <cstdlib>
 
 
-namespace cuda_frequency {
+namespace cuda_monitor {
 
 class monitor
 {
@@ -74,7 +74,7 @@ public:
         check_nvml(nvmlDeviceGetHandleByIndex(cuda_device_id, &nvml_device));
     }
 
-    bool enabled() const {
+    static bool enabled() {
         const char* freq_env = std::getenv("CUBLAS_BENCH_FREQ");
         return freq_env != nullptr;
     }
@@ -219,4 +219,4 @@ private:
     }
 };
 
-} // namespace cuda_frequency
+} // namespace cuda_monitor

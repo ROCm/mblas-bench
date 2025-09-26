@@ -282,16 +282,16 @@ int main(int argc, char **argv) {
     }
 
 
-  //   gemm->create_gemm(result);
-  //   string header = gemm->prepare_array();
-  //   cout << header << flush;
-  //   gemm->test();
-  //   cout << std::fixed;
+    gemm->create_gemm(result);
+    string header = gemm->prepare_array();
+    cout << header << flush;
+    gemm->test();
+    cout << std::fixed;
 
-  //   string results = gemm->get_result_string();
-  //   cout << results << flush;
+    string results = gemm->get_result_string();
+    cout << results << flush;
 
-  //   gemm->free_mem();
+    gemm->free_mem();
   }
 
   // delete gemm;

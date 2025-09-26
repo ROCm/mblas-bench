@@ -73,7 +73,6 @@ class generic_gemm {
   double gbyte_per_second = 0;
   double iter_time_us = 0;
 
-  bool monitor_freq = false;
   float avg_sysclk_mhz = 0;
   float med_sysclk_mhz = 0;
   float avg_memclk_mhz = 0;
