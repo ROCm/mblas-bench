@@ -16,6 +16,7 @@
 #include "cublas_datatype_utils.h"
 #include "cuda_error.h"
 #include "cxxopts.hpp"
+#include "cuda_freq_monitor.h"
 
 using std::cerr;
 using std::cout;
@@ -533,6 +534,12 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
+  if (monitor_freq) {
+    ossValues << avg_sysclk_mhz << ',';
+    ossValues << med_sysclk_mhz << ',';
+    ossValues << avg_memclk_mhz << ',';
+    ossValues << med_memclk_mhz << ',';
+  }
   ossValues << endl;
   return ossValues.str();
 }
@@ -597,6 +604,10 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   /*
     Run and time the performance test
   */
+  auto& freq_monitor = cuda_frequency::monitor();
+  freq_monitor.set_device_id(mat->devIDX);
+  
+  freq_monitor.start();
   cudaEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
     int flush_index = rep % flush_batch_count;
@@ -607,6 +618,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   }
   cudaEventRecord(stop, stream);
   cudaEventSynchronize(stop);
+  freq_monitor.stop();
 
   // Check for errors during the performance test
   check_cublas(stat);
@@ -617,4 +629,12 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   cudaEventElapsedTime(&elapsedTime_ms, start, stop);
   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
       calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+
+  if (freq_monitor.enabled()) {
+    avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
+    med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
+    avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
+    med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
+  }
+
 }

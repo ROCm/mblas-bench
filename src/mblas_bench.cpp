@@ -12,6 +12,7 @@
 //#include "hipblaslt_gemm.h"
 //#include "cublas_gemm.h"
 //#include "cublaslt_gemm.h"
+#include "yaml_parser.h"
 #include <generic_gemm_factory.h>
 #include <rocblas_gemm_factory.h>
 #include <hipblaslt_gemm_factory.h>
@@ -229,6 +230,9 @@ int main(int argc, char **argv) {
             cxxopts::value<int>()->default_value("2"));
   opp_adder("driver", "Backend to run the GEMM test with",
             cxxopts::value<string>()->default_value("rocblas"));
+  opp_adder("yaml",
+            "Use YAML file as problem input. Command line options will be overridden by YAML file input",
+            cxxopts::value<bool>()->default_value(""));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
@@ -261,16 +265,32 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  gemm->create_gemm(result);
-  string header = gemm->prepare_array();
-  cout << header << flush;
-  gemm->test();
-  cout << std::fixed;
+  std::vector<cxxopts::ParseResult> input_problems;
+  if (result.count("yaml")) {
+    string yaml_file = result["yaml"].as<string>();
+    input_problems = parse_yaml_file(yaml_file, result);
+    if (input_problems.size() == 0) {
+      cerr << "No valid problems found in YAML file" << endl;
+      return 1;
+    }
+  } else {
+    input_problems.push_back(result);
+  }
 
-  string results = gemm->get_result_string();
-  cout << results << flush;
+  for (auto &result: input_problems){
+    
+    gemm->create_gemm(result);
+    string header = gemm->prepare_array();
+    cout << header << flush;
+    gemm->test();
+    cout << std::fixed;
 
-  gemm->free_mem();
+    string results = gemm->get_result_string();
+    cout << results << flush;
+
+    gemm->free_mem();
+  }
+
   delete gemm;
 
   return 0;
