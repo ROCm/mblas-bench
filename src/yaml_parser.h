@@ -7,7 +7,7 @@
 #include <regex>
 #include <fstream>
 
-std::optional<cxxopts::ParseResult> parse_line(const std::string& line, const cxxopts::ParseResult& default_opts)
+std::optional<std::unordered_map<std::string, std::string>> parse_line(const std::string& line)
 {
     // Expected formats:
     // - {key1: value1, key2: value2, ...}
@@ -21,31 +21,31 @@ std::optional<cxxopts::ParseResult> parse_line(const std::string& line, const cx
     }
 
     // Extract the content within braces
-    size_t start = trimmed_line.find('{') + 1;
-    size_t end = trimmed_line.find('}') - 1;
+    size_t start = trimmed_line.find('{');
+    size_t end = trimmed_line.find('}');
     if (start == std::string::npos || end == std::string::npos || start >= end) {
         return std::nullopt; // Not a valid YAML line
     }
-    trimmed_line = trimmed_line.substr(start, end - start + 1);
+    trimmed_line = trimmed_line.substr(start + 1, end - start - 1);
 
     // Parse key-value pairs
     std::string content = trimmed_line; //match[1].str();
     std::regex pair_regex(R"(\s*([^:]+)\s*:\s*([^,]+)\s*,?)");
     auto pairs_begin = std::sregex_iterator(content.begin(), content.end(), pair_regex);
     auto pairs_end = std::sregex_iterator();
-    cxxopts::ParseResult result = default_opts;
+
+    std::unordered_map<std::string, std::string> result;
     for (std::sregex_iterator i = pairs_begin; i != pairs_end; ++i) {
         std::smatch pair_match = *i;
         std::string key = std::regex_replace(pair_match[1].str(), std::regex(R"(^\s+|\s+$)"), "");
         std::string value = std::regex_replace(pair_match[2].str(), std::regex(R"(^\s+|\s+$)"), "");
-        std::cout << "Parsed key: " << key << ", value: " << value << std::endl;
-        // result[key] = value;
+        result[key] = value;
     }
     return result;
 }
 
 
-std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, const cxxopts::ParseResult& default_opts)
+std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, cxxopts::Options& opts, int argc, char** argv)
 {
     std::vector<cxxopts::ParseResult> results;
     std::ifstream file(filename);
@@ -56,9 +56,26 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
 
     std::string line;
     while (std::getline(file, line)) {
-        auto parsed = parse_line(line, default_opts);
+        const auto& parsed = parse_line(line);
         if (parsed) {
-            results.push_back(*parsed);
+            std::vector<std::string> args;
+            for (int i = 0; i < argc; ++i) {
+                args.push_back(argv[i]);
+            }
+            for (const auto& [key, value]: *parsed)
+            {
+                const std::string arg_key = key.size() == 1 ? "-" + key : "--" + key;
+                args.push_back(arg_key);
+                args.push_back(value);
+            }
+            std::vector<const char*> cstr_args;
+            for (const auto& arg: args) {
+                cstr_args.push_back(arg.c_str());
+            }
+
+            auto result = opts.parse(static_cast<int>(cstr_args.size()), cstr_args.data());
+            results.push_back(result);
+            std::cout << result.arguments_string() << std::endl; // For debugging
         }
     }
     file.close();

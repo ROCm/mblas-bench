@@ -246,7 +246,7 @@ int main(int argc, char **argv) {
   std::vector<cxxopts::ParseResult> input_problems;
   if (result.count("yaml")) {
     string yaml_file = result["yaml"].as<string>();
-    input_problems = parse_yaml_file(yaml_file, result);
+    input_problems = parse_yaml_file(yaml_file, options, argc, argv);
     if (input_problems.size() == 0) {
       cerr << "No valid problems found in YAML file" << endl;
       return 1;
