@@ -29,7 +29,7 @@ std::optional<std::unordered_map<std::string, std::string>> parse_line(const std
     trimmed_line = trimmed_line.substr(start + 1, end - start - 1);
 
     // Parse key-value pairs
-    std::string content = trimmed_line; //match[1].str();
+    std::string content = trimmed_line;
     std::regex pair_regex(R"(\s*([^:]+)\s*:\s*([^,]+)\s*,?)");
     auto pairs_begin = std::sregex_iterator(content.begin(), content.end(), pair_regex);
     auto pairs_end = std::sregex_iterator();
@@ -77,7 +77,7 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
 
             auto result = opts.parse(static_cast<int>(cstr_args.size()), cstr_args.data());
             results.push_back(result);
-            std::cout << result.arguments_string() << std::endl; // For debugging
+            std::cout << result.arguments_string() << std::endl; // For debugging for now
         }
     }
     file.close();

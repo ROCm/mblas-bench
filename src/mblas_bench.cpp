@@ -255,7 +255,7 @@ int main(int argc, char **argv) {
     input_problems.push_back(result);
   }
 
-  for (auto &result: input_problems)
+  for (const auto &result: input_problems)
   {
 
     generic_gemm_factory *gemm;
