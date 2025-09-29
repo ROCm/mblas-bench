@@ -47,6 +47,8 @@ std::optional<std::unordered_map<std::string, std::string>> parse_line(const std
 
 std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, cxxopts::Options& opts, int argc, char** argv)
 {
+    // Read the YAML file and parse each line
+    // For each parsed line, convert it to command-line arguments and parse with cxxopts so that the original code can remain unchanged
     std::vector<cxxopts::ParseResult> results;
     std::ifstream file(filename);
     if (!file.is_open()) {

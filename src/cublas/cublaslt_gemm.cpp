@@ -286,10 +286,11 @@ string cublaslt_gemm::prepare_array() {
   if (batched) {
     ossHeader << "batch_count,";
   }
-  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us," << endl;
+  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
   if (cuda_monitor::monitor::enabled()) {
     ossHeader << "avg_sysclk_mhz,med_sysclk_mhz,avg_memclk_mhz,med_memclk_mhz,";
   }
+  ossHeader << endl;
   return ossHeader.str();
 }
 
