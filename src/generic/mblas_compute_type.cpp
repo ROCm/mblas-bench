@@ -6,11 +6,17 @@
 const std::map<std::string, mblas_compute_type_enum> mblas_compute_type::computeDType = {
     // Generic, similar to rocblas format
     {"f32_r", MBLAS_COMPUTE_32F},
+    {"c_f32_r", MBLAS_COMPUTE_32F},
     {"f64_r", MBLAS_COMPUTE_64F},
+    {"c_f64_r", MBLAS_COMPUTE_64F},
     {"i32_r", MBLAS_COMPUTE_32I},
+    {"c_i32_r", MBLAS_COMPUTE_32I},
     {"f16_r", MBLAS_COMPUTE_16F},
+    {"c_f16_r", MBLAS_COMPUTE_16F},
     {"xf32_r", MBLAS_COMPUTE_32F_FAST_TF32},
+    {"c_xf32_r", MBLAS_COMPUTE_32F_FAST_TF32},
     {"tf32_r", MBLAS_COMPUTE_32F_FAST_TF32},
+    {"c_tf32_r", MBLAS_COMPUTE_32F_FAST_TF32},
     {"MBLAS_COMPUTE_16F", MBLAS_COMPUTE_16F},
     {"MBLAS_COMPUTE_16F_PEDANTIC", MBLAS_COMPUTE_16F_PEDANTIC},
     {"MBLAS_COMPUTE_32F", MBLAS_COMPUTE_32F},
