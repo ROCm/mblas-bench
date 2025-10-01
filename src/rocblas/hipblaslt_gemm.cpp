@@ -168,7 +168,7 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
       inplace);
 }
 
-string hipblaslt_gemm::prepare_array() {
+string hipblaslt_gemm::prepare_array(const int& solution_request_count) {
   alpha = convert_scalar(scalar, alpha);
   beta = convert_scalar(scalar, beta);
   this->alloc_host();
@@ -350,6 +350,7 @@ void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
     check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
   }
   mat->algo = heuristicResult;
+  returned_algo_count = retResults;
 }
 void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
   // Not currently implemented, using simple method
@@ -370,7 +371,8 @@ void hipblaslt_gemm::free_mem() {
   }
 }
 
-double hipblaslt_gemm::test() {
+double hipblaslt_gemm::test(const int &ith_solution) {
+  // TODO: do similar thing to cublaslt_gemm? currently, ith_solution is ignored.
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

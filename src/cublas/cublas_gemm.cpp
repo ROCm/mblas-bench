@@ -195,7 +195,8 @@ cublas_gemm::cublas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       true);
 }
 
-string cublas_gemm::prepare_array() {
+string cublas_gemm::prepare_array(const int& solution_request_count) {
+  returned_algo_count = solution_request_count;
   alpha = convert_scalar(scalar, alpha);
   beta = convert_scalar(scalar, beta);
   this->alloc_host();
@@ -344,7 +345,7 @@ void cublas_gemm::free_mem() {
   }
 }
 
-double cublas_gemm::test() {
+double cublas_gemm::test(const int &ith_solution) {
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

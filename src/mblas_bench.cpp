@@ -233,6 +233,9 @@ int main(int argc, char **argv) {
   opp_adder("yaml",
             "Use YAML file as problem input. Command line options will be overridden by YAML file input",
             cxxopts::value<string>()->default_value(""));
+  opp_adder("requested_solution_num,requested_solution",
+            "Number of solutions to request from the heuristic. Use -1 to request all solutions. Currently, this feature is only supported for cublaslt.",
+            cxxopts::value<int>()->default_value("1"));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
@@ -262,34 +265,40 @@ int main(int argc, char **argv) {
     // Select backend implementation
     string driver = s_to_lower(result["driver"].as<string>());
     string function = s_to_lower(result["function"].as<string>());
+    int requested_solution_num = result["requested_solution_num"].as<int>();
 
     if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
       // Since regular cublas has no matmul, we can safely assume the user means
       // cublaslt
       gemm = new cublaslt_gemm_factory();
     } else if (driver == "cublas-bench" || driver == "cublas") {
+      requested_solution_num = 1; // cublas only returns one solution
       gemm = new cublas_gemm_factory();
     } else if (driver == "hipblaslt" || (driver == "rocblas" && function == "matmul")) {
       // Since regular rocblas has no matmul, we can safely assume the user means
       // hipblaslt
       // gemm = new hipblaslt_gemm(result);
+      requested_solution_num = 1; // This feature is not implemented yet
       gemm = new hipblaslt_gemm_factory();
     } else if (driver == "rocblas-bench" || driver == "rocblas") {
+      requested_solution_num = 1; // rocblas only returns one solution
       gemm = new rocblas_gemm_factory();
     } else {
       cerr << "Driver \"" << driver << "\" not supported" << endl;
       return 1;
     }
 
-
     gemm->create_gemm(result);
-    string header = gemm->prepare_array();
+    string header = gemm->prepare_array(requested_solution_num);
     cout << header << flush;
-    gemm->test();
-    cout << std::fixed;
 
-    string results = gemm->get_result_string();
-    cout << results << flush;
+    for (int i = 0; i < gemm->get_returned_algo_count(); i++) {
+      gemm->test(i);
+      cout << std::fixed;
+
+      string results = gemm->get_result_string();
+      cout << results << flush;
+    }
 
     gemm->free_mem();
     delete gemm;

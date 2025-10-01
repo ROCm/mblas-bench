@@ -165,7 +165,9 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       inplace);
 }
 
-string rocblas_gemm::prepare_array() {
+string rocblas_gemm::prepare_array(const int& solution_request_count) {
+  // TODO: does rocblas_gemm return multiple algorithms like cublaslt_gemm?
+  returned_algo_count = solution_request_count;
   // std::cout << "Pre Convert: " << *((float *)alpha) << std::endl;
   // alpha = convert_scalar(scalar, alpha);
   // std::cout << "Post Convert: " << __half2float(*(__half *)alpha) <<
@@ -306,7 +308,7 @@ void rocblas_gemm::free_mem() {
   }
 }
 
-double rocblas_gemm::test() {
+double rocblas_gemm::test(const int &ith_solution) {
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

@@ -18,8 +18,9 @@ class generic_gemm_factory {
   generic_gemm * gemm;
 
  public:
-  std::string prepare_array() { return gemm->prepare_array(); }
-  void test() { gemm->test(); } 
+  std::string prepare_array(const int& solution_request_count = 1) { return gemm->prepare_array(solution_request_count); }
+  void test(const int &ith_solution = 0) { gemm->test(ith_solution); } 
+  int get_returned_algo_count() { return gemm->get_returned_algo_count(); }
   std::string get_result_string() { return gemm->get_result_string(); }
   void free_mem() { gemm->free_mem(); }
 };

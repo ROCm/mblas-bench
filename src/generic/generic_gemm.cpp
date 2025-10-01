@@ -172,3 +172,5 @@ void generic_gemm::set_flush_batch_count(
 //    if ()
 //  }
 //}
+
+int generic_gemm::get_returned_algo_count() { return returned_algo_count; };

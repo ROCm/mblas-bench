@@ -82,6 +82,8 @@ class generic_gemm {
 
   std::string initialization;
 
+  int returned_algo_count = 0;
+
  public:
   generic_gemm(cxxopts::ParseResult);
 
@@ -90,9 +92,9 @@ class generic_gemm {
   int set_ld(std::string ld, std::string OP, int x, int y);
   std::pair<int, int> set_row_col(std::string OP, int d1, int d2);
 
-  virtual std::string prepare_array() = 0;
+  virtual std::string prepare_array(const int& solution_request_count) = 0;
 
-  virtual double test() = 0;
+  virtual double test(const int &ith_solution) = 0;
 
   virtual std::string get_result_string() = 0;
   virtual void free_mem() = 0;
@@ -103,5 +105,7 @@ class generic_gemm {
   void set_flush_batch_count(int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
                         int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing, 
                         bool inplace);
+
+  int get_returned_algo_count();
 
 };
