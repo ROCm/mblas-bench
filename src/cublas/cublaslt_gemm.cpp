@@ -286,6 +286,10 @@ string cublaslt_gemm::prepare_array() {
   if (batched) {
     ossHeader << "batch_count,";
   }
+  ossHeader << "alpha,beta,";
+  ossHeader << "a_type,b_type,c_type,d_type,compute_type,scalar_type,";
+  ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
+  ossHeader << "rotating_buffer,";
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
   if (cuda_monitor::monitor::enabled()) {
     ossHeader << "avg_sysclk_mhz,med_sysclk_mhz,avg_memclk_mhz,med_memclk_mhz,";
@@ -535,6 +539,20 @@ std::string cublaslt_gemm::get_result_string() {
   if (batched) {
     ossValues << batch_count << ',';
   }
+  ossValues << *((float *)alpha) << ',';
+  ossValues << *((float *)beta)   << ',';
+  ossValues << a_type.to_string() << ',';
+  ossValues << b_type.to_string() << ',';
+  ossValues << c_type.to_string() << ',';
+  ossValues << d_type.to_string() << ',';
+  ossValues << compute.to_string() << ',';
+  ossValues << scalar.to_string() << ',';
+  ossValues << a_scale_type.to_string() << ',';
+  ossValues << b_scale_type.to_string() << ',';
+  ossValues << c_scale_type.to_string() << ',';
+  ossValues << d_scale_type.to_string() << ',';
+  ossValues << bias_type.to_string() << ',';
+  ossValues << flush_memory_size << ','; // rotating buffer size
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';

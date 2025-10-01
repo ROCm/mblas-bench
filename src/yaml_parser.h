@@ -67,7 +67,17 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
             }
             for (const auto& [key, value]: *parsed)
             {
-                const std::string arg_key = key.size() == 1 ? "-" + key : "--" + key;
+                // m,n,k can be uppercase in YAML, but should be lowercase in command-line arguments
+                std::string key_normalized = key;
+                if (key_normalized == "M") {
+                    key_normalized = "m";
+                } else if (key_normalized == "N") {
+                    key_normalized = "n";
+                } else if (key_normalized == "K") {
+                    key_normalized = "k";
+                }
+
+                const std::string arg_key = key_normalized.size() == 1 ? "-" + key_normalized : "--" + key_normalized;
                 args.push_back(arg_key);
                 args.push_back(value);
             }
@@ -77,9 +87,22 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
             }
             // Copy opts just in case member variables are modified during parsing
             cxxopts::Options opts_copy = opts;
+            opts_copy = opts_copy.allow_unrecognised_options();
             auto result = opts_copy.parse(static_cast<int>(cstr_args.size()), cstr_args.data());
             results.push_back(result);
-            std::cout << result.arguments_string() << std::endl; // For debugging for now
+            // For debugging
+            if (true) {
+                const auto &unmatched = result.unmatched();
+                if (!unmatched.empty()) {
+                    std::cout << "Unmatched arguments:";
+                    for (const auto &arg: unmatched) {
+                        std::cout << " " << arg;
+                    }
+                    std::cout << std::endl;
+                }
+                std::cout << "Parsed arguments: " << line << std::endl;
+                std::cout << result.arguments_string() << std::endl;
+            }
         }
     }
     file.close();
