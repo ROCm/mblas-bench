@@ -292,9 +292,9 @@ int main(int argc, char **argv) {
     cout << results << flush;
 
     gemm->free_mem();
+    delete gemm;
   }
 
-  // delete gemm;
 
   return 0;
 }
