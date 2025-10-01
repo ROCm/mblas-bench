@@ -155,9 +155,12 @@ void generic_gemm::set_flush_batch_count(
   if (new_flush_batch_count == 0) {
     std::cerr << "Note: Unable to set flush_batch_count from flush_memory_size (rotating). "
     "Problem does not fit into memory size of " << flush_memory_size << "MiB" << std::endl;
+  } else if (new_flush_batch_count > std::max(cold_iters, iters)) {
+    flush_batch_count = std::max(cold_iters, iters);
+    std::cout << "Note: flush_batch_count reduced from " << new_flush_batch_count << " to " << flush_batch_count << " to avoid excessive memory allocation." << std::endl;
   } else {
     flush_batch_count = new_flush_batch_count;
-  }
+  } 
   std::cout << "Using flush_batch_count = " << flush_batch_count << std::endl;
 }
 
