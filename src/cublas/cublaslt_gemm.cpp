@@ -283,9 +283,9 @@ string cublaslt_gemm::prepare_array() {
   }
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
-  if (batched) {
+  // if (batched) {
     ossHeader << "batch_count,";
-  }
+  // }
   ossHeader << "alpha,beta,";
   ossHeader << "a_type,b_type,c_type,d_type,compute_type,scalar_type,";
   ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
@@ -536,9 +536,9 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << transA.to_string_short() << ',' << transB.to_string_short() << ',' << m
             << ',' << n << ',' << k << ',' << lda << ',' << ldb << ',' << ldc
             << ',';
-  if (batched) {
+  // if (batched) {
     ossValues << batch_count << ',';
-  }
+  // }
   ossValues << *((float *)alpha) << ',';
   ossValues << *((float *)beta)   << ',';
   ossValues << a_type.to_string() << ',';
