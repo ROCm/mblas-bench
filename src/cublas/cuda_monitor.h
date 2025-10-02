@@ -152,7 +152,10 @@ private:
             std::unique_lock<std::mutex> lock(data_mutex);
             while (!should_exit) {
                 while (!monitoring_task.valid() && !should_exit) {
-                    cv.wait(lock);
+                    auto status = cv.wait_for(lock, std::chrono::seconds(10));
+                    if (status == std::cv_status::timeout) {
+                        continue;
+                    }
                 }
                 
                 if (should_exit) break;
@@ -212,7 +215,7 @@ private:
 
     void wait() {
         if (!monitoring_future.valid()) return;
-        
+
         monitoring_future.wait();
         monitoring_future = std::future<void>();
         monitoring_active = false;
