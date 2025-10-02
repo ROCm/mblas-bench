@@ -284,7 +284,7 @@ string cublaslt_gemm::prepare_array(const int& _solution_request_count) {
   //   run_threaded(&cublaslt_gemm::no_tuning);
   // }
   std::ostringstream ossHeader;
-  ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
+  ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,ldd,";
   // if (batched) {
     ossHeader << "batch_count,";
   // }
@@ -554,7 +554,7 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << std::setprecision(7);
   ossValues << transA.to_string_short() << ',' << transB.to_string_short() << ',' << m
             << ',' << n << ',' << k << ',' << lda << ',' << ldb << ',' << ldc
-            << ',';
+            << ',' << ldd << ',';
   // if (batched) {
     ossValues << batch_count << ',';
   // }
