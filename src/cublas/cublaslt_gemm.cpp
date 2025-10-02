@@ -489,15 +489,52 @@ void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
 void cublaslt_gemm::free_mem() {
   free(alpha);
   free(beta);
+  for (int i = 0; i < flush_batch_count; i++) {
+        free(ptr_host_a[i]);
+        free(ptr_host_b[i]);
+        free(ptr_host_c[i]);
+        free(ptr_host_d[i]);
+  }
   free(ptr_host_a);
   free(ptr_host_b);
   free(ptr_host_c);
   free(ptr_host_d);
+  if (use_scaling) {
+    free(scale_host_a);
+    free(scale_host_b);
+    free(scale_host_c);
+    free(scale_host_d);
+  }
   for (auto mat : mat_ptrs) {
+    for(int i = 0; i < flush_batch_count; i++) {
+          cudaFree(mat.ptr_dev_a[i]);
+          cudaFree(mat.ptr_dev_b[i]);
+          cudaFree(mat.ptr_dev_c[i]);
+          if (!inplace) {
+            cudaFree(mat.ptr_dev_d[i]);
+          }
+    }
     cudaFree(mat.ptr_dev_a);
     cudaFree(mat.ptr_dev_b);
     cudaFree(mat.ptr_dev_c);
-    cudaFree(mat.ptr_dev_d);
+    if (!inplace) {
+      cudaFree(mat.ptr_dev_d);
+    }
+    cudaFree(mat.devWork);
+    if (use_scaling) {
+      cudaFree(mat.scale_dev_a);
+      cudaFree(mat.scale_dev_b);
+      cudaFree(mat.scale_dev_c);
+      cudaFree(mat.scale_dev_d);
+    }
+    cublasLtMatmulDescDestroy(mat.desc_op);
+    cublasLtMatrixLayoutDestroy(mat.desc_a);
+    cublasLtMatrixLayoutDestroy(mat.desc_b);
+    cublasLtMatrixLayoutDestroy(mat.desc_c);
+    if (!inplace) {
+      cublasLtMatrixLayoutDestroy(mat.desc_d);
+    }
+    cublasLtMatmulPreferenceDestroy(mat.pref);
   }
 }
 
