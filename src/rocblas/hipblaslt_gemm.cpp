@@ -362,14 +362,14 @@ void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
   check_hipblas(hipblasLtCreate(&handle));
   int retResults = 0;
   const int requested_algo_count = requested_solution_count < 0 ? 65536 : requested_solution_count;
-  hipblasLtMatmulHeuristicResult_t heuristicResults[requested_algo_count];
+  std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults(requested_algo_count);
   check_hipblas(hipblasLtMatmulAlgoGetHeuristic(
       handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
-      mat->pref, requested_algo_count, heuristicResults, &retResults));
+      mat->pref, requested_algo_count, heuristicResults.data(), &retResults));
   if (retResults == 0) {
     check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
   }
-  mat->algos = vector<hipblasLtMatmulHeuristicResult_t>(heuristicResults, heuristicResults + retResults);
+  mat->algos = heuristicResults;
   returned_algo_count = retResults;
 }
 
@@ -388,7 +388,6 @@ void hipblaslt_gemm::free_mem() {
 }
 
 double hipblaslt_gemm::test(const int &ith_solution) {
-  // TODO: do similar thing to cublaslt_gemm? currently, ith_solution is ignored.
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

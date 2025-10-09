@@ -491,14 +491,14 @@ void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
   check_cublas(cublasLtCreate(&handle));
   int returnedAlgoCount = 0;
   const int requestedAlgoCount = requested_solution_count < 0 ? 65536 : requested_solution_count;
-  cublasLtMatmulHeuristicResult_t algoList[requestedAlgoCount] = {0};
+  std::vector<cublasLtMatmulHeuristicResult_t> algoList(requestedAlgoCount);
   check_cublas(cublasLtMatmulAlgoGetHeuristic(
       handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
-      mat->pref, requestedAlgoCount, algoList, &returnedAlgoCount));
+      mat->pref, requestedAlgoCount, algoList.data(), &returnedAlgoCount));
   if (returnedAlgoCount == 0) {
     check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
   }
-  mat->algos = std::vector<cublasLtMatmulHeuristicResult_t>(algoList, algoList + returnedAlgoCount);
+  mat->algos = algoList;
   returned_algo_count = returnedAlgoCount;
 }
 
