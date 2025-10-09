@@ -163,11 +163,11 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       get_packing_count(c_type), 
       get_packing_count(d_type), 
       inplace);
+  // TODO: does rocblas_gemm return multiple algorithms like cublaslt_gemm?
+  requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
-string rocblas_gemm::prepare_array(const int& solution_request_count) {
-  // TODO: does rocblas_gemm return multiple algorithms like cublaslt_gemm?
-  returned_algo_count = solution_request_count;
+string rocblas_gemm::prepare_array() {
   // std::cout << "Pre Convert: " << *((float *)alpha) << std::endl;
   // alpha = convert_scalar(scalar, alpha);
   // std::cout << "Post Convert: " << __half2float(*(__half *)alpha) <<

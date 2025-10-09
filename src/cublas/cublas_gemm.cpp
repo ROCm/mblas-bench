@@ -193,10 +193,10 @@ cublas_gemm::cublas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       get_packing_count(c_type), 
       get_packing_count(c_type), 
       true);
+  requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
-string cublas_gemm::prepare_array(const int& solution_request_count) {
-  returned_algo_count = solution_request_count;
+string cublas_gemm::prepare_array() {
   alpha = convert_scalar(scalar, alpha);
   beta = convert_scalar(scalar, beta);
   this->alloc_host();

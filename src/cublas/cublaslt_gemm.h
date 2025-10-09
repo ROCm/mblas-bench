@@ -133,8 +133,6 @@ class cublaslt_gemm : public generic_gemm {
   static std::vector<matmul_prec_type> matmul_supported;
   std::vector<cublaslt_gemm_inst> mat_ptrs;
 
-  int solution_request_count = 1;
-
  private:
   // cudaDataType_t precisionStringToDType(std::string stringPrecision);
   // void parse_problem_type(std::string a, std::string b, std::string c);
@@ -156,7 +154,7 @@ class cublaslt_gemm : public generic_gemm {
 
  public:
   cublaslt_gemm(cxxopts::ParseResult result);
-  std::string prepare_array(const int& solution_request_count);
+  std::string prepare_array();
   double test(const int &ith_solution = 0);
   std::string get_result_string();
   virtual void free_mem();

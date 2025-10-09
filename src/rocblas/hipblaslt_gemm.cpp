@@ -166,9 +166,10 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
       get_packing_count(c_type), 
       get_packing_count(d_type), 
       inplace);
+  requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
-string hipblaslt_gemm::prepare_array(const int& solution_request_count) {
+string hipblaslt_gemm::prepare_array() {
   alpha = convert_scalar(scalar, alpha);
   beta = convert_scalar(scalar, beta);
   this->alloc_host();

@@ -82,6 +82,7 @@ class generic_gemm {
 
   std::string initialization;
 
+  int requested_solution_count = 1;
   int returned_algo_count = 0;
 
  public:
@@ -92,7 +93,7 @@ class generic_gemm {
   int set_ld(std::string ld, std::string OP, int x, int y);
   std::pair<int, int> set_row_col(std::string OP, int d1, int d2);
 
-  virtual std::string prepare_array(const int& solution_request_count) = 0;
+  virtual std::string prepare_array() = 0;
 
   virtual double test(const int &ith_solution) = 0;
 

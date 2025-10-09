@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
     }
 
     gemm->create_gemm(result);
-    string header = gemm->prepare_array(requested_solution_num);
+    string header = gemm->prepare_array();
     cout << header << flush;
 
     for (int i = 0; i < gemm->get_returned_algo_count(); i++) {

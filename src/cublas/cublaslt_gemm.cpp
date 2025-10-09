@@ -246,10 +246,10 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
       get_packing_count(c_type), 
       get_packing_count(d_type), 
       inplace);
+  requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
-string cublaslt_gemm::prepare_array(const int& _solution_request_count) {
-  solution_request_count = _solution_request_count; // TODO: how to pass _solution_request_count to auto_tuning() function via run_thread()?
+string cublaslt_gemm::prepare_array() {
   alpha = convert_scalar(scalar, alpha);
   beta = convert_scalar(scalar, beta);
   this->alloc_host();
@@ -484,15 +484,14 @@ void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
   mat->algos = {heuristicResult};
   returned_algo_count = retResults;
 }
+
 void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
-  // // Not currently implemented, using simple method
-  // no_tuning(mat);
   cublasStatus_t stat;
   cublasLtHandle_t handle;
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasLtCreate(&handle));
   int returnedAlgoCount = 0;
-  const int requestedAlgoCount = solution_request_count < 0 ? 65536 : solution_request_count;
+  const int requestedAlgoCount = requested_solution_count < 0 ? 65536 : requested_solution_count;
   cublasLtMatmulHeuristicResult_t algoList[requestedAlgoCount] = {0};
   check_cublas(cublasLtMatmulAlgoGetHeuristic(
       handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
