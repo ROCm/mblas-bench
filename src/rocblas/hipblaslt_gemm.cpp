@@ -198,7 +198,8 @@ string hipblaslt_gemm::prepare_array() {
   run_threaded(&hipblaslt_gemm::copy_host_to_dev);
   run_threaded(&hipblaslt_gemm::prepare_matrix);
   // Enable tuning with a parameter later
-  if (false) {
+  if (requested_solution_count > 0) {
+    run_threaded(&hipblaslt_gemm::auto_tuning);
   } else {
     run_threaded(&hipblaslt_gemm::no_tuning);
   }
@@ -350,12 +351,26 @@ void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
   if (retResults == 0) {
     check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
   }
-  mat->algo = heuristicResult;
+  mat->algos = {heuristicResult};
   returned_algo_count = retResults;
 }
+
 void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
-  // Not currently implemented, using simple method
-  no_tuning(mat);
+  hipblasStatus_t stat;
+  hipblasLtHandle_t handle;
+  check_hip(hipSetDevice(mat->devIDX));
+  check_hipblas(hipblasLtCreate(&handle));
+  int retResults = 0;
+  const int requested_algo_count = requested_solution_count < 0 ? 65536 : requested_solution_count;
+  hipblasLtMatmulHeuristicResult_t heuristicResults[requested_algo_count] = {0};
+  check_hipblas(hipblasLtMatmulAlgoGetHeuristic(
+      handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
+      mat->pref, requested_algo_count, heuristicResults, &retResults));
+  if (retResults == 0) {
+    check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
+  }
+  mat->algos = vector<hipblasLtMatmulHeuristicResult_t>(heuristicResults, heuristicResults + retResults);
+  returned_algo_count = retResults;
 }
 
 void hipblaslt_gemm::free_mem() {

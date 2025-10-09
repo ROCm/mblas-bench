@@ -277,12 +277,11 @@ string cublaslt_gemm::prepare_array() {
   run_threaded(&cublaslt_gemm::alloc_dev);
   run_threaded(&cublaslt_gemm::copy_host_to_dev);
   run_threaded(&cublaslt_gemm::prepare_matrix);
-  // Enable tuning with a parameter later
-  run_threaded(&cublaslt_gemm::auto_tuning);
-  // if (false) {
-  // } else {
-  //   run_threaded(&cublaslt_gemm::no_tuning);
-  // }
+  if (requested_solution_count > 0) {
+    run_threaded(&cublaslt_gemm::auto_tuning);
+  } else {
+    run_threaded(&cublaslt_gemm::no_tuning);
+  }
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,ldd,";
   // if (batched) {
@@ -499,9 +498,8 @@ void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
   if (returnedAlgoCount == 0) {
     check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
   }
+  mat->algos = std::vector<cublasLtMatmulHeuristicResult_t>(algoList, algoList + returnedAlgoCount);
   returned_algo_count = returnedAlgoCount;
-  mat->algos = std::vector<cublasLtMatmulHeuristicResult_t>(
-      algoList, algoList + returnedAlgoCount);
 }
 
 void cublaslt_gemm::free_mem() {

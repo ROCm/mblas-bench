@@ -62,7 +62,7 @@ struct hipblaslt_gemm_inst {
   hipblasLtMatrixLayout_t desc_c;
   hipblasLtMatrixLayout_t desc_d;
   hipblasLtMatmulPreference_t pref;
-  hipblasLtMatmulHeuristicResult_t algo;
+  std::vector<hipblasLtMatmulHeuristicResult_t> algos;
   void *devWork;
   long wSZ;
   hipblaslt_gemm_inst(int devID) { devIDX = devID; }

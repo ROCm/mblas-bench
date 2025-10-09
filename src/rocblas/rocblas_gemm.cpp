@@ -163,7 +163,6 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       get_packing_count(c_type), 
       get_packing_count(d_type), 
       inplace);
-  // TODO: does rocblas_gemm return multiple algorithms like cublaslt_gemm?
   requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
