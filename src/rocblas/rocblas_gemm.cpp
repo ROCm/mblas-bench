@@ -327,6 +327,9 @@ void rocblas_gemm::free_mem() {
 }
 
 double rocblas_gemm::test(const int &ith_solution) {
+  if (ith_solution != 0) {
+    throw std::invalid_argument("rocblas_gemm::test: ith_solution must be 0");
+  }
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

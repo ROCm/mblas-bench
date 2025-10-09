@@ -357,6 +357,9 @@ void cublas_gemm::free_mem() {
 }
 
 double cublas_gemm::test(const int &ith_solution) {
+  if (ith_solution != 0) {
+    throw std::invalid_argument("cublas_gemm::test: ith_solution must be 0");
+  }
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

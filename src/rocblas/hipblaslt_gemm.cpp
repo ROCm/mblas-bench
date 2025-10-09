@@ -421,6 +421,14 @@ void hipblaslt_gemm::free_mem() {
 }
 
 double hipblaslt_gemm::test(const int &ith_solution) {
+  if (ith_solution >= returned_algo_count) {
+    string errorString =
+        "Solution index out of range"
+        "\nNumber of detected solutions: " +
+        std::to_string(returned_algo_count) +
+        "\nRequested solution index:     " + std::to_string(ith_solution);
+    throw std::invalid_argument(errorString);
+  }
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
