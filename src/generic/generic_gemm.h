@@ -82,7 +82,7 @@ class generic_gemm {
 
   std::string initialization;
 
-  int requested_solution_count = 1;
+  int requested_solution_count = 0;
   int returned_algo_count = 0;
 
  public:

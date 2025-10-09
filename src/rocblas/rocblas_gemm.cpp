@@ -197,6 +197,7 @@ string rocblas_gemm::prepare_array() {
 
   run_threaded(&rocblas_gemm::alloc_dev);
   run_threaded(&rocblas_gemm::copy_host_to_dev);
+  returned_algo_count = 1; // rocblas only returns one solution
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
   if (batched) {
