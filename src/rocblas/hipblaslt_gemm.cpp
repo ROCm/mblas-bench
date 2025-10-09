@@ -392,7 +392,7 @@ double hipblaslt_gemm::test(const int &ith_solution) {
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
-    threads.push_back(thread(&hipblaslt_gemm::test_matmul, this, &mat));
+    threads.push_back(thread(&hipblaslt_gemm::test_matmul, this, &mat, ith_solution));
   }
   // Wait on running jobs
   for (auto &thread : threads) {
@@ -466,7 +466,7 @@ std::tuple<double, double, double> hipblaslt_gemm::calculate_figure_of_merit(
                                             avgTime_us);
 }
 
-void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
+void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
   hipblasStatus_t stat;
   hipblasLtHandle_t handle;
   hipStream_t stream;
@@ -478,7 +478,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
     int flush_index = rep % flush_batch_count;
     stat = hipblasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo.algo, mat->devWork,
+                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo[ith_solution].algo, mat->devWork,
                           mat->wSZ, stream);
     // Check for errors during the gemm run
     check_hipblas(stat);
@@ -498,7 +498,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
     int flush_index = rep % flush_batch_count;
     stat = hipblasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo.algo, mat->devWork,
+                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo[ith_solution].algo, mat->devWork,
                           mat->wSZ, stream);
   }
   hipEventRecord(stop, stream);

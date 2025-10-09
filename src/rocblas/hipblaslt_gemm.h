@@ -118,7 +118,7 @@ class hipblaslt_gemm : public generic_gemm {
   void auto_tuning(hipblaslt_gemm_inst *);
   void run_threaded(void (hipblaslt_gemm::*func)(hipblaslt_gemm_inst *));
   std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
-  void test_matmul(hipblaslt_gemm_inst *mat);
+  void test_matmul(hipblaslt_gemm_inst *mat, int ith_solution);
 
  public:
   hipblaslt_gemm(cxxopts::ParseResult result);
