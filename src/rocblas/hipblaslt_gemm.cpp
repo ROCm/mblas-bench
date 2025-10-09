@@ -362,7 +362,7 @@ void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
   check_hipblas(hipblasLtCreate(&handle));
   int retResults = 0;
   const int requested_algo_count = requested_solution_count < 0 ? 65536 : requested_solution_count;
-  hipblasLtMatmulHeuristicResult_t heuristicResults[requested_algo_count] = {0};
+  hipblasLtMatmulHeuristicResult_t heuristicResults[requested_algo_count];
   check_hipblas(hipblasLtMatmulAlgoGetHeuristic(
       handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
       mat->pref, requested_algo_count, heuristicResults, &retResults));
@@ -478,7 +478,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
     int flush_index = rep % flush_batch_count;
     stat = hipblasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo[ith_solution].algo, mat->devWork,
+                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algos[ith_solution].algo, mat->devWork,
                           mat->wSZ, stream);
     // Check for errors during the gemm run
     check_hipblas(stat);
@@ -498,7 +498,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
     int flush_index = rep % flush_batch_count;
     stat = hipblasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo[ith_solution].algo, mat->devWork,
+                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algos[ith_solution].algo, mat->devWork,
                           mat->wSZ, stream);
   }
   hipEventRecord(stop, stream);
