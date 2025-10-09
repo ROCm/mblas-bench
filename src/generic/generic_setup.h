@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <cstdint>
 
 uint64_t round_up(uint64_t numToRound, uint64_t multiple);
 
