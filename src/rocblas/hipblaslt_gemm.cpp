@@ -379,11 +379,44 @@ void hipblaslt_gemm::free_mem() {
   //free(host_a);
   //free(host_b);
   //free(host_c);
+  for (int i = 0; i < flush_batch_count; i++) {
+    free(ptr_host_a[i]);
+    free(ptr_host_b[i]);
+    free(ptr_host_c[i]);
+    if (!inplace) {
+      free(ptr_host_d[i]);
+    }
+  }
+  free(ptr_host_a);
+  free(ptr_host_b);
+  free(ptr_host_c);
+  if (!inplace) {
+    free(ptr_host_d);
+  }
   for (auto mat : mat_ptrs) {
+    for (int i = 0; i < flush_batch_count; i++) {
+      hipFree(mat.ptr_dev_a[i]);
+      hipFree(mat.ptr_dev_b[i]);
+      hipFree(mat.ptr_dev_c[i]);
+      if (!inplace) {
+        hipFree(mat.ptr_dev_d[i]);
+      }
+    }
     hipFree(mat.ptr_dev_a);
     hipFree(mat.ptr_dev_b);
     hipFree(mat.ptr_dev_c);
-    hipFree(mat.ptr_dev_d);
+    if (!inplace) {
+      hipFree(mat.ptr_dev_d);
+    }
+    hipFree(mat.devWork);
+    hipblasLtMatmulDescDestroy(mat.desc_op);
+    hipblasLtMatrixLayoutDestroy(mat.desc_a);
+    hipblasLtMatrixLayoutDestroy(mat.desc_b);
+    hipblasLtMatrixLayoutDestroy(mat.desc_c);
+    if (!inplace) {
+      hipblasLtMatrixLayoutDestroy(mat.desc_d);
+    }
+    hipblasLtMatmulPreferenceDestroy(mat.pref);
   }
 }
 
