@@ -277,10 +277,10 @@ string cublaslt_gemm::prepare_array() {
   run_threaded(&cublaslt_gemm::alloc_dev);
   run_threaded(&cublaslt_gemm::copy_host_to_dev);
   run_threaded(&cublaslt_gemm::prepare_matrix);
-  if (requested_solution_count > 0) {
-    run_threaded(&cublaslt_gemm::auto_tuning);
-  } else {
+  if (requested_solution_count == 1) {
     run_threaded(&cublaslt_gemm::no_tuning);
+  } else {
+    run_threaded(&cublaslt_gemm::auto_tuning);
   }
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,ldd,";

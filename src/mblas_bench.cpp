@@ -234,7 +234,7 @@ int main(int argc, char **argv) {
             "Use YAML file as problem input. Command line options will be overridden by YAML file input",
             cxxopts::value<string>()->default_value(""));
   opp_adder("requested_solution_num,requested_solution",
-            "Number of solutions to request from the heuristic. Use -1 to request all solutions. Currently, this feature is only supported for cublaslt.",
+            "Number of solutions to request from the heuristic. Use -1 to request all solutions.",
             cxxopts::value<int>()->default_value("1"));
   opp_adder("h,help", "Print Usage");
 

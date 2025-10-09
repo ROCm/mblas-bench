@@ -198,10 +198,10 @@ string hipblaslt_gemm::prepare_array() {
   run_threaded(&hipblaslt_gemm::copy_host_to_dev);
   run_threaded(&hipblaslt_gemm::prepare_matrix);
   // Enable tuning with a parameter later
-  if (requested_solution_count > 0) {
-    run_threaded(&hipblaslt_gemm::auto_tuning);
-  } else {
+  if (requested_solution_count == 1) {
     run_threaded(&hipblaslt_gemm::no_tuning);
+  } else {
+    run_threaded(&hipblaslt_gemm::auto_tuning);
   }
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
