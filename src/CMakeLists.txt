@@ -52,6 +52,14 @@ target_include_directories(mblas-bench PUBLIC
     generic
 )
 
+include(FetchContent)
+FetchContent_Declare(
+  yaml-cpp
+  GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+  GIT_TAG 0.8.0
+)
+FetchContent_MakeAvailable(yaml-cpp)
+
 # Add each backend to the include path
 # If backend is disabled, use the dummy implementation
 if (WITH_ROCM)
@@ -79,6 +87,7 @@ target_link_libraries(mblas-bench PUBLIC
     -lm
     -lpthread
     -fopenmp
+    yaml-cpp::yaml-cpp
 )
 
 if (WITH_ROCM)
