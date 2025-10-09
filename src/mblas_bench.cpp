@@ -5,6 +5,7 @@
 
 #include <cctype>
 #include <iostream>
+#include <fstream>
 
 
 //#include "generic_gemm.h"
@@ -12,7 +13,6 @@
 //#include "hipblaslt_gemm.h"
 //#include "cublas_gemm.h"
 //#include "cublaslt_gemm.h"
-#include "yaml_parser.h"
 #include <generic_gemm_factory.h>
 #include <rocblas_gemm_factory.h>
 #include <hipblaslt_gemm_factory.h>
@@ -20,6 +20,7 @@
 #include <cublaslt_gemm_factory.h>
 
 #include "third_party/cxxopts.hpp"
+#include <yaml-cpp/yaml.h>
 
 using std::cerr;
 using std::cout;
@@ -32,6 +33,65 @@ std::string s_to_lower(std::string data) {
                  [](unsigned char c) { return std::tolower(c); });
   return data;
 }
+
+
+std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, const cxxopts::Options& opts, int argc, char** argv)
+{
+    // Read the YAML file and parse each line
+    // For each parsed line, convert it to command-line arguments and parse with cxxopts so that the original code can remain unchanged
+
+    std::vector<cxxopts::ParseResult> results;
+    YAML::Node config = YAML::LoadFile(filename);
+    for (const auto& node : config) {
+        if (node.IsMap()) {
+            std::vector<std::string> args;
+            for (int i = 0; i < argc; ++i) {
+                args.push_back(argv[i]);
+            }
+            for (const auto& it : node) {
+                std::string key = it.first.as<std::string>();
+                std::string value = it.second.as<std::string>();
+
+                // m,n,k can be uppercase in YAML, but should be lowercase in command-line arguments
+                if (key == "M") {
+                    key = "m";
+                } else if (key == "N") {
+                    key = "n";
+                } else if (key == "K") {
+                    key = "k";
+                }
+
+                const std::string arg_key = key.size() == 1 ? "-" + key : "--" + key;
+                args.push_back(arg_key);
+                args.push_back(value);
+            }
+            std::vector<const char*> cstr_args;
+            for (const auto& arg: args) {
+                cstr_args.push_back(arg.c_str());
+            }
+            // Copy opts just in case member variables are modified during parsing
+            cxxopts::Options opts_copy = opts;
+            opts_copy = opts_copy.allow_unrecognised_options();
+            auto result = opts_copy.parse(static_cast<int>(cstr_args.size()), cstr_args.data());
+            results.push_back(result);
+            // For debugging
+            if (true) {
+                const auto &unmatched = result.unmatched();
+                if (!unmatched.empty()) {
+                    std::cout << "Unmatched arguments:";
+                    for (const auto &arg: unmatched) {
+                        std::cout << " " << arg;
+                    }
+                    std::cout << std::endl;
+                }
+                std::cout << "Parsed arguments from YAML:" << std::endl;
+                std::cout << result.arguments_string() << std::endl;
+            }
+        }
+    }
+    return results;
+}
+
 
 int main(int argc, char **argv) {
   // print device info
