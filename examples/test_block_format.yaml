@@ -16,7 +16,6 @@
 #   compute_type: f32_r
 #   function: matmul
 #   rotating: 512
-#   driver: cublaslt
 
 - m: 1024
   n: 1024
@@ -35,7 +34,6 @@
   compute_type: f32_r
   function: matmul
   rotating: 512
-  driver: cublaslt
 
 - m: 2048
   n: 2048
@@ -54,7 +52,6 @@
   compute_type: f32_r
   function: matmul
   rotating: 512
-  driver: cublaslt
 
 - m: 4096
   n: 4096
@@ -73,4 +70,3 @@
   compute_type: f32_r
   function: matmul
   rotating: 512
-  driver: cublaslt
