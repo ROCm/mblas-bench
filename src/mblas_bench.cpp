@@ -75,7 +75,7 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
             auto result = opts_copy.parse(static_cast<int>(cstr_args.size()), cstr_args.data());
             results.push_back(result);
             // For debugging
-            if (true) {
+            if (false) {
                 const auto &unmatched = result.unmatched();
                 if (!unmatched.empty()) {
                     std::cout << "Unmatched arguments:";
