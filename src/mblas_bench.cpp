@@ -74,16 +74,20 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
             opts_copy = opts_copy.allow_unrecognised_options();
             auto result = opts_copy.parse(static_cast<int>(cstr_args.size()), cstr_args.data());
             results.push_back(result);
-            // For debugging
+
+            // Print unmatched arguments
+            const auto &unmatched = result.unmatched();
+            const std::string YELLOW = "\033[33m";
+            const std::string RESET = "\033[0m";
+            if (!unmatched.empty()) {
+              std::cout << YELLOW << "Ignored (unmatched) arguments:";
+              for (const auto &arg: unmatched) {
+                std::cout << " " << arg;
+              }
+              std::cout << RESET << std::endl;
+            }
+            // For debugging. All parsed arguments from YAML
             if (false) {
-                const auto &unmatched = result.unmatched();
-                if (!unmatched.empty()) {
-                    std::cout << "Unmatched arguments:";
-                    for (const auto &arg: unmatched) {
-                        std::cout << " " << arg;
-                    }
-                    std::cout << std::endl;
-                }
                 std::cout << "Parsed arguments from YAML:" << std::endl;
                 std::cout << result.arguments_string() << std::endl;
             }
