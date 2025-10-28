@@ -16,6 +16,7 @@
 #include "cublas_datatype_utils.h"
 #include "cuda_error.h"
 #include "cxxopts.hpp"
+#include "cuda_monitor.h"
 
 using std::cerr;
 using std::cout;
@@ -281,11 +282,19 @@ string cublaslt_gemm::prepare_array() {
     run_threaded(&cublaslt_gemm::no_tuning);
   }
   std::ostringstream ossHeader;
-  ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
-  if (batched) {
+  ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,ldd,";
+  // if (batched) {
     ossHeader << "batch_count,";
+  // }
+  ossHeader << "alpha,beta,";
+  ossHeader << "a_type,b_type,c_type,d_type,compute_type,scalar_type,";
+  ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
+  ossHeader << "rotating_buffer,";
+  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
+  if (cuda_monitor::monitor::enabled()) {
+    ossHeader << "avg_sysclk_mhz,med_sysclk_mhz,avg_memclk_mhz,med_memclk_mhz,";
   }
-  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us," << endl;
+  ossHeader << endl;
   return ossHeader.str();
 }
 
@@ -480,15 +489,52 @@ void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
 void cublaslt_gemm::free_mem() {
   free(alpha);
   free(beta);
+  for (int i = 0; i < flush_batch_count; i++) {
+        free(ptr_host_a[i]);
+        free(ptr_host_b[i]);
+        free(ptr_host_c[i]);
+        free(ptr_host_d[i]);
+  }
   free(ptr_host_a);
   free(ptr_host_b);
   free(ptr_host_c);
   free(ptr_host_d);
+  if (use_scaling) {
+    free(scale_host_a);
+    free(scale_host_b);
+    free(scale_host_c);
+    free(scale_host_d);
+  }
   for (auto mat : mat_ptrs) {
+    for(int i = 0; i < flush_batch_count; i++) {
+          cudaFree(mat.ptr_dev_a[i]);
+          cudaFree(mat.ptr_dev_b[i]);
+          cudaFree(mat.ptr_dev_c[i]);
+          if (!inplace) {
+            cudaFree(mat.ptr_dev_d[i]);
+          }
+    }
     cudaFree(mat.ptr_dev_a);
     cudaFree(mat.ptr_dev_b);
     cudaFree(mat.ptr_dev_c);
-    cudaFree(mat.ptr_dev_d);
+    if (!inplace) {
+      cudaFree(mat.ptr_dev_d);
+    }
+    cudaFree(mat.devWork);
+    if (use_scaling) {
+      cudaFree(mat.scale_dev_a);
+      cudaFree(mat.scale_dev_b);
+      cudaFree(mat.scale_dev_c);
+      cudaFree(mat.scale_dev_d);
+    }
+    cublasLtMatmulDescDestroy(mat.desc_op);
+    cublasLtMatrixLayoutDestroy(mat.desc_a);
+    cublasLtMatrixLayoutDestroy(mat.desc_b);
+    cublasLtMatrixLayoutDestroy(mat.desc_c);
+    if (!inplace) {
+      cublasLtMatrixLayoutDestroy(mat.desc_d);
+    }
+    cublasLtMatmulPreferenceDestroy(mat.pref);
   }
 }
 
@@ -526,13 +572,33 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << std::setprecision(7);
   ossValues << transA.to_string_short() << ',' << transB.to_string_short() << ',' << m
             << ',' << n << ',' << k << ',' << lda << ',' << ldb << ',' << ldc
-            << ',';
-  if (batched) {
+            << ',' << ldd << ',';
+  // if (batched) {
     ossValues << batch_count << ',';
-  }
+  // }
+  ossValues << *((float *)alpha) << ',';
+  ossValues << *((float *)beta)   << ',';
+  ossValues << a_type.to_string() << ',';
+  ossValues << b_type.to_string() << ',';
+  ossValues << c_type.to_string() << ',';
+  ossValues << d_type.to_string() << ',';
+  ossValues << compute.to_string() << ',';
+  ossValues << scalar.to_string() << ',';
+  ossValues << a_scale_type.to_string() << ',';
+  ossValues << b_scale_type.to_string() << ',';
+  ossValues << c_scale_type.to_string() << ',';
+  ossValues << d_scale_type.to_string() << ',';
+  ossValues << bias_type.to_string() << ',';
+  ossValues << flush_memory_size << ','; // rotating buffer size
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
+  if (cuda_monitor::monitor::enabled()) {
+    ossValues << avg_sysclk_mhz << ',';
+    ossValues << med_sysclk_mhz << ',';
+    ossValues << avg_memclk_mhz << ',';
+    ossValues << med_memclk_mhz << ',';
+  }
   ossValues << endl;
   return ossValues.str();
 }
@@ -597,6 +663,10 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   /*
     Run and time the performance test
   */
+  auto freq_monitor = cuda_monitor::monitor();
+  freq_monitor.set_device_id(mat->devIDX);
+  
+  freq_monitor.start();
   cudaEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
     int flush_index = rep % flush_batch_count;
@@ -607,6 +677,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   }
   cudaEventRecord(stop, stream);
   cudaEventSynchronize(stop);
+  freq_monitor.stop();
 
   // Check for errors during the performance test
   check_cublas(stat);
@@ -617,4 +688,12 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   cudaEventElapsedTime(&elapsedTime_ms, start, stop);
   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
       calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+
+  if (cuda_monitor::monitor::enabled()) {
+    avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
+    med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
+    avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
+    med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
+  }
+
 }

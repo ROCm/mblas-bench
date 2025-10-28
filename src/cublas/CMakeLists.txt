@@ -61,5 +61,6 @@ target_link_libraries(mblascuda PUBLIC
     CUDA::cuda_driver 
     CUDA::cublas 
     CUDA::cublasLt
+    CUDA::nvml
     mblasgeneric
 )

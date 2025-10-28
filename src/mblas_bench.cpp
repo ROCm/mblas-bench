@@ -5,6 +5,7 @@
 
 #include <cctype>
 #include <iostream>
+#include <fstream>
 
 
 //#include "generic_gemm.h"
@@ -19,6 +20,7 @@
 #include <cublaslt_gemm_factory.h>
 
 #include "third_party/cxxopts.hpp"
+#include <yaml-cpp/yaml.h>
 
 using std::cerr;
 using std::cout;
@@ -31,6 +33,69 @@ std::string s_to_lower(std::string data) {
                  [](unsigned char c) { return std::tolower(c); });
   return data;
 }
+
+
+std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, const cxxopts::Options& opts, int argc, char** argv)
+{
+    // Read the YAML file and parse each line
+    // For each parsed line, convert it to command-line arguments and parse with cxxopts so that the original code can remain unchanged
+
+    std::vector<cxxopts::ParseResult> results;
+    YAML::Node config = YAML::LoadFile(filename);
+    for (const auto& node : config) {
+        if (node.IsMap()) {
+            std::vector<std::string> args;
+            for (int i = 0; i < argc; ++i) {
+                args.push_back(argv[i]);
+            }
+            for (const auto& it : node) {
+                std::string key = it.first.as<std::string>();
+                std::string value = it.second.as<std::string>();
+
+                // m,n,k can be uppercase in YAML, but should be lowercase in command-line arguments
+                if (key == "M") {
+                    key = "m";
+                } else if (key == "N") {
+                    key = "n";
+                } else if (key == "K") {
+                    key = "k";
+                }
+
+                const std::string arg_key = key.size() == 1 ? "-" + key : "--" + key;
+                args.push_back(arg_key);
+                args.push_back(value);
+            }
+            std::vector<const char*> cstr_args;
+            for (const auto& arg: args) {
+                cstr_args.push_back(arg.c_str());
+            }
+            // Copy opts just in case member variables are modified during parsing
+            cxxopts::Options opts_copy = opts;
+            opts_copy = opts_copy.allow_unrecognised_options();
+            auto result = opts_copy.parse(static_cast<int>(cstr_args.size()), cstr_args.data());
+            results.push_back(result);
+
+            // Print unmatched arguments
+            const auto &unmatched = result.unmatched();
+            const std::string YELLOW = "\033[33m";
+            const std::string RESET = "\033[0m";
+            if (!unmatched.empty()) {
+              std::cout << YELLOW << "Ignored (unmatched) arguments:";
+              for (const auto &arg: unmatched) {
+                std::cout << " " << arg;
+              }
+              std::cout << RESET << std::endl;
+            }
+            // For debugging. All parsed arguments from YAML
+            if (false) {
+                std::cout << "Parsed arguments from YAML:" << std::endl;
+                std::cout << result.arguments_string() << std::endl;
+            }
+        }
+    }
+    return results;
+}
+
 
 int main(int argc, char **argv) {
   // print device info
@@ -229,6 +294,9 @@ int main(int argc, char **argv) {
             cxxopts::value<int>()->default_value("2"));
   opp_adder("driver", "Backend to run the GEMM test with",
             cxxopts::value<string>()->default_value("rocblas"));
+  opp_adder("yaml",
+            "Use YAML file as problem input. Command line options will be overridden by YAML file input",
+            cxxopts::value<string>()->default_value(""));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
@@ -238,40 +306,59 @@ int main(int argc, char **argv) {
     exit(0);
   }
 
-  generic_gemm_factory *gemm;
-  // Select backend implementation
-  string driver = s_to_lower(result["driver"].as<string>());
-  string function = s_to_lower(result["function"].as<string>());
-
-  if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
-    // Since regular cublas has no matmul, we can safely assume the user means
-    // cublaslt
-    gemm = new cublaslt_gemm_factory();
-  } else if (driver == "cublas-bench" || driver == "cublas") {
-    gemm = new cublas_gemm_factory();
-  } else if (driver == "hipblaslt" || (driver == "rocblas" && function == "matmul")) {
-    // Since regular rocblas has no matmul, we can safely assume the user means
-    // hipblaslt
-    // gemm = new hipblaslt_gemm(result);
-    gemm = new hipblaslt_gemm_factory();
-  } else if (driver == "rocblas-bench" || driver == "rocblas") {
-    gemm = new rocblas_gemm_factory();
+  
+  std::vector<cxxopts::ParseResult> input_problems;
+  if (result.count("yaml")) {
+    string yaml_file = result["yaml"].as<string>();
+    input_problems = parse_yaml_file(yaml_file, options, argc, argv);
+    if (input_problems.size() == 0) {
+      cerr << "No valid problems found in YAML file" << endl;
+      return 1;
+    }
   } else {
-    cerr << "Driver \"" << driver << "\" not supported" << endl;
-    return 1;
+    input_problems.push_back(result);
   }
 
-  gemm->create_gemm(result);
-  string header = gemm->prepare_array();
-  cout << header << flush;
-  gemm->test();
-  cout << std::fixed;
+  for (const auto &result: input_problems)
+  {
 
-  string results = gemm->get_result_string();
-  cout << results << flush;
+    generic_gemm_factory *gemm;
+    // Select backend implementation
+    string driver = s_to_lower(result["driver"].as<string>());
+    string function = s_to_lower(result["function"].as<string>());
 
-  gemm->free_mem();
-  delete gemm;
+    if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
+      // Since regular cublas has no matmul, we can safely assume the user means
+      // cublaslt
+      gemm = new cublaslt_gemm_factory();
+    } else if (driver == "cublas-bench" || driver == "cublas") {
+      gemm = new cublas_gemm_factory();
+    } else if (driver == "hipblaslt" || (driver == "rocblas" && function == "matmul")) {
+      // Since regular rocblas has no matmul, we can safely assume the user means
+      // hipblaslt
+      // gemm = new hipblaslt_gemm(result);
+      gemm = new hipblaslt_gemm_factory();
+    } else if (driver == "rocblas-bench" || driver == "rocblas") {
+      gemm = new rocblas_gemm_factory();
+    } else {
+      cerr << "Driver \"" << driver << "\" not supported" << endl;
+      return 1;
+    }
+
+
+    gemm->create_gemm(result);
+    string header = gemm->prepare_array();
+    cout << header << flush;
+    gemm->test();
+    cout << std::fixed;
+
+    string results = gemm->get_result_string();
+    cout << results << flush;
+
+    gemm->free_mem();
+    delete gemm;
+  }
+
 
   return 0;
 }

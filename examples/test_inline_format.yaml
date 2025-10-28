@@ -1,0 +1,5 @@
+# This line is for comment out testing
+# - {m: 4096, n: 4096, k: 4096, alpha: 1.0, beta: 0.0, transA: T, transB: N, initialization: trig_float, iters: 10, cold_iters: 2, a_type: f16_r, b_type: f16_r, c_type: f16_r, d_type: f16_r, compute_type: f32_r, function: matmul, rotating: 512}
+- {m: 1024, n: 1024, k: 1024, alpha: 1.0, beta: 0.0, transA: T, transB: N, initialization: trig_float, iters: 10, cold_iters: 2, a_type: f16_r, b_type: f16_r, c_type: f16_r, d_type: f16_r, compute_type: f32_r, function: matmul, rotating: 512}
+- {m: 2048, n: 2048, k: 2048, alpha: 1.0, beta: 0.0, transA: N, transB: N, initialization: trig_float, iters: 10, cold_iters: 2, a_type: f16_r, b_type: f16_r, c_type: f16_r, d_type: f16_r, compute_type: f32_r, function: matmul, rotating: 512}
+- {m: 4096, n: 4096, k: 4096, alpha: 1.0, beta: 0.0, transA: T, transB: T, initialization: trig_float, iters: 10, cold_iters: 2, a_type: f16_r, b_type: f16_r, c_type: f16_r, d_type: f16_r, compute_type: f32_r, function: matmul, rotating: 512}

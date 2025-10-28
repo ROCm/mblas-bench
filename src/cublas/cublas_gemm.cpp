@@ -325,10 +325,20 @@ void cublas_gemm::copy_host_to_dev(cublasgemmInst *mat) {
 void cublas_gemm::free_mem() {
   free(alpha);
   free(beta);
+  for (int i = 0; i < flush_batch_count; i++) {
+    free(ptr_host_a[i]);
+    free(ptr_host_b[i]);
+    free(ptr_host_c[i]);
+  }
   free(ptr_host_a);
   free(ptr_host_b);
   free(ptr_host_c);
   for (auto mat : mat_ptrs) {
+    for (int i = 0; i < flush_batch_count; i++) {
+      cudaFree(mat.ptr_dev_a[i]);
+      cudaFree(mat.ptr_dev_b[i]);
+      cudaFree(mat.ptr_dev_c[i]);
+    }
     cudaFree(mat.ptr_dev_a);
     cudaFree(mat.ptr_dev_b);
     cudaFree(mat.ptr_dev_c);

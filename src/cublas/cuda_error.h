@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <nvml.h>
 
 #include <iostream>
 
@@ -34,6 +35,14 @@ static inline cublasStatus_t check_cublas(cublasStatus_t result) {
     // fprintf(stderr, "CUDA Runtime Error: %s\n",
     // cublas_get_error_string(result));
     assert(result == CUBLAS_STATUS_SUCCESS);
+  }
+  return result;
+}
+
+static inline nvmlReturn_t check_nvml(nvmlReturn_t result) {
+  if (result != NVML_SUCCESS) {
+    std::cerr << "NVML Runtime Error: " << nvmlErrorString(result) << std::endl;
+    assert(result == NVML_SUCCESS);
   }
   return result;
 }
