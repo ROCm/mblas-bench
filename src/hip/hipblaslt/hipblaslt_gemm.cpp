@@ -152,24 +152,21 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
   string salphai = result["alphai"].as<string>();
   alpha = malloc(get_malloc_size_scalar(precision));
   type_call_host<set_scalar>(precision, alpha, salpha, salphai);
-  //alpha =
-  //    type_call_host<allocSetScalar>(precision, salpha.c_str(), salphai.c_str());
+  
   string sbeta = result["beta"].as<string>();
   string sbetai = result["betai"].as<string>();
   beta = malloc(get_malloc_size_scalar(precision));
   type_call_host<set_scalar>(precision, beta, sbeta, sbetai);
-
-  //beta = type_call_host<allocSetScalar>(precision, sbeta.c_str(), sbetai.c_str());
   // std::cout << *((float *)alpha) << std::endl;
   // std::cout << *((float *)beta) << std::endl;
   uint64_t a_offset, b_offset, c_offset, d_offset;
   set_flush_batch_count( 
       type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
       type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(d_type), 
-      get_packing_count(a_type), 
-      get_packing_count(b_type), 
-      get_packing_count(c_type), 
-      get_packing_count(d_type), 
+      a_type.get_packing_count(), 
+      b_type.get_packing_count(), 
+      c_type.get_packing_count(), 
+      d_type.get_packing_count(), 
       inplace);
 }
 

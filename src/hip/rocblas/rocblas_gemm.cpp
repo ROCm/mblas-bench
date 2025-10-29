@@ -149,27 +149,27 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
   // Pull in alpha and beta, alloc memory and save to pointers
   string salpha = result["alpha"].as<string>();
   string salphai = result["alphai"].as<string>();
-  alpha =
-      type_call_host<allocSetScalar>(precision, salpha.c_str(), salphai.c_str());
+  alpha = malloc(get_malloc_size_scalar(precision));
+  type_call_host<set_scalar>(precision, alpha, salpha, salphai);
+  
   string sbeta = result["beta"].as<string>();
   string sbetai = result["betai"].as<string>();
-  beta = type_call_host<allocSetScalar>(precision, sbeta.c_str(), sbetai.c_str());
+  beta = malloc(get_malloc_size_scalar(precision));
+  type_call_host<set_scalar>(precision, beta, sbeta, sbetai);
 
   set_flush_batch_count( 
       type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
       type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(d_type), 
-      get_packing_count(a_type), 
-      get_packing_count(b_type), 
-      get_packing_count(c_type), 
-      get_packing_count(d_type), 
+      a_type.get_packing_count(), 
+      b_type.get_packing_count(), 
+      c_type.get_packing_count(), 
+      d_type.get_packing_count(), 
       inplace);
 }
 
 string rocblas_gemm::prepare_array() {
-  // std::cout << "Pre Convert: " << *((float *)alpha) << std::endl;
-  // alpha = convert_scalar(scalar, alpha);
-  // std::cout << "Post Convert: " << __half2float(*(__half *)alpha) <<
-  // std::endl; beta = convert_scalar(scalar, beta);
+  alpha = convert_scalar(scalar, alpha);
+  beta = convert_scalar(scalar, beta);
   this->alloc_host();
   this->fill_host();
 
@@ -225,10 +225,10 @@ void rocblas_gemm::alloc_host() {
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(d_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = allocate_host_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-    ptr_host_b[i] = allocate_host_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-    ptr_host_c[i] = allocate_host_array(c_type, rows_mem_c, cols_mem_c, batch_count);
-    ptr_host_d[i] = allocate_host_array(d_type, rows_mem_d, cols_mem_d, batch_count);
+    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count));
+    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count));
+    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count));
+    ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count));
   }
 }
 
@@ -249,10 +249,10 @@ void rocblas_gemm::alloc_dev(rocblas_gemm_inst *mat) {
   }
 
   for (int i = 0; i < flush_batch_count; i++) {
-    mat->ptr_dev_a[i] = allocate_dev_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-    mat->ptr_dev_b[i] = allocate_dev_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-    mat->ptr_dev_c[i] = allocate_dev_array(c_type, rows_mem_c, cols_mem_c, batch_count);
-    mat->ptr_dev_d[i] = allocate_dev_array(d_type, rows_mem_d, cols_mem_d, batch_count);
+    hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count));
+    hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count));
+    hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count));
+    hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count));
   }
 
   mat->wSZ = workspace_size;
