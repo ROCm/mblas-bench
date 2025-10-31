@@ -6,6 +6,14 @@ Goals:
 - Implement native support for cuBLAS, cuBLASLT, and other GPU BLAS libraries
 - Expose implementation specific tuneables to the user
 
+### Cloning the Repository
+To get started, clone the repository from GitHub using:
+
+```
+git clone git@github.com:ROCm/mblas-bench.git
+cd mblas-bench
+```
+
 ### Building for ROCm only
 ```
 cmake -S src -B build -DWITH_ROCM=true -DWITH_CUDA=false  
@@ -50,7 +58,7 @@ Use the below commands to run "4k" gemms on ROCm or CUDA. You'll need to make su
 | TF32      | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA T --transposeB N --initialization trig_float --iters 10 --cold_iters 2 --compute_type CUBLAS_COMPUTE_32F_FAST_TF32 --function gemm_ex --precision s --rotating 512 --driver ${DRIVER}                         |
 | FP16      | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA N --transposeB T --initialization trig_float --iters 10 --cold_iters 2 --a_type f16_r --b_type f16_r --c_type f16_r --d_type f16_r --compute_type f32_r --function matmul --rotating 512 --driver ${DRIVER}    |
 | BF16      | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA N --transposeB T --initialization trig_float --iters 10 --cold_iters 2 --a_type bf16_r --b_type bf16_r --c_type bf16_r --d_type bf16_r --compute_type f32_r --function matmul --rotating 512 --driver ${DRIVER}|
-| FP8       | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA T --transposeB N --initialization trig_float --iters 10 --cold_iters 2 --a_type f8_r --b_type f8_r --c_type f16_r --d_type f16_r --compute_type f32_r --function matmul --rotating 512 --driver ${DRIVER}      |
+| FP8       | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA T --transposeB N --initialization trig_float --iters 10 --cold_iters 2 --a_type f8_r --b_type f8_r --c_type bf16_r --d_type bf16_r --compute_type f32_r --function matmul --rotating 512 --driver ${DRIVER}      |
 | INT8      | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA T --transposeB N --initialization rand_int --iters 10 --cold_iters 2 --a_type i8_r --b_type i8_r --c_type i32_r --d_type i32_r --compute_type i32_r --function matmul --rotating 512 --driver ${DRIVER}         |
 
 #### Running gemms from a YAML file
