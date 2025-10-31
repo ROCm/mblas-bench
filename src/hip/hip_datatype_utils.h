@@ -8,6 +8,15 @@
 
 #if MBLAS_WITH_ROCBLAS
 #include <rocblas/rocblas.h>
+#endif 
+
+#if HIP_VERSION >= 70000000
+#include <hipblaslt/hipblaslt.h>
+#include "mblas_hip_data_type.h"
+
+std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, 
+                                                  hipblasLtMatmulMatrixScale_t ScaleMode);
+hipblasLtMatmulMatrixScale_t get_scale_mode(mblas_hip_data_type type);
 #endif
 
 
