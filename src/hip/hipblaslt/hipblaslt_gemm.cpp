@@ -15,6 +15,7 @@
 #include "hip_datatype_utils.h"
 #include "hip_error.h"
 #include "cxxopts.hpp"
+#include "generic_setup.h"
 
 using std::cerr;
 using std::cout;
@@ -50,6 +51,60 @@ std::vector<matmul_prec_type_f8> hipblaslt_gemm::matmulSupportedF8 = {
   {MBLAS_R_32F,  MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3,  MBLAS_R_32F },
   {MBLAS_R_32F,  MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2,  MBLAS_R_32F },
 };
+
+#if HIP_VERSION >= 70000000
+// MX format configurations (ROCm 7.0+)
+// Note: These use block scaling with VEC32_UE8M0
+std::vector<matmul_prec_type> hipblaslt_gemm::mx_matmul_supported = {
+  // MXfp8 x MXfp8 (E4M3)
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3, MBLAS_R_16BF, MBLAS_R_8F_E4M3, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3, MBLAS_R_16F, MBLAS_R_8F_E4M3, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  
+  // MXBF8 x MXBF8 (E5M2)
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2, MBLAS_R_16BF, MBLAS_R_8F_E5M2, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  
+  // MXfp8 x MXBF8 (mixed 8-bit)
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E5M2, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E5M2, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E4M3, MBLAS_R_8F_E5M2, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E5M2, MBLAS_R_8F_E4M3, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E5M2, MBLAS_R_8F_E4M3, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_8F_E5M2, MBLAS_R_8F_E4M3, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  
+  // MXfp6 x MXfp6 (E2M3)
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E2M3, MBLAS_R_6F_E2M3, MBLAS_R_16BF, MBLAS_R_6F_E2M3, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E2M3, MBLAS_R_6F_E2M3, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E2M3, MBLAS_R_6F_E2M3, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E2M3, MBLAS_R_6F_E2M3, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  
+  // MXBF6 x MXBF6 (E3M2)
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E3M2, MBLAS_R_6F_E3M2, MBLAS_R_16BF, MBLAS_R_6F_E3M2, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E3M2, MBLAS_R_6F_E3M2, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E3M2, MBLAS_R_6F_E3M2, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E3M2, MBLAS_R_6F_E3M2, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  
+  // MXfp6 x MXBF6 (mixed 6-bit)
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E2M3, MBLAS_R_6F_E3M2, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E2M3, MBLAS_R_6F_E3M2, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E2M3, MBLAS_R_6F_E3M2, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E3M2, MBLAS_R_6F_E2M3, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E3M2, MBLAS_R_6F_E2M3, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_6F_E3M2, MBLAS_R_6F_E2M3, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+  
+  // MXfp4 x MXfp4
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_4F_E2M1, MBLAS_R_4F_E2M1, MBLAS_R_16BF, MBLAS_R_4F_E2M1, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_4F_E2M1, MBLAS_R_4F_E2M1, MBLAS_R_16BF, MBLAS_R_16BF, MBLAS_R_16BF},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_4F_E2M1, MBLAS_R_4F_E2M1, MBLAS_R_16F, MBLAS_R_4F_E2M1, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_4F_E2M1, MBLAS_R_4F_E2M1, MBLAS_R_16F, MBLAS_R_16F, MBLAS_R_16F},
+  {MBLAS_COMPUTE_32F, MBLAS_R_32F, MBLAS_R_4F_E2M1, MBLAS_R_4F_E2M1, MBLAS_R_32F, MBLAS_R_32F, MBLAS_R_32F},
+};
+#endif
 // clang-format on
 
 void hipblaslt_gemm::parse_dev_iters(std::string deviceStr) {
@@ -98,6 +153,42 @@ void hipblaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
   }
 }
 
+#if HIP_VERSION >= 70000000
+std::tuple<mblas_hip_data_type, hipblasLtMatmulMatrixScale_t, scale_size> 
+hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, string matrix_id) {
+  mblas_hip_data_type scale_type;
+  hipblasLtMatmulMatrixScale_t scale_mode;
+  scale_size scale_size_result;
+  
+  if (desc.scale_mode == scaling_type::Block) {
+    scale_type = type.get_scale_type();  // Returns MBLAS_R_8F_UE8M0 for MX
+    std::cout << "scale_type: " << scale_type.to_string() << std::endl;
+    scale_mode = get_scale_mode(type);  // Returns VEC32_UE8M0 for MX
+    scale_size_result = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (type.is_mx_possible()) {
+    string errorString = 
+        "Non-block scaled MX formats not supported in hipblaslt. "
+        "Matrix: " + matrix_id + "\nType: " + type.to_string();
+    std::cerr << scaling_string(desc.scale_mode) << std::endl;
+    throw std::invalid_argument(errorString);
+  } else if (desc.scale_mode == scaling_type::Vector) {
+    scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F;
+    long scaling_vec_len = (matrix_id == "B") ? n : m;
+    scale_size_result = std::make_pair<size_t, size_t>(1, scaling_vec_len);
+    scale_type = MBLAS_R_32F;
+  } else if (desc.scale_mode == scaling_type::Scalar) {
+    scale_size_result = std::make_pair<size_t, size_t>(1, 1);
+    scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F;
+    scale_type = MBLAS_R_32F;
+  } else {
+    scale_size_result.rows = 0;
+    scale_size_result.cols = 0;
+  }
+  
+  return std::make_tuple(scale_type, scale_mode, scale_size_result);
+}
+#endif
+
 void hipblaslt_gemm::validate_parameters() {
   // Validate that data types exist in table of supported configurations
   matmul_prec_type selType = {
@@ -115,6 +206,39 @@ void hipblaslt_gemm::validate_parameters() {
       return;
     }
   }
+#if HIP_VERSION >= 70000000
+  else if (a_type.is_mx_possible() && b_type.is_mx_possible()) {
+    // Check MX format configurations
+    auto mx_result = std::find(begin(mx_matmul_supported), end(mx_matmul_supported), selType);
+    if (mx_result != end(mx_matmul_supported)) {
+      return;
+    }
+  }
+  
+  // Validate MX format constraints (initial implementation)
+  if (use_scaling) {
+    // Check batch size = 1
+    if (batch_count != 1) {
+      throw std::invalid_argument("MX formats currently only support batch_count=1");
+    }
+    
+    // Check M, N divisible by 16
+    if (m % 16 != 0 || n % 16 != 0) {
+      throw std::invalid_argument("MX formats require M and N divisible by 16");
+    }
+    
+    // Check K divisible by 32
+    if (k % 32 != 0) {
+      throw std::invalid_argument("MX formats require K divisible by 32");
+    }
+    
+    // Check C and D types (must be FP32, FP16, or BF16)
+    if (!(c_type == mblas_hip_data_type::MBLAS_R_32F || c_type == mblas_hip_data_type::MBLAS_R_16F || c_type == mblas_hip_data_type::MBLAS_R_16BF) ||
+        !(d_type == mblas_hip_data_type::MBLAS_R_32F || d_type == mblas_hip_data_type::MBLAS_R_16F || d_type == mblas_hip_data_type::MBLAS_R_16BF)) {
+      throw std::invalid_argument("MX formats require C and D types to be FP32, FP16, or BF16");
+    }
+  }
+#endif
   // Unable to find matching config, not supported
   string errorString =
       "Invalid GEMM specification for MatMul.  Combination of parameters "
@@ -128,7 +252,8 @@ void hipblaslt_gemm::validate_parameters() {
   throw std::invalid_argument(errorString);
 }
 
-hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
+hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result),
+  scale_host_a(nullptr), scale_host_b(nullptr), scale_host_c(nullptr), scale_host_d(nullptr) {
   // Grab precision from command line
   precision = mblas_hip_data_type(result["precision"].as<string>());
   // Grab compute type from command line
@@ -145,6 +270,20 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
   std::string tB = result["transposeB"].as<std::string>();
   transA = mblas_hipblas_operation(result["transposeA"].as<std::string>());
   transB = mblas_hipblas_operation(result["transposeB"].as<std::string>());
+  
+#if HIP_VERSION >= 70000000
+  use_scaling = a_type.is_mx_possible() || b_type.is_mx_possible() || 
+                c_type.is_mx_possible() || d_type.is_mx_possible();
+  if (use_scaling) {
+    std::tie(a_scale_type, a_scale_mode, a_scale_size) = configure_scaling(a_props, a_type, "A");
+    std::cout << "a_scale_type: " << a_scale_type.to_string() << std::endl;
+    std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
+    std::cout << "b_scale_type: " << b_scale_type.to_string() << std::endl;
+    std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
+    std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
+  }
+#endif
+  
   validate_parameters();
 
   // Pull in alpha and beta, alloc memory and save to pointers
@@ -245,6 +384,24 @@ void hipblaslt_gemm::alloc_host() {
       ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count));
     }
   }
+  
+#if HIP_VERSION >= 70000000
+  if (a_props.scale_mode != scaling_type::None) {
+    std::cout << "a_scale_size.rows: " << a_scale_size.rows << std::endl;
+    std::cout << "a_scale_size.cols: " << a_scale_size.cols << std::endl;
+    std::cout << "a_scale_size.get_size: " << a_scale_size.get_size() << std::endl;
+    scale_host_a = malloc(a_scale_size.get_size()*type_call_host<sizeofCUDT>(a_scale_type));
+  }
+  if (b_props.scale_mode != scaling_type::None) {
+    scale_host_b = malloc(b_scale_size.get_size()*type_call_host<sizeofCUDT>(b_scale_type));
+  }
+  if (c_props.scale_mode != scaling_type::None) {
+    scale_host_c = malloc(c_scale_size.get_size()*type_call_host<sizeofCUDT>(c_scale_type));
+  }
+  if (d_props.scale_mode != scaling_type::None) {
+    scale_host_d = malloc(d_scale_size.get_size()*type_call_host<sizeofCUDT>(d_scale_type));
+  }
+#endif
 }
 
 void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
@@ -273,6 +430,21 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
   }
   mat->wSZ = workspace_size;
   hipMalloc(&mat->devWork, mat->wSZ);
+  
+#if HIP_VERSION >= 70000000
+  if (a_props.scale_mode != scaling_type::None) {
+    hipMalloc(&mat->scale_dev_a, a_scale_size.get_size()*type_call_dev<sizeofCUDT>(a_scale_type));
+  }
+  if (b_props.scale_mode != scaling_type::None) {
+    hipMalloc(&mat->scale_dev_b, b_scale_size.get_size()*type_call_dev<sizeofCUDT>(b_scale_type));
+  }
+  if (c_props.scale_mode != scaling_type::None) {
+    hipMalloc(&mat->scale_dev_c, c_scale_size.get_size()*type_call_dev<sizeofCUDT>(c_scale_type));
+  }
+  if (d_props.scale_mode != scaling_type::None) {
+    hipMalloc(&mat->scale_dev_d, d_scale_size.get_size()*type_call_dev<sizeofCUDT>(d_scale_type));
+  }
+#endif
 }
 
 void hipblaslt_gemm::fill_host() {
@@ -284,6 +456,31 @@ void hipblaslt_gemm::fill_host() {
     type_call_host<initHost>(c_type, initialization, ptr_host_c[i], rows_c, cols_c, ldc,
                            batch_count, stride_c, control_c, constant_c, filename_c);
   }
+  std::cout << "test" << std::endl; 
+#if HIP_VERSION >= 70000000
+  // Initialize scale factors to 1.0 for all MX formats
+  if (a_props.scale_mode != scaling_type::None) {
+    std::cout << "a_scale_size.rows: " << a_scale_size.rows << std::endl;
+    std::cout << "a_scale_size.cols: " << a_scale_size.cols << std::endl;
+    std::cout << "a_scale_size.get_size: " << a_scale_size.get_size() << std::endl;
+    type_call_host<initHost>(a_scale_type, "constant", scale_host_a, a_scale_size.rows, a_scale_size.cols, 
+                            a_scale_size.rows, 1, 0, 0.0, 1.0, "");
+  }
+  if (b_props.scale_mode != scaling_type::None) {
+    std::cout << "b_scale_size.rows: " << b_scale_size.rows << std::endl;
+    std::cout << "b_scale_size.cols: " << b_scale_size.cols << std::endl;
+    type_call_host<initHost>(b_scale_type, "constant", scale_host_b, b_scale_size.rows, b_scale_size.cols, 
+                            b_scale_size.rows, 1, 0, 0.0, 1.0, "");
+  }
+  if (c_props.scale_mode != scaling_type::None) {
+    type_call_host<initHost>(c_scale_type, "constant", scale_host_c, c_scale_size.rows, c_scale_size.cols, 
+                            c_scale_size.cols, 1, 0, 0.0, 1.0, "");
+  }
+  if (d_props.scale_mode != scaling_type::None) {
+    type_call_host<initHost>(d_scale_type, "constant", scale_host_d, d_scale_size.rows, d_scale_size.cols, 
+                            d_scale_size.cols, 1, 0, 0.0, 1.0, "");
+  }
+#endif
 }
 
 void hipblaslt_gemm::copy_host_to_dev(hipblaslt_gemm_inst *mat) {
@@ -293,6 +490,22 @@ void hipblaslt_gemm::copy_host_to_dev(hipblaslt_gemm_inst *mat) {
     copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count);
     copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], rows_mem_c, cols_mem_c, batch_count);
   }
+  
+#if HIP_VERSION >= 70000000
+  // Copy scale factors to device
+  if (a_props.scale_mode != scaling_type::None) {
+    copy_and_convert(a_scale_type, scale_host_a, mat->scale_dev_a, a_scale_size.rows, a_scale_size.cols, 1);
+  }
+  if (b_props.scale_mode != scaling_type::None) {
+    copy_and_convert(b_scale_type, scale_host_b, mat->scale_dev_b, b_scale_size.rows, b_scale_size.cols, 1);
+  }
+  if (c_props.scale_mode != scaling_type::None) {
+    copy_and_convert(c_scale_type, scale_host_c, mat->scale_dev_c, c_scale_size.rows, c_scale_size.cols, 1);
+  }
+  if (d_props.scale_mode != scaling_type::None) {
+    copy_and_convert(d_scale_type, scale_host_d, mat->scale_dev_d, d_scale_size.rows, d_scale_size.cols, 1);
+  }
+#endif
 }
 
 void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
@@ -334,6 +547,42 @@ void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
   check_hipblas(hipblasLtMatmulPreferenceSetAttribute(
       mat->pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES, &mat->wSZ,
       sizeof(mat->wSZ)));
+      
+#if HIP_VERSION >= 70000000
+  // Set scaling attributes for MX formats
+  if (a_props.scale_mode != scaling_type::None) {
+    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op,  
+        HIPBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
+    //check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_a, 
+    //    HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &a_scale_type, sizeof(a_scale_type)));
+    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op, 
+        HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a, sizeof(mat->scale_dev_a)));
+  }
+  if (b_props.scale_mode != scaling_type::None) {
+    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op, 
+        HIPBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
+    //check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_b, 
+    //    HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &b_scale_type, sizeof(b_scale_type)));
+    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op, 
+        HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER, &mat->scale_dev_b, sizeof(mat->scale_dev_b)));
+  }
+  //if (c_props.scale_mode != scaling_type::None) {
+  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_c, 
+  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_MODE, &c_scale_mode, sizeof(c_scale_mode)));
+  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_c, 
+  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &c_scale_type, sizeof(c_scale_type)));
+  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_c, 
+  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE, &mat->scale_dev_c, sizeof(mat->scale_dev_c)));
+  //}
+  //if (d_props.scale_mode != scaling_type::None && !inplace) {
+  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_d, 
+  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_MODE, &d_scale_mode, sizeof(d_scale_mode)));
+  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_d, 
+  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &d_scale_type, sizeof(d_scale_type)));
+  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_d, 
+  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE, &mat->scale_dev_d, sizeof(mat->scale_dev_d)));
+  //}
+#endif
 }
 
 void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
@@ -376,6 +625,15 @@ void hipblaslt_gemm::free_mem() {
   if (!inplace) {
     free(ptr_host_d);
   }
+  
+#if HIP_VERSION >= 70000000
+  // Free scale host buffers
+  if (scale_host_a) free(scale_host_a);
+  if (scale_host_b) free(scale_host_b);
+  if (scale_host_c) free(scale_host_c);
+  if (scale_host_d) free(scale_host_d);
+#endif
+  
   for (auto mat : mat_ptrs) {
     hipSetDevice(mat.devIDX);
     for (int i = 0; i < flush_batch_count; i++) {
@@ -393,6 +651,15 @@ void hipblaslt_gemm::free_mem() {
       free(mat.ptr_dev_d);
     }
     hipFree(mat.devWork);
+    
+#if HIP_VERSION >= 70000000
+    // Free scale device buffers
+    if (mat.scale_dev_a) hipFree(mat.scale_dev_a);
+    if (mat.scale_dev_b) hipFree(mat.scale_dev_b);
+    if (mat.scale_dev_c) hipFree(mat.scale_dev_c);
+    if (mat.scale_dev_d) hipFree(mat.scale_dev_d);
+#endif
+    
     hipblasLtMatmulDescDestroy(mat.desc_op);
     hipblasLtMatrixLayoutDestroy(mat.desc_a);
     hipblasLtMatrixLayoutDestroy(mat.desc_b);
@@ -536,3 +803,23 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
   check_hip(hipStreamDestroy(stream));
   check_hipblas(hipblasLtDestroy(handle));
 }
+
+//#if HIP_VERSION >= 70000000
+//std::tuple<mblas_hip_data_type, hipblasLtMatmulMatrixScale_t, scale_size>
+//hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, std::string matrix_id) {
+//  mblas_hip_data_type scale_type = type.get_scale_type();
+//  hipblasLtMatmulMatrixScale_t scale_mode = get_scale_mode(type);
+//  
+//  // Get scale tensor dimensions based on matrix dimensions and scale mode
+//  int rows = (matrix_id == "A") ? rows_a : 
+//             (matrix_id == "B") ? rows_b :
+//             (matrix_id == "C") ? rows_c : rows_d;
+//  int cols = (matrix_id == "A") ? cols_a : 
+//             (matrix_id == "B") ? cols_b :
+//             (matrix_id == "C") ? cols_c : cols_d;
+//  
+//  scale_size sz = get_scale_tensor_size(rows, cols, scale_mode);
+//  
+//  return std::make_tuple(scale_type, scale_mode, sz);
+//}
+//#endif

@@ -5,8 +5,13 @@
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
+#if HIP_VERSION >= 70000000
+//#include <hip/hip_fp4.h>
+#include <hip/hip_fp6.h>
+#endif
 #include "hip_create_allocate.h"
 #include "hip_error.h"
+#include "generic_setup.h"
 
 __global__ void float_to_bf16(float *input, size_t num_elements,
                                 hip_bfloat16 *output)
@@ -36,6 +41,20 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
     output[idx] = __hip_cvt_float_to_fp8(input[idx], __HIP_SATFINITE, interp);
   }
 }
+
+#if HIP_VERSION >= 70000000
+__global__ void float_to_ue8m0(float *input, size_t num_elements,
+                                __hip_fp8_storage_t *output)
+{
+  long idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < num_elements)
+  {
+    uint32_t float_bits = __float_as_uint(input[idx]);
+    uint8_t ue8m0_value = (float_bits >> 23) & 0xFF;
+    output[idx] = (__hip_fp8_storage_t)ue8m0_value;
+  }
+}
+#endif
 
 // __global__ void intToInt8(__int32_t *input, size_t num_elements,
 //                           __int8_t *output, __nv_fp8_interpretation_t interp)
@@ -104,6 +123,63 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     check_hip(hipGetLastError());
     hipFree(tmpA);
   }
+#if HIP_VERSION >= 70000000
+  else if (precision == mblas_data_type::MBLAS_R_4F_E2M1)
+  {
+    // Allocate memory in the device for host precision (float)
+    void *tmpA;
+    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
+    check_hip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+                         hipMemcpyHostToDevice));
+    long num_elements = ceil_division(batchsz * x * y, 2l);
+    long block_size = 256;
+    long num_blocks = (num_elements + block_size - 1) / block_size;
+    float_to_fp4_helper((float2 *)tmpA, num_elements, (__hip_fp8_storage_t *)devA, num_blocks, block_size);
+    //float_to_fp4<<<num_blocks, block_size>>>((float2 *)tmpA, num_elements, 
+    //                                           (__hip_fp8_storage_t *)devA);
+    check_hip(hipGetLastError());
+    hipFree(tmpA);
+  }
+  else if (precision == mblas_data_type::MBLAS_R_6F_E2M3 || precision == mblas_data_type::MBLAS_R_6F_E3M2)
+  {
+    // Allocate memory in the device for host precision (float)
+    void *tmpA;
+    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
+    check_hip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+                         hipMemcpyHostToDevice));
+    long num_elements = batchsz * x * y;
+    long block_size = 256;
+    long num_blocks = (num_elements + block_size - 1) / block_size;
+    mblas_fp6_interpretation_t interp;
+    if (precision == mblas_data_type::MBLAS_R_6F_E2M3)
+    {
+      interp = MBLAS_F6_E2M3;
+    }
+    else if (precision == mblas_data_type::MBLAS_R_6F_E3M2)
+    {
+      interp = MBLAS_F6_E3M2;
+    }
+    float_to_fp6_helper((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA, interp, num_blocks, block_size);
+    // float_to_fp6<<<num_blocks, block_size>>>((float *)tmpA, num_elements,
+    //                                            (__hip_fp8_storage_t *)devA, interp);
+    check_hip(hipGetLastError());
+    hipFree(tmpA);
+  }
+  else if (precision == mblas_data_type::MBLAS_R_8F_UE8M0)
+  {
+    // Allocate memory in the device for host precision (float)
+    void *tmpA;
+    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
+    check_hip(hipMemcpy(tmpA, hostA, batchsz * x * y * hostsz,
+                         hipMemcpyHostToDevice));
+    long num_elements = batchsz * x * y;
+    long block_size = 256;
+    long num_blocks = (num_elements + block_size - 1) / block_size;
+    float_to_ue8m0<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA);
+    check_hip(hipGetLastError());
+    hipFree(tmpA);
+  }
+#endif
   else 
   {
     check_hip(hipMemcpy(devA, hostA, (long)batchsz * x * y * hostsz,
