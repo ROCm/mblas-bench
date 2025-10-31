@@ -12,12 +12,12 @@ jobs:
   build:
     strategy:
         matrix:
-          rocm_version: [6.4.3,7.0.2]
-        include:
-          - rocm_version: 6.4.3
-            gpu_targets: "gfx1100,gfx1030,gfx942,gfx90a,gfx908"
-          - rocm_version: 7.0.2
-            gpu_targets: "gfx950,gfx1201,gfx1200,gfx1101,gfx1100,gfx1030,gfx942,gfx90a,gfx908"
+          rocm_version: [6.4.3, 7.0.2]
+          include:
+            - rocm_version: 6.4.3
+              gpu_targets: "gfx1100,gfx1030,gfx942,gfx90a,gfx908"
+            - rocm_version: 7.0.2
+              gpu_targets: "gfx950,gfx1201,gfx1200,gfx1101,gfx1100,gfx1030,gfx942,gfx90a,gfx908"
     runs-on: ubuntu-latest
     container:
       image: rocm/dev-ubuntu-22.04:${{ matrix.rocm_version }}
@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Fix unfortunate rocm container bug
-        if: ${{ matrix.version == 7.0.2 }}
+        if: ${{ matrix.rocm_version == '7.0.2' }}
         run: |
           sed -i "s/7.0.2/30.10.2/" /etc/apt/sources.list.d/amdgpu.list 
 
