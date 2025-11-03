@@ -26,17 +26,6 @@ endif()
 if(NOT WITH_HIP AND NOT WITH_CUDA)
     message(FATAL_ERROR "No backends enabled. Please enable at least one backend (WITH_ROCM, WITH_HIPBLASLT, WITH_ROCBLAS, WITH_CUDA).")
 endif()
-#set(CMAKE_MODULE_PATH "/opt/rocm/hip/cmake":"/opt/rocm/lib/cmake/":${CMAKE_MODULE_PATH})
-#message("CMAKE_MODULE_PATH"=${CMAKE_MODULE_PATH})
-
-# Set the GPU to compile for
-#set(GPU_TARGETS "gfx908:sramecc+:xnack-" CACHE STRING "GPU targets to compile for")
-# Search for rocm in common locations
-#list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
-# Find hip packages
-#find_package(hip REQUIRED)
-#find_package(rocblas REQUIRED)
-#find_package(Threads REQUIRED) 
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
@@ -45,20 +34,10 @@ add_subdirectory(generic)
 #Compile shared libs for GPU backends
 if (WITH_HIP)
     add_subdirectory(hip)
-    add_compile_definitions(WITH_HIP)
-endif()
-
-if (WITH_HIPBLASLT)
-    add_compile_definitions(WITH_HIPBLASLT)
-endif()
-
-if (WITH_ROCBLAS)
-    add_compile_definitions(WITH_ROCBLAS)
 endif()
 
 if (WITH_CUDA)
     add_subdirectory(cublas)
-    add_compile_definitions(WITH_CUDA)
 endif()
 
 add_executable(
