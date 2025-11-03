@@ -37,17 +37,23 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y cmake build-essential git rocblas-dev hipblas-dev hipblaslt-dev
-      
-      - name: Configure CMake
+          apt-get install -y wget build-essential git rocblas-dev hipblas-dev hipblaslt-dev
+
+      # Needed for hipblaslt 1.1.0
+      - name: Install CMake manually
         run: |
-          cmake -S src -B build \
+          mkdir -p /opt/cmake
+          wget --no-check-certificate --quiet -O - https://github.com/Kitware/CMake/releases/download/v3.31.9/cmake-3.31.9-linux-x86_64.tar.gz | tar --strip-components=1 -xz -C /opt/cmake
+
+      - name: Configure Project with CMake
+        run: |
+          /opt/cmake/bin/cmake -S src -B build \
             -DWITH_ROCM=true \
             -DWITH_CUDA=false \
             -DGPU_TARGETS=${{ matrix.gpu_targets }}
       
-      - name: Build
-        run: cmake --build build
+      - name: Build mblas-bench
+        run: /opt/cmake/bin/cmake --build build
 
       - name: Build Summary
         if: always()

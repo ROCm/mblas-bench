@@ -26,13 +26,13 @@ jobs:
           apt-get update
           apt-get install -y cmake build-essential git
       
-      - name: Configure CMake
+      - name: Configure Project with CMake
         run: |
           cmake -S src -B build \
             -DWITH_CUDA=true \
             -DWITH_ROCM=false
       
-      - name: Build
+      - name: Build mblas-bench
         run: cmake --build build
 
       - name: Build Summary
