@@ -141,6 +141,7 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
     std::cerr << scaling_string(desc.scale_mode) << std::endl;
     throw std::invalid_argument(errorString);
   } else if (desc.scale_mode == scaling_type::Vector) {
+#if (CUDART_VERSION >= 12090)
     // Dependent on if this is the A or B matrix
     // Use the columns for B, rows for everything else (A,C,D)
     scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F; 
@@ -150,6 +151,14 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
     long scaling_vec_len = (matrix_id == "B") ? n : m;
     scale_size = std::make_pair<size_t, size_t>(1, scaling_vec_len);
     scale_type = MBLAS_R_32F;
+#else
+    string errorString =
+        "Vector scaling mode requires CUDA 12.9.0 or later. "
+        "Matrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    std::cerr << scaling_string(desc.scale_mode) << std::endl;
+    throw std::invalid_argument(errorString);
+#endif
   } else if (desc.scale_mode == scaling_type::Scalar) {
     scale_size = std::make_pair<size_t, size_t>(1, 1);
     scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F; 
