@@ -150,21 +150,23 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
   // Pull in alpha and beta, alloc memory and save to pointers
   string salpha = result["alpha"].as<string>();
   string salphai = result["alphai"].as<string>();
-  alpha =
-      type_call_host<allocSetScalar>(precision, salpha.c_str(), salphai.c_str());
+  alpha = malloc(get_malloc_size_scalar(precision));
+  type_call_host<set_scalar>(precision, alpha, salpha, salphai);
+  
   string sbeta = result["beta"].as<string>();
   string sbetai = result["betai"].as<string>();
-  beta = type_call_host<allocSetScalar>(precision, sbeta.c_str(), sbetai.c_str());
+  beta = malloc(get_malloc_size_scalar(precision));
+  type_call_host<set_scalar>(precision, beta, sbeta, sbetai);
   // std::cout << *((float *)alpha) << std::endl;
   // std::cout << *((float *)beta) << std::endl;
   uint64_t a_offset, b_offset, c_offset, d_offset;
   set_flush_batch_count( 
       type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
       type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(d_type), 
-      get_packing_count(a_type), 
-      get_packing_count(b_type), 
-      get_packing_count(c_type), 
-      get_packing_count(d_type), 
+      a_type.get_packing_count(), 
+      b_type.get_packing_count(), 
+      c_type.get_packing_count(), 
+      d_type.get_packing_count(), 
       inplace);
 }
 
@@ -236,11 +238,11 @@ void hipblaslt_gemm::alloc_host() {
 
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = allocate_host_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-    ptr_host_b[i] = allocate_host_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-    ptr_host_c[i] = allocate_host_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count));
+    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count));
+    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count));
     if (!inplace) {
-      ptr_host_d[i] = allocate_host_array(d_type, rows_mem_d, cols_mem_d, batch_count);
+      ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count));
     }
   }
 }
@@ -262,11 +264,11 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
   }
 
   for (int i = 0; i < flush_batch_count; i++) {
-    mat->ptr_dev_a[i] = allocate_dev_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-    mat->ptr_dev_b[i] = allocate_dev_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-    mat->ptr_dev_c[i] = allocate_dev_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+    hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count));
+    hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count));
+    hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count));
     if (!inplace) {
-      mat->ptr_dev_d[i] = allocate_dev_array(d_type, rows_mem_d, cols_mem_d, batch_count);
+      hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count));
     }
   }
   mat->wSZ = workspace_size;
@@ -287,9 +289,9 @@ void hipblaslt_gemm::fill_host() {
 void hipblaslt_gemm::copy_host_to_dev(hipblaslt_gemm_inst *mat) {
   hipSetDevice(mat->devIDX);
   for (int i = 0; i < flush_batch_count; i++) {
-    copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], m, k, batch_count);
-    copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], k, n, batch_count);
-    copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], n, m, batch_count);
+    copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], rows_mem_a, cols_mem_a, batch_count);
+    copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count);
+    copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], rows_mem_c, cols_mem_c, batch_count);
   }
 }
 
@@ -350,6 +352,7 @@ void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
     check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
   }
   mat->algo = heuristicResult;
+  hipblasLtDestroy(handle);
 }
 void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
   // Not currently implemented, using simple method
@@ -359,9 +362,6 @@ void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
 void hipblaslt_gemm::free_mem() {
   free(alpha);
   free(beta);
-  //free(host_a);
-  //free(host_b);
-  //free(host_c);
   for (int i = 0; i < flush_batch_count; i++) {
     free(ptr_host_a[i]);
     free(ptr_host_b[i]);
@@ -377,6 +377,7 @@ void hipblaslt_gemm::free_mem() {
     free(ptr_host_d);
   }
   for (auto mat : mat_ptrs) {
+    hipSetDevice(mat.devIDX);
     for (int i = 0; i < flush_batch_count; i++) {
       hipFree(mat.ptr_dev_a[i]);
       hipFree(mat.ptr_dev_b[i]);
@@ -385,11 +386,11 @@ void hipblaslt_gemm::free_mem() {
         hipFree(mat.ptr_dev_d[i]);
       }
     }
-    hipFree(mat.ptr_dev_a);
-    hipFree(mat.ptr_dev_b);
-    hipFree(mat.ptr_dev_c);
+    free(mat.ptr_dev_a);
+    free(mat.ptr_dev_b);
+    free(mat.ptr_dev_c);
     if (!inplace) {
-      hipFree(mat.ptr_dev_d);
+      free(mat.ptr_dev_d);
     }
     hipFree(mat.devWork);
     hipblasLtMatmulDescDestroy(mat.desc_op);
@@ -528,4 +529,10 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
   hipEventElapsedTime(&elapsedTime_ms, start, stop);
   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
       calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+  
+  // Cleanup
+  check_hip(hipEventDestroy(start));
+  check_hip(hipEventDestroy(stop));
+  check_hip(hipStreamDestroy(stream));
+  check_hipblas(hipblasLtDestroy(handle));
 }

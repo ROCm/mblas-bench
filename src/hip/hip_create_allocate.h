@@ -16,9 +16,14 @@
 #include "generic_init.h"
 #include "mblas_data_type.h"
 
-void *allocate_host_array(mblas_data_type type, long x, long y, int batch = 1);
-void *allocate_dev_array(mblas_data_type type, long x, long y, int batch = 1);
-void *allocate_host_dev_array(mblas_data_type type, long x, long y, int batch = 1);
+// DEPRECATED: These functions are disabled due to cross-library malloc/free issues.
+// Use malloc(get_malloc_size_host(...)) and hipMalloc(..., get_malloc_size_dev(...)) instead.
+// void *allocate_host_array(mblas_data_type type, long x, long y, int batch = 1);
+// void *allocate_dev_array(mblas_data_type type, long x, long y, int batch = 1);
+// void *allocate_host_dev_array(mblas_data_type type, long x, long y, int batch = 1);
+
+long get_malloc_size_host(mblas_data_type type, long x, long y, int batch);
+long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch);
 
 // void initHostH(mblas_data_type precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
@@ -40,9 +45,16 @@ struct batchedPtrMagic {
                   int y);
 };
 
+// DEPRECATED: allocSetScalar performs malloc in the wrong library context.
+// Use malloc + set_scalar instead to keep allocation in the calling library.
+//template <typename T>
+//struct allocSetScalar {
+//  void *operator()(std::string, std::string);
+//};
+
 template <typename T>
-struct allocSetScalar {
-  void *operator()(std::string, std::string);
+struct set_scalar {
+  void operator()(void *ptr, std::string, std::string);
 };
 
 template <template <typename> class tFunc, class... Args>
@@ -53,21 +65,23 @@ template <template <typename> class tFunc, class... Args>
 auto type_call_dev(mblas_data_type type, Args... args) ->
     typename std::result_of<tFunc<double>(Args...)>::type;
 
+long get_malloc_size_scalar(mblas_data_type type);
+
 template <typename T>
-void *alloc_set_scalar_val(std::string sval, std::string sval2, T dummy) {
+void set_scalar_val(void *ptr, std::string sval, std::string sval2, T dummy) {
   // Only for real numbers, no need to worry about contents from sval2
-  void *ptr = (void *)malloc(sizeof(T));
+  //void *ptr = (void *)malloc(sizeof(T));
   T *data = (T *)ptr;
   std::istringstream iss(sval.c_str());
   iss >> *data;
-  return ptr;
+  //return ptr;
 }
 
 template <typename T>
-void *alloc_set_scalar_val(std::string sval, std::string sval2,
+void set_scalar_val(void *ptr, std::string sval, std::string sval2,
                          std::complex<T> dummy) {
   // Complex numbers, do something about sval2
-  void *ptr = (void *)malloc(sizeof(std::complex<T>));
+  //void *ptr = (void *)malloc(sizeof(std::complex<T>));
   std::complex<T> *data = (std::complex<T> *)ptr;
   T val;
   std::istringstream iss(sval.c_str());
@@ -76,8 +90,36 @@ void *alloc_set_scalar_val(std::string sval, std::string sval2,
   std::istringstream iss2(sval2.c_str());
   iss2 >> val;
   data->imag(val);
-  return ptr;
+  //return ptr;
 }
+
+// DEPRECATED: alloc_set_scalar_val performs malloc in the wrong library context.
+// Use malloc + set_scalar_val instead to keep allocation in the calling library.
+//template <typename T>
+//void *alloc_set_scalar_val(std::string sval, std::string sval2, T dummy) {
+//  // Only for real numbers, no need to worry about contents from sval2
+//  void *ptr = (void *)malloc(sizeof(T));
+//  T *data = (T *)ptr;
+//  std::istringstream iss(sval.c_str());
+//  iss >> *data;
+//  return ptr;
+//}
+//
+//template <typename T>
+//void *alloc_set_scalar_val(std::string sval, std::string sval2,
+//                         std::complex<T> dummy) {
+//  // Complex numbers, do something about sval2
+//  void *ptr = (void *)malloc(sizeof(std::complex<T>));
+//  std::complex<T> *data = (std::complex<T> *)ptr;
+//  T val;
+//  std::istringstream iss(sval.c_str());
+//  iss >> val;
+//  data->real(val);
+//  std::istringstream iss2(sval2.c_str());
+//  iss2 >> val;
+//  data->imag(val);
+//  return ptr;
+//}
 
 template <typename T>
 int sizeofCUDT<T>::operator()() {
@@ -89,10 +131,17 @@ int sizeofCUDTP<T>::operator()() {
   return sizeof(T *);
 }
 
+// DEPRECATED: allocSetScalar implementation commented out
+//template <typename T>
+//void *allocSetScalar<T>::operator()(std::string sval1, std::string sval2) {
+//  T dummy;
+//  return alloc_set_scalar_val(sval1, sval2, std::forward<T>(dummy));
+//}
+
 template <typename T>
-void *allocSetScalar<T>::operator()(std::string sval1, std::string sval2) {
+void set_scalar<T>::operator()(void *ptr, std::string sval1, std::string sval2) {
   T dummy;
-  return alloc_set_scalar_val(sval1, sval2, std::forward<T>(dummy));
+  return set_scalar_val(ptr, sval1, sval2, std::forward<T>(dummy));
 }
 
 template <typename T>
@@ -297,11 +346,8 @@ auto type_call_dev(mblas_data_type type, Args... args) ->
 //  void *h_A;
 //  type_call_host<fill_rand_host_blasgemm>(CUDA_R_64F, h_A, 10, 10, 10, 1, 0);
 //  type_call_host<sizeofCUDTP>(CUDA_R_64F);
-//  type_call_host<allocSetScalar>(CUDA_R_64F, "1", "0");
+//  // DEPRECATED: allocSetScalar no longer used
+//  //type_call_host<allocSetScalar>(CUDA_R_64F, "1", "0");
 //  type_call_dev<batchedPtrMagic>(CUDA_R_64F, (void **)NULL, (void **)NULL,
 //                               (void *)NULL, 10, 10, 10);
-//  // template void *allocSetScalar<double>::operator()(string);
 //}
-
-
-int get_packing_count(mblas_data_type type);

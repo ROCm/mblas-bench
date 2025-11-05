@@ -6,8 +6,7 @@
 
 class mblas_rocblas_compute_type: public mblas_compute_type {
  private:
-  static const std::map<mblas_compute_type_enum, rocblas_computetype> compute_mappings;
-  //static const std::vector<std::pair<mblas_compute_type_enum, mblas_data_type_enum>> prec_mappings;
+  static const std::vector<std::pair<mblas_compute_type_enum, mblas_data_type_enum>> prec_mappings;
   bool roc_is_real;
  public:
   // Constructors
@@ -15,12 +14,8 @@ class mblas_rocblas_compute_type: public mblas_compute_type {
   mblas_rocblas_compute_type() : mblas_compute_type() {}
   mblas_rocblas_compute_type(mblas_compute_type_enum y) : mblas_compute_type(y) {}
   // Conversions
-  static rocblas_computetype convert_to_rocm(mblas_rocblas_compute_type data);
-  static rocblas_computetype convert_to_rocm(const mblas_rocblas_compute_type *data);
-  operator rocblas_computetype() const;
   static rocblas_datatype convert_to_rocm_data(const mblas_rocblas_compute_type *data);
   operator rocblas_datatype() const;
-  // void operator = (const rocblas_computetype cudt);
   //mblas_rocblas_compute_type& operator = (const mblas_rocblas_compute_type mdt);
   //mblas_rocblas_compute_type & operator = (const mblas_rocblas_compute_type mdt);
   mblas_rocblas_compute_type & operator = (const mblas_rocblas_compute_type& mdt);

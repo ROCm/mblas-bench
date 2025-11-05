@@ -16,34 +16,40 @@
 #include "generic_init.h"
 #include "generic_setup.h"
 
-void *allocate_host_array(mblas_data_type type, long x, long y, int batch) {
-  int typesize = type_call_host<sizeofCUDT>(type);
-  void *data = (void *)malloc(x * y * batch * typesize);
-  return data;
-}
+// DEPRECATED: Disabled due to cross-library malloc/free issues
+// Use malloc(get_malloc_size_host(...)) instead
+// void *allocate_host_array(mblas_data_type type, long x, long y, int batch) {
+//   int typesize = type_call_host<sizeofCUDT>(type);
+//   void *data = (void *)malloc(x * y * batch * typesize);
+//   return data;
+// }
 
-void *allocate_dev_array(mblas_data_type type, long x, long y, int batch) {
-  int typesize = type_call_dev<sizeofCUDT>(type);
-  long packing_count = get_packing_count(type);
-  // Compensate for packing of 4 bit dtypes
-  long malloc_size = ceil_division(x * y * batch * typesize, packing_count);
-  void *data;
-  check_cuda(cudaMalloc(&data, malloc_size));
-  return data;
-}
+// DEPRECATED: Disabled due to cross-library malloc/free issues
+// Use cudaMalloc(&ptr, get_malloc_size_dev(...)) instead
+// void *allocate_dev_array(mblas_data_type type, long x, long y, int batch) {
+//   int typesize = type_call_dev<sizeofCUDT>(type);
+//   long packing_count = get_packing_count(type);
+//   // Compensate for packing of 4 bit dtypes
+//   long malloc_size = ceil_division(x * y * batch * typesize, packing_count);
+//   void *data;
+//   check_cuda(cudaMalloc(&data, malloc_size));
+//   return data;
+// }
 
-void *allocate_host_dev_array(mblas_data_type type, long x, long y, int batch) {
-  int typesize = type_call_host<sizeofCUDT>(type);
-  void *data;
-  check_cuda(cudaMalloc(&data, x * y * batch * typesize));
-  return data;
-}
+// DEPRECATED: Disabled due to cross-library malloc/free issues
+// Use cudaMalloc(&ptr, get_malloc_size_host(...)) instead
+// void *allocate_host_dev_array(mblas_data_type type, long x, long y, int batch) {
+//   int typesize = type_call_host<sizeofCUDT>(type);
+//   void *data;
+//   check_cuda(cudaMalloc(&data, x * y * batch * typesize));
+//   return data;
+// }
 
 void batched_pointer_magic_generic(void **hptr, void *dAr, int batch_count, long x, long y, int flush_batch_count, long total_block_size, mblas_data_type type) {
   //T **host = reinterpret_cast<T **>(hptr);
   //T *device_array = static_cast<T *>(dAr);
   long type_size = type_call_host<sizeofCUDT>(type);
-  long packing_count = get_packing_count(type);
+  long packing_count = type.get_packing_count();
   for (int j = 0; j < flush_batch_count; j++) {
     // Offset to the next block if using cache flushing
     int flush_offset = j*total_block_size;
@@ -53,14 +59,19 @@ void batched_pointer_magic_generic(void **hptr, void *dAr, int batch_count, long
   }
 }
 
+long get_malloc_size_scalar(mblas_data_type type) {
+  return type_call_host<sizeofCUDT>(type);
+}
 
-int get_packing_count(mblas_data_type type) {
-  if (type == mblas_data_type::MBLAS_R_4F_E2M1) {
-    // Two 4-bit FP4 floats per byte
-    return 2;
-  } else {
-    return 1;
-  }
+long get_malloc_size_host(mblas_data_type type, long x, long y, int batch) {
+  int typesize = type_call_host<sizeofCUDT>(type);
+  return x * y * batch * typesize;
+}
 
+long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch) {
+  int typesize = type_call_dev<sizeofCUDT>(type);
+  long packing_count = type.get_packing_count();
+  // Compensate for packing of 4 bit dtypes
+  return ceil_division(x * y * batch * typesize, packing_count);
 }
 

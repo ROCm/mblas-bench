@@ -21,10 +21,6 @@ class mblas_compute_type {
     static const mblas_compute_type MBLAS_COMPUTE_64F_PEDANTIC;
     static const mblas_compute_type MBLAS_COMPUTE_32I;
     static const mblas_compute_type MBLAS_COMPUTE_32I_PEDANTIC;
-    static const mblas_compute_type MBLAS_COMPUTE_32F_8F_8F;
-    static const mblas_compute_type MBLAS_COMPUTE_32F_8F_8BF;
-    static const mblas_compute_type MBLAS_COMPUTE_32F_8BF_8F;
-    static const mblas_compute_type MBLAS_COMPUTE_32F_8BF_8BF;
     static const mblas_compute_type MBLAS_COMPUTE_NULL;
 
     // Internal enum
@@ -67,8 +63,4 @@ constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_64F{mblas_c
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_64F_PEDANTIC{mblas_compute_type_enum::MBLAS_COMPUTE_64F_PEDANTIC};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32I{mblas_compute_type_enum::MBLAS_COMPUTE_32I};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32I_PEDANTIC{mblas_compute_type_enum::MBLAS_COMPUTE_32I_PEDANTIC};
-constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32F_8F_8F{mblas_compute_type_enum::MBLAS_COMPUTE_32F_8F_8F};
-constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32F_8F_8BF{mblas_compute_type_enum::MBLAS_COMPUTE_32F_8F_8BF};
-constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32F_8BF_8F{mblas_compute_type_enum::MBLAS_COMPUTE_32F_8BF_8F};
-constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32F_8BF_8BF{mblas_compute_type_enum::MBLAS_COMPUTE_32F_8BF_8BF};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_NULL{mblas_compute_type_enum::MBLAS_COMPUTE_NULL};

@@ -72,7 +72,8 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   if (precision == mblas_data_type::MBLAS_C_16F || precision == mblas_data_type::MBLAS_R_16F)
   {
     // Allocate memory in the device for host precision (float)
-    void *tmpA = allocate_host_dev_array(precision, x, y, batchsz);
+    void *tmpA;
+    check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
     check_cuda(cudaMemcpy(tmpA, host_a, batchsz * x * y * hostsz,
                          cudaMemcpyHostToDevice));
     long num_elements = batchsz * x * y;
@@ -85,7 +86,8 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   else if (precision == mblas_data_type::MBLAS_C_16BF || precision == mblas_data_type::MBLAS_R_16BF)
   {
     // Allocate memory in the device for host precision (float)
-    void *tmpA = allocate_host_dev_array(precision, x, y, batchsz);
+    void *tmpA;
+    check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
     check_cuda(cudaMemcpy(tmpA, host_a, batchsz * x * y * hostsz,
                          cudaMemcpyHostToDevice));
     long num_elements = batchsz * x * y;
@@ -98,7 +100,8 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 || precision == mblas_data_type::MBLAS_R_8F_E5M2 || precision == mblas_data_type::MBLAS_R_8F_UE4M3)
   {
     // Allocate memory in the device for host precision (float)
-    void *tmpA = allocate_host_dev_array(precision, x, y, batchsz);
+    void *tmpA;
+    check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
     check_cuda(cudaMemcpy(tmpA, host_a, batchsz * x * y * hostsz,
                          cudaMemcpyHostToDevice));
     long num_elements = batchsz * x * y;
@@ -126,7 +129,8 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
 
 #if (ENABLE_CUDA_FP4)
     // Allocate memory in the device for host precision (float)
-    void *tmpA = allocate_host_dev_array(precision, x, y, batchsz);
+    void *tmpA;
+    check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
     check_cuda(cudaMemcpy(tmpA, host_a, batchsz * x * y * hostsz,
                          cudaMemcpyHostToDevice));
     long num_elements = ceil_division(batchsz * x * y, 2l);
@@ -158,19 +162,24 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
 
 void *convert_scalar(mblas_cuda_data_type precision, void *scalar)
 {
-
   if (precision == mblas_data_type::MBLAS_R_16F)
   {
+    // Read float value, convert to __half, write in-place
     float scalarVal = *static_cast<float *>(scalar);
-    free(scalar);
-    __half *hscalar = (__half *)malloc(sizeof(__half));
+    __half *hscalar = (__half *)scalar;
     *hscalar = __float2half(scalarVal);
-    return (void *)hscalar;
+    return scalar;
   }
   else if (precision == mblas_data_type::MBLAS_C_16F)
   {
-    // Implement me...
-    return NULL;
+    // Read complex<float>, convert to complex<__half>, write in-place
+    std::complex<float> *cFloat = static_cast<std::complex<float> *>(scalar);
+    float realVal = cFloat->real();
+    float imagVal = cFloat->imag();
+    
+    std::complex<__half> *cHalf = (std::complex<__half> *)scalar;
+    *cHalf = std::complex<__half>(__float2half(realVal), __float2half(imagVal));
+    return scalar;
   }
   else
   {

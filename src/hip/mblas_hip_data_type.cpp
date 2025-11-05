@@ -70,6 +70,6 @@ const std::map<mblas_data_type, hipDataType> mblas_hip_data_type::prec_mappings 
     {MBLAS_C_64I,  HIP_C_64I},
     {MBLAS_R_64U,  HIP_R_64U},
     {MBLAS_C_64U,  HIP_C_64U},
-    {MBLAS_R_8F_E4M3, HIP_R_8F_E4M3_FNUZ},
-    {MBLAS_R_8F_E5M2, HIP_R_8F_E5M2_FNUZ},
+    {MBLAS_R_8F_E4M3, HIP_R_8F_E4M3},
+    {MBLAS_R_8F_E5M2, HIP_R_8F_E5M2},
 };
