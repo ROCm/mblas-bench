@@ -135,6 +135,30 @@ void fill_rand_host_uniform(void *ptr, long rows_A, long cols_A, long ld, int ba
 }
 
 template <typename T>
+void fill_rand_host_pow2_binomial(void *ptr, long rows_A, long cols_A, long ld, int batch,
+                                   long long int stride, int n = 10) {
+  T *A = (T *)ptr;
+  std::random_device r;
+  int random_dev_seed = r();
+  #pragma omp parallel shared(A) 
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    std::binomial_distribution<int> binomial_dist(2 * n + 1, 0.5);
+    #pragma omp for collapse(3) 
+    for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+      for (size_t j = 0; j < cols_A; ++j) {
+        for (size_t i = 0; i < rows_A; ++i) {
+          int binomial_value = binomial_dist(gen);
+          int offset_value = binomial_value - (n + 1);
+          A[i + j * ld + i_batch * stride] = T(std::ldexp(T(1), offset_value));
+        }
+      }
+    }
+  }
+}
+
+template <typename T>
 void fill_rand_host_trig_float(void *ptr, long rows_A, long cols_A, long ld, int batch,
                            long long int stride, bool isSin, float scaling) {
   T *A = (T *)ptr;
@@ -237,6 +261,17 @@ void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
       fill_rand_host_uniform<T>(ptr, rows_A, cols_A, ld, batch, stride, min_val, max_val);
     } else {
       std::string error_string = "Error: uniform distribution not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  } else if (parse_parameterized_init(initialization, 
+            {"pow2_binomial"}, (int&)batch)) {
+    // Parse n parameter, default is 10
+    int n = 10;
+    parse_parameterized_init(initialization, {"pow2_binomial"}, n);
+    if constexpr (std::is_floating_point_v<T>) {
+      fill_rand_host_pow2_binomial<T>(ptr, rows_A, cols_A, ld, batch, stride, n);
+    } else {
+      std::string error_string = "Error: pow2_binomial distribution not supported for non-floating-point types";
       throw std::invalid_argument(error_string);
     }
   //} else if (initialization == "hpl") {
