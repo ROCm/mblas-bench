@@ -55,6 +55,7 @@ class mblas_data_type {
     bool is_real() const;
     bool is_fp8() const;
     bool is_fp4() const;
+    int get_packing_count() const;
     void set_scalar(std::string scalarstr, mblas_data_type precision, mblas_compute_type& compute);
 };
 

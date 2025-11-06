@@ -177,21 +177,24 @@ cublas_gemm::cublas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
   transB = mblas_cuda_operation(result["transposeB"].as<std::string>());
 
   // Pull in alpha and beta, alloc memory and save to pointers
+  // Use local allocation to avoid cross-library malloc/free issues
   string salpha = result["alpha"].as<string>();
   string salphai = result["alphai"].as<string>();
-  alpha =
-      type_call_host<allocSetScalar>(precision, salpha.c_str(), salphai.c_str());
+  alpha = malloc(get_malloc_size_scalar(precision));
+  type_call_host<set_scalar>(precision, alpha, salpha, salphai);
+  
   string sbeta = result["beta"].as<string>();
   string sbetai = result["betai"].as<string>();
-  beta = type_call_host<allocSetScalar>(precision, sbeta.c_str(), sbetai.c_str());
+  beta = malloc(get_malloc_size_scalar(precision));
+  type_call_host<set_scalar>(precision, beta, sbeta, sbetai);
   
   set_flush_batch_count( 
       type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
       type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(c_type), 
-      get_packing_count(a_type), 
-      get_packing_count(b_type), 
-      get_packing_count(c_type), 
-      get_packing_count(c_type), 
+      a_type.get_packing_count(), 
+      b_type.get_packing_count(), 
+      c_type.get_packing_count(), 
+      c_type.get_packing_count(), 
       true);
   requested_solution_count = result["requested_solution_num"].as<int>();
 }
@@ -253,9 +256,9 @@ void cublas_gemm::alloc_host() {
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(c_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = allocate_host_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-    ptr_host_b[i] = allocate_host_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-    ptr_host_c[i] = allocate_host_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count));
+    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count));
+    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count));
   }
 }
 
@@ -270,9 +273,9 @@ void cublas_gemm::alloc_dev(cublasgemmInst *mat) {
       (void **)malloc(batch_count * flush_batch_count * type_call_dev<sizeofCUDTP>(c_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    mat->ptr_dev_a[i] = allocate_dev_array(a_type, rows_mem_a, cols_mem_a, batch_count);
-    mat->ptr_dev_b[i] = allocate_dev_array(b_type, rows_mem_b, cols_mem_b, batch_count);
-    mat->ptr_dev_c[i] = allocate_dev_array(c_type, rows_mem_c, cols_mem_c, batch_count);
+    cudaMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count));
+    cudaMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count));
+    cudaMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count));
   }
 
   mat->wSZ = workspace_size;

@@ -195,6 +195,15 @@ bool mblas_data_type::is_fp4() const {
   return false;
 }
 
+int mblas_data_type::get_packing_count() const {
+  if (value == MBLAS_R_4F_E2M1) {
+    // Two 4-bit FP4 floats per byte
+    return 2;
+  } else {
+    return 1;
+  }
+}
+
 void mblas_data_type::set_scalar(std::string scalarstr, mblas_data_type precision,
                             mblas_compute_type& compute) {
   if (scalarstr != "") {

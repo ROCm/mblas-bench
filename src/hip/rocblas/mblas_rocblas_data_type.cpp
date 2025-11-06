@@ -59,6 +59,9 @@ const std::map<mblas_data_type, rocblas_datatype> mblas_rocblas_data_type::prec_
     {MBLAS_C_32I,  rocblas_datatype_i32_c},
     {MBLAS_R_32U,  rocblas_datatype_u32_r},
     {MBLAS_C_32U,  rocblas_datatype_u32_c},
+#if (HIP_VERSION < 70000000)
+    // Undocumented rocblas fp8 support, removed in rocm 7.0.0
     {MBLAS_R_8F_E4M3, rocblas_datatype_f8_r},
     {MBLAS_R_8F_E5M2, rocblas_datatype_bf8_r},
+#endif
 };

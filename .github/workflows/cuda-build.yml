@@ -1,0 +1,44 @@
+name: CUDA Build Test
+
+on:
+  #push:
+  #  branches:
+  #    - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        cuda_version: [12.8.1, 12.9.1, 13.0.1]
+        #arch: [x86_64, arm64]
+        arch: [x86_64]
+      fail-fast: false
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm64' || 'ubuntu-24.04' }}
+    container:
+      image: nvidia/cuda:${{ matrix.cuda_version }}-devel-ubuntu24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y cmake build-essential git
+      
+      - name: Configure Project with CMake
+        run: |
+          cmake -S src -B build \
+            -DWITH_CUDA=true \
+            -DWITH_ROCM=false
+      
+      - name: Build mblas-bench
+        run: cmake --build build -j
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "CUDA ${{ matrix.cuda_version }} (${{ matrix.arch }}) build complete: ${{ job.status }}"
+
