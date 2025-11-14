@@ -17,6 +17,9 @@ const std::map<mblas_compute_type_enum, cublasComputeType_t> mblas_cuda_compute_
 #if (CUDART_VERSION >= 12090)
     {MBLAS_COMPUTE_32F_EMULATED_16BFX9, CUBLAS_COMPUTE_32F_EMULATED_16BFX9},
 #endif
+#if (MBLAS_CUDA_VERSION_FULL >= 130088)
+    {MBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT, CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT},
+#endif
 };
 
 cublasComputeType_t mblas_cuda_compute_type::convert_to_cuda(mblas_cuda_compute_type data)  { return convert_to_cuda(&data); }

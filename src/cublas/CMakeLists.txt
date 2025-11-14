@@ -50,6 +50,32 @@ if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.8.0)
     add_definitions(-DENABLE_CUDA_FP4)
 endif()
 
+# Extract exact CUDA version including patch number from CMake's detected version
+# This comes from the "The CUDA compiler identification is NVIDIA X.Y.Z" message
+if(CMAKE_CUDA_COMPILER_VERSION)
+    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" CUDA_VERSION_MATCH "${CMAKE_CUDA_COMPILER_VERSION}")
+    if(CUDA_VERSION_MATCH)
+        set(CUDA_VERSION_MAJOR ${CMAKE_MATCH_1})
+        set(CUDA_VERSION_MINOR ${CMAKE_MATCH_2})
+        set(CUDA_VERSION_PATCH ${CMAKE_MATCH_3})
+        
+        # Create a numeric version like 130088 for 13.0.88
+        math(EXPR CUDA_VERSION_FULL "${CUDA_VERSION_MAJOR} * 10000 + ${CUDA_VERSION_MINOR} * 100 + ${CUDA_VERSION_PATCH}")
+        
+        message(STATUS "Using CUDA version: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.${CUDA_VERSION_PATCH} (MBLAS_CUDA_VERSION_FULL=${CUDA_VERSION_FULL})")
+        
+        # Pass as preprocessor definitions
+        add_definitions(-DMBLAS_CUDA_VERSION_MAJOR=${CUDA_VERSION_MAJOR})
+        add_definitions(-DMBLAS_CUDA_VERSION_MINOR=${CUDA_VERSION_MINOR})
+        add_definitions(-DMBLAS_CUDA_VERSION_PATCH=${CUDA_VERSION_PATCH})
+        add_definitions(-DMBLAS_CUDA_VERSION_FULL=${CUDA_VERSION_FULL})
+    else()
+        message(WARNING "Could not parse CUDA version from CMAKE_CUDA_COMPILER_VERSION: ${CMAKE_CUDA_COMPILER_VERSION}")
+    endif()
+else()
+    message(WARNING "CMAKE_CUDA_COMPILER_VERSION not set")
+endif()
+
 target_include_directories(mblascuda PRIVATE
     .
     ../third_party
