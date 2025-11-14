@@ -370,15 +370,28 @@ void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::fill_host() {
-  for (int i = 0; i < flush_batch_count; i++){
-    type_call_host<initHost>(a_type, initialization, ptr_host_a[i], rows_a, cols_a, lda,
-                           batch_count, stride_a, control_a, constant_a, filename_a);
-    type_call_host<initHost>(b_type, initialization, ptr_host_b[i], rows_b, cols_b, ldb,
-                           batch_count, stride_b, control_b, constant_b, filename_b);
-    type_call_host<initHost>(c_type, initialization, ptr_host_c[i], rows_c, cols_c, ldc,
-                           batch_count, stride_c, control_c, constant_c, filename_c);
+  // Initialize first buffer
+  type_call_host<initHost>(a_type, initialization, ptr_host_a[0], rows_a, cols_a, lda,
+                         batch_count, stride_a, control_a, constant_a, filename_a);
+  type_call_host<initHost>(b_type, initialization, ptr_host_b[0], rows_b, cols_b, ldb,
+                         batch_count, stride_b, control_b, constant_b, filename_b);
+  type_call_host<initHost>(c_type, initialization, ptr_host_c[0], rows_c, cols_c, ldc,
+                         batch_count, stride_c, control_c, constant_c, filename_c);
+  
+  // Get buffer sizes
+  size_t size_a = get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count);
+  size_t size_b = get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count);
+  size_t size_c = get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count);
+  
+  // Copy to remaining buffers
+  for (int i = 1; i < flush_batch_count; i++){
+    memcpy(ptr_host_a[i], ptr_host_a[0], size_a);
+    memcpy(ptr_host_b[i], ptr_host_b[0], size_b);
+    memcpy(ptr_host_c[i], ptr_host_c[0], size_c);
     // D is just output, don't need to init
   }
+  
+  std::cout << "All " << flush_batch_count << " buffers ready" << std::endl;
   if (use_scaling) {
     type_call_host<initHost>(a_scale_type, string("constant"), scale_host_a, a_scale_size.rows, a_scale_size.cols, 1, 1, 0LL, false, scale_factor_a, string(""));
     type_call_host<initHost>(b_scale_type, string("constant"), scale_host_b, b_scale_size.rows, b_scale_size.cols, 1, 1, 0LL, false, scale_factor_b, string(""));
@@ -464,6 +477,7 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
     cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_FAST_ACCUM,
                                    &fastAccuMode, sizeof(fastAccuMode));
   }
+  std::cout << "prepare matrix" << std::endl;
 }
 
 void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
