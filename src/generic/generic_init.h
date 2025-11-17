@@ -55,10 +55,13 @@ void fill_rand_host_blasgemm(void *ptr, long rows_A, long cols_A, long ld, int b
 template <typename T>
 void fill_rand_host_constant(void *ptr, long rows_A, long cols_A, long ld, int batch,
                           long long int stride, float constant) {
-  int a = 1;
   T *A = (T *)ptr;
-  for (size_t i = 0; i < rows_A * cols_A * batch; i++) {
-    A[i] = (T)(constant);
+  for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+    for (size_t j = 0; j < cols_A; ++j) {
+      for (size_t i = 0; i < rows_A; ++i) {
+        A[i + j * ld + i_batch * stride] = (T)(constant);
+      }
+    }
   }
 }
 
@@ -89,7 +92,7 @@ void fill_rand_host_rand_int_alternating(void *ptr, long rows_A, long cols_A, lo
 
 template <typename T>
 void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, int batch,
-                             long long int stride) {
+                             long long int stride, float mean = 0.0f, float std_dev = 1.0f) {
   T *A = (T *)ptr;
   std::random_device r;
   int random_dev_seed = r();
@@ -97,13 +100,58 @@ void fill_rand_host_normal_float(void *ptr, long rows_A, long cols_A, long ld, i
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
     std::mt19937 gen(seed);
-    std::normal_distribution normal_dist(5.0, 2.0);
-    T dummy;
+    std::normal_distribution<T> normal_dist(mean, std_dev);
     #pragma omp for collapse(3) 
     for (size_t i_batch = 0; i_batch < batch; i_batch++) {
       for (size_t j = 0; j < cols_A; ++j) {
         for (size_t i = 0; i < rows_A; ++i) {
-          A[i + j * ld + i_batch * stride] = normal_float_gen(normal_dist, gen, dummy);
+          A[i + j * ld + i_batch * stride] = normal_dist(gen);
+        }
+      }
+    }
+  }
+}
+
+template <typename T>
+void fill_rand_host_uniform(void *ptr, long rows_A, long cols_A, long ld, int batch,
+                           long long int stride, float min_val = 0.0f, float max_val = 1.0f) {
+  T *A = (T *)ptr;
+  std::random_device r;
+  int random_dev_seed = r();
+  #pragma omp parallel shared(A) 
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<T> uniform_dist(min_val, max_val);
+    #pragma omp for collapse(3) 
+    for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+      for (size_t j = 0; j < cols_A; ++j) {
+        for (size_t i = 0; i < rows_A; ++i) {
+          A[i + j * ld + i_batch * stride] = uniform_dist(gen);
+        }
+      }
+    }
+  }
+}
+
+template <typename T>
+void fill_rand_host_pow2_binomial(void *ptr, long rows_A, long cols_A, long ld, int batch,
+                                   long long int stride, int n = 10) {
+  T *A = (T *)ptr;
+  std::random_device r;
+  int random_dev_seed = r();
+  #pragma omp parallel shared(A) 
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    std::binomial_distribution<int> binomial_dist(2 * n + 1, 0.5);
+    #pragma omp for collapse(3) 
+    for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+      for (size_t j = 0; j < cols_A; ++j) {
+        for (size_t i = 0; i < rows_A; ++i) {
+          int binomial_value = binomial_dist(gen);
+          int offset_value = binomial_value - (n + 1);
+          A[i + j * ld + i_batch * stride] = T(std::ldexp(T(1), offset_value));
         }
       }
     }
@@ -170,25 +218,126 @@ struct initHost {
                   float constant = 0.f, std::string filename = "");
 };
 
+// Generic helper function to detect and parse parameterized initialization patterns
+template<typename... Args>
+bool parse_parameterized_init(const std::string& initialization, 
+                           const std::vector<std::string>& patterns,
+                           Args&... default_and_output_params);
+
 template <typename T>
 void initHost<T>::operator()(std::string initialization, void *ptr, long rows_A,
                              long cols_A, long ld, int batch,
                              long long int stride, bool control,
                              float constant, std::string filename) {
-  if (!filename.empty()) {
+  // Norm defaults
+  float mean = 0.0;
+  float std_dev = 1.0;
+  // Uniform defaults
+  float min_val = 0.0;
+  float max_val = 1.0;
+  
+  if (initialization == "csv" && !filename.empty()) {
     fill_rand_host_csv<T>(ptr, rows_A, cols_A, ld, batch, stride, filename);
   } else if (initialization == "rand_int") {
     std::random_device r;
     fill_rand_host_rand_int_alternating<T>(ptr, rows_A, cols_A, ld, batch, stride, control, r());
   } else if (initialization == "trig_float") {
     fill_rand_host_trig_float<T>(ptr, rows_A, cols_A, ld, batch, stride, control, constant);
-  } else if (initialization == "normal_float") {
-    fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride);
-  } else if (initialization == "hpl") {
+  } else if (parse_parameterized_init(initialization, 
+            {"normal_float", "norm_float", "norm_dist"}, mean, std_dev)) {
+    // Can be "normal_float", "norm_float", or "norm_dist"
+    if constexpr (std::is_floating_point_v<T>) {
+      //std::cout << "mean: " << mean << " std_dev: " << std_dev << std::endl;
+      fill_rand_host_normal_float<T>(ptr, rows_A, cols_A, ld, batch, stride, mean, std_dev);
+    } else {
+      std::string error_string = "Error: normal distribution not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  } else if (parse_parameterized_init(initialization, 
+            {"uniform_dist", "uniform"}, min_val, max_val)) {
+    // Can be "uniform_dist" or "uniform"
+    if constexpr (std::is_floating_point_v<T>) {
+      //std::cout << "min_val: " << min_val << " max_val: " << max_val << std::endl;
+      fill_rand_host_uniform<T>(ptr, rows_A, cols_A, ld, batch, stride, min_val, max_val);
+    } else {
+      std::string error_string = "Error: uniform distribution not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  } else if (parse_parameterized_init(initialization, 
+            {"pow2_binomial"}, (int&)batch)) {
+    // Parse n parameter, default is 10
+    int n = 10;
+    parse_parameterized_init(initialization, {"pow2_binomial"}, n);
+    if constexpr (std::is_floating_point_v<T>) {
+      fill_rand_host_pow2_binomial<T>(ptr, rows_A, cols_A, ld, batch, stride, n);
+    } else {
+      std::string error_string = "Error: pow2_binomial distribution not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  //} else if (initialization == "hpl") {
   } else if (initialization == "blasgemm") {
     fill_rand_host_blasgemm<T>(ptr, rows_A, cols_A, ld, batch, stride);
   } else if (initialization == "constant") {
     fill_rand_host_constant<T>(ptr, rows_A, cols_A, ld, batch, stride, constant);
+  } else {
+    std::string error_string = "Error: \"" + initialization + "\" not supported";
+    throw std::invalid_argument(error_string);
   }
 }
 
+// Helper function to parse a single parameter from string to the target type
+template<typename T>
+bool parse_parameter(const std::string& param_str, T& value) {
+  try {
+    if constexpr (std::is_same_v<T, float>) {
+      value = std::stof(param_str);
+    } else if constexpr (std::is_same_v<T, double>) {
+      value = std::stod(param_str);
+    } else if constexpr (std::is_same_v<T, int>) {
+      value = std::stoi(param_str);
+    } else if constexpr (std::is_same_v<T, long>) {
+      value = std::stol(param_str);
+    } else if constexpr (std::is_same_v<T, long long>) {
+      value = std::stoll(param_str);
+    } else {
+      // For other types, try to use assignment from double
+      value = static_cast<T>(std::stod(param_str));
+    }
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+
+// Generic helper function to detect and parse parameterized initialization patterns
+template<typename... Args>
+bool parse_parameterized_init(const std::string& initialization, 
+                             const std::vector<std::string>& patterns,
+                             Args&... default_and_output_params) {
+  for (const auto& pattern : patterns) {
+    if (initialization.find(pattern) == 0) {
+      // Pattern found, now check for parameters
+      if (initialization.length() > pattern.length() && initialization[pattern.length()] == '_') {
+        // Parse additional parameters like "pattern_param1_param2_param3"
+        std::string params = initialization.substr(pattern.length() + 1);
+        std::istringstream ss(params);
+        std::vector<std::string> param_strs;
+        std::string param;
+        
+        // Split parameters by underscore
+        while (std::getline(ss, param, '_')) {
+          if (!param.empty()) {
+            param_strs.push_back(param);
+          }
+        }
+        
+        // Parse parameters using fold expression (C++17)
+        size_t index = 0;
+        ((index < param_strs.size() ? parse_parameter(param_strs[index++], default_and_output_params) : false), ...);
+      }
+      // Pattern matched (with or without parameters)
+      return true;
+    }
+  }
+  return false;
+}

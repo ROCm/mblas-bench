@@ -229,6 +229,15 @@ int main(int argc, char **argv) {
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
             "hpl, blasgemm",
             cxxopts::value<string>()->default_value("rand_int"));
+  opp_adder("mx_init",
+            "Initialize any MX datatypes with this initialization strategy."
+            "Defaults to the value of initialization"
+            "Options: rand_int, trig_float, normal_float, hpl, blasgemm",
+            cxxopts::value<string>()->default_value(""));
+  opp_adder("scale_init",
+            "Initialize the block scaling factors with a particular distribution "
+            "Options: constant, normal_float",
+            cxxopts::value<string>()->default_value("constant"));
   opp_adder("filename_a",
             "Intialize matrix A with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
@@ -261,19 +270,19 @@ int main(int argc, char **argv) {
   opp_adder("scale_mode_a,scaleA",
             "Scale mode for A matrix.  Accepts both numeric and text input"
             "0 = none, 1 = scalar, 2 = vector, 3 = block",
-            cxxopts::value<float>()->default_value("0"));
+            cxxopts::value<string>()->default_value("0"));
   opp_adder("scale_mode_b,scaleB",
             "Scale mode for B matrix.  Accepts both numeric and text input"
             "0 = none, 1 = scalar, 2 = vector, 3 = block",
-            cxxopts::value<float>()->default_value("0"));
+            cxxopts::value<string>()->default_value("0"));
   opp_adder("scale_mode_c,scaleC",
             "Scale mode for C matrix.  Accepts both numeric and text input"
             "0 = none, 1 = scalar, 2 = vector, 3 = block",
-            cxxopts::value<float>()->default_value("0"));
+            cxxopts::value<string>()->default_value("0"));
   opp_adder("scale_mode_d,scaleD",
             "Scale mode for D matrix.  Accepts both numeric and text input"
             "0 = none, 1 = scalar, 2 = vector, 3 = block",
-            cxxopts::value<float>()->default_value("0"));
+            cxxopts::value<string>()->default_value("0"));
   opp_adder("scale_factor_a",
             "Scale factor for A matrix.",
             cxxopts::value<float>()->default_value("1"));
