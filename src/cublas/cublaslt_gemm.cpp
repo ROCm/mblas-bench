@@ -327,6 +327,7 @@ string cublaslt_gemm::prepare_array() {
   ossHeader << "alpha,beta,";
   ossHeader << "a_type,b_type,c_type,d_type,compute_type,scalar_type,";
   ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
+  ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
   if (cuda_monitor::monitor::enabled()) {
@@ -664,6 +665,10 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << c_scale_type.to_string() << ',';
   ossValues << d_scale_type.to_string() << ',';
   ossValues << bias_type.to_string() << ',';
+  ossValues << scaling_string(scale_mode_a) << ',';
+  ossValues << scaling_string(scale_mode_b) << ',';
+  ossValues << scaling_string(scale_mode_c) << ',';
+  ossValues << scaling_string(scale_mode_d) << ',';
   ossValues << flush_memory_size << ','; // rotating buffer size
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
