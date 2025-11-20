@@ -19,7 +19,7 @@ find_package(Threads REQUIRED)
 # Check for CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT enum in CUDA headers
 # This is more reliable than parsing version numbers since patch levels can vary
 if(CUDAToolkit_INCLUDE_DIRS)
-    set(CUBLAS_HEADER "${CUDAToolkit_INCLUDE_DIRS}/cublas_v2.h")
+    set(CUBLAS_HEADER "${CUDAToolkit_INCLUDE_DIRS}/cublas_api.h")
     if(EXISTS "${CUBLAS_HEADER}")
         file(READ "${CUBLAS_HEADER}" CUBLAS_HEADER_CONTENT)
         string(FIND "${CUBLAS_HEADER_CONTENT}" "CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT" ENUM_FOUND)
