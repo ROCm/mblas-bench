@@ -14,7 +14,27 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(GPU_TARGETS "gfx90a" CACHE STRING "GPU targets to compile for")
 # Find packages
 find_package(CUDAToolkit REQUIRED)
-find_package(Threads REQUIRED) 
+find_package(Threads REQUIRED)
+
+# Check for CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT enum in CUDA headers
+# This is more reliable than parsing version numbers since patch levels can vary
+if(CUDAToolkit_INCLUDE_DIRS)
+    set(CUBLAS_HEADER "${CUDAToolkit_INCLUDE_DIRS}/cublas_v2.h")
+    if(EXISTS "${CUBLAS_HEADER}")
+        file(READ "${CUBLAS_HEADER}" CUBLAS_HEADER_CONTENT)
+        string(FIND "${CUBLAS_HEADER_CONTENT}" "CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT" ENUM_FOUND)
+        if(NOT ENUM_FOUND EQUAL -1)
+            message(STATUS "Found CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT in ${CUBLAS_HEADER}")
+            add_definitions(-DHAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+        else()
+            message(STATUS "CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT not found in ${CUBLAS_HEADER}")
+        endif()
+    else()
+        message(WARNING "Could not find cublas_v2.h at ${CUBLAS_HEADER}")
+    endif()
+else()
+    message(WARNING "CUDAToolkit_INCLUDE_DIRS not set, cannot check for CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT")
+endif() 
 
 add_library(mblascuda SHARED
     cublas_gemm.cpp
@@ -48,32 +68,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.8.0)
     add_definitions(-DENABLE_CUDA_FP4)
-endif()
-
-# Extract exact CUDA version including patch number from CMake's detected version
-# This comes from the "The CUDA compiler identification is NVIDIA X.Y.Z" message
-if(CMAKE_CUDA_COMPILER_VERSION)
-    string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" CUDA_VERSION_MATCH "${CMAKE_CUDA_COMPILER_VERSION}")
-    if(CUDA_VERSION_MATCH)
-        set(CUDA_VERSION_MAJOR ${CMAKE_MATCH_1})
-        set(CUDA_VERSION_MINOR ${CMAKE_MATCH_2})
-        set(CUDA_VERSION_PATCH ${CMAKE_MATCH_3})
-        
-        # Create a numeric version like 130088 for 13.0.88
-        math(EXPR CUDA_VERSION_FULL "${CUDA_VERSION_MAJOR} * 10000 + ${CUDA_VERSION_MINOR} * 100 + ${CUDA_VERSION_PATCH}")
-        
-        message(STATUS "Using CUDA version: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.${CUDA_VERSION_PATCH} (MBLAS_CUDA_VERSION_FULL=${CUDA_VERSION_FULL})")
-        
-        # Pass as preprocessor definitions
-        add_definitions(-DMBLAS_CUDA_VERSION_MAJOR=${CUDA_VERSION_MAJOR})
-        add_definitions(-DMBLAS_CUDA_VERSION_MINOR=${CUDA_VERSION_MINOR})
-        add_definitions(-DMBLAS_CUDA_VERSION_PATCH=${CUDA_VERSION_PATCH})
-        add_definitions(-DMBLAS_CUDA_VERSION_FULL=${CUDA_VERSION_FULL})
-    else()
-        message(WARNING "Could not parse CUDA version from CMAKE_CUDA_COMPILER_VERSION: ${CMAKE_CUDA_COMPILER_VERSION}")
-    endif()
-else()
-    message(WARNING "CMAKE_CUDA_COMPILER_VERSION not set")
 endif()
 
 target_include_directories(mblascuda PRIVATE
