@@ -42,6 +42,20 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
   }
 }
 
+__global__ void float_to_e8m0(float *input, size_t num_elements,
+                           __nv_fp8_storage_t *output)
+{
+  long idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < num_elements)
+  {
+    /*
+     Rounding only controls the direction of rounding
+     https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__FP8__MISC.html
+    */
+    output[idx] = __nv_cvt_float_to_e8m0(input[idx], __NV_SATFINITE, cudaRoundZero);
+  }
+}
+
 /*
 FYI: 
 
@@ -66,7 +80,10 @@ __global__ void float_to_fp4(float2 *input, size_t num_elements,
 
 void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, long x, long y, int batchsz)
 {
-
+  if (batchsz * x * y == 0) {
+    // Matrix not used, don't copy
+    return;
+  }
   long hostsz = type_call_host<sizeofCUDT>(precision);
   long devsz = type_call_dev<sizeofCUDT>(precision);
   if (precision == mblas_data_type::MBLAS_C_16F || precision == mblas_data_type::MBLAS_R_16F)
@@ -112,7 +129,7 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     {
       interp = __NV_E4M3;
     }
-    if (precision == mblas_data_type::MBLAS_R_8F_UE4M3)
+    else if (precision == mblas_data_type::MBLAS_R_8F_UE4M3)
     {
       interp = __NV_E4M3;
     }
@@ -123,6 +140,22 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     float_to_fp8<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__nv_fp8_storage_t *)devA, interp);
     check_cuda(cudaGetLastError());
     cudaFree(tmpA);
+  }
+  else if (precision == mblas_data_type::MBLAS_R_8F_UE8M0)
+  {
+#if (ENABLE_CUDA_FP4)
+    // Allocate memory in the device for host precision (float)
+    void *tmpA;
+    check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
+    check_cuda(cudaMemcpy(tmpA, host_a, batchsz * x * y * hostsz,
+                         cudaMemcpyHostToDevice));
+    long num_elements = batchsz * x * y;
+    long block_size = 256;
+    long num_blocks = (num_elements + block_size - 1) / block_size;
+    float_to_e8m0<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__nv_fp8_storage_t *)devA);
+    check_cuda(cudaGetLastError());
+    cudaFree(tmpA);
+#endif
   }
   else if (precision == mblas_data_type::MBLAS_R_4F_E2M1)
   {
@@ -140,7 +173,7 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     check_cuda(cudaGetLastError());
     cudaFree(tmpA);
 #endif
-  }
+  } 
   // else if (precision == mblas_data_type::MBLAS_C_8I || precision == mblas_data_type::MBLAS_R_8I)
   //{
   //   // Allocate memory in the device for host precision (float)

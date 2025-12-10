@@ -11,7 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set the GPU to compile for
 #set(GPU_TARGETS "gfx908:sramecc+:xnack-" CACHE STRING "GPU targets to compile for")
-set(GPU_TARGETS "gfx90a,gfx942" CACHE STRING "GPU targets to compile for")
+set(GPU_TARGETS "gfx90a,gfx942,gfx950" CACHE STRING "GPU targets to compile for")
 # Search for rocm in common locations
 list(PREPEND CMAKE_PREFIX_PATH /opt/rocm)
 set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
