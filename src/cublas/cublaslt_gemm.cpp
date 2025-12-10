@@ -431,26 +431,24 @@ void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::fill_host() {
-  for (int i = 0; i < flush_batch_count; i++){
-    type_call_host<initHost>(a_type, a_props.init, ptr_host_a[i], rows_a, cols_a, lda,
-                           batch_count, stride_a, control_a, constant_a, filename_a);
-    type_call_host<initHost>(b_type, b_props.init, ptr_host_b[i], rows_b, cols_b, ldb,
-                           batch_count, stride_b, control_b, constant_b, filename_b);
-    type_call_host<initHost>(c_type, c_props.init, ptr_host_c[i], rows_c, cols_c, ldc,
-                           batch_count, stride_c, control_c, constant_c, filename_c);
-    // D is just output, don't need to init
-  }
+  type_call_host<initHost>(a_type, a_props.init, ptr_host_a, rows_a, cols_a, lda,
+                         batch_count, stride_a, flush_batch_count, control_a, constant_a, filename_a);
+  type_call_host<initHost>(b_type, b_props.init, ptr_host_b, rows_b, cols_b, ldb,
+                         batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
+  type_call_host<initHost>(c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
+                         batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
+  // D is just output, don't need to init
   if (a_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(a_scale_type, scale_init, scale_host_a, a_scale_size.rows, a_scale_size.cols, a_scale_size.rows, 1, 0LL, false, scale_factor_a, string(""));
+    type_call_host<initHost>(a_scale_type, scale_init, &scale_host_a, a_scale_size.rows, a_scale_size.cols, a_scale_size.rows, 1, 0LL, 1, false, scale_factor_a, string(""));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(b_scale_type, scale_init, scale_host_b, b_scale_size.rows, b_scale_size.cols, b_scale_size.rows, 1, 0LL, false, scale_factor_b, string(""));
+    type_call_host<initHost>(b_scale_type, scale_init, &scale_host_b, b_scale_size.rows, b_scale_size.cols, b_scale_size.rows, 1, 0LL, 1, false, scale_factor_b, string(""));
   }
   if (c_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(c_scale_type, scale_init, scale_host_c, c_scale_size.rows, c_scale_size.cols, c_scale_size.rows, 1, 0LL, false, scale_factor_c, string(""));
+    type_call_host<initHost>(c_scale_type, scale_init, &scale_host_c, c_scale_size.rows, c_scale_size.cols, c_scale_size.rows, 1, 0LL, 1, false, scale_factor_c, string(""));
   }
   if (d_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(d_scale_type, scale_init, scale_host_d, d_scale_size.rows, d_scale_size.cols, d_scale_size.rows, 1, 0LL, false, scale_factor_d, string(""));
+    type_call_host<initHost>(d_scale_type, scale_init, &scale_host_d, d_scale_size.rows, d_scale_size.cols, d_scale_size.rows, 1, 0LL, 1, false, scale_factor_d, string(""));
   }
 }
 
