@@ -573,10 +573,16 @@ void cublaslt_gemm::free_mem() {
   free(ptr_host_b);
   free(ptr_host_c);
   free(ptr_host_d);
-  if (use_scaling) {
+  if (a_props.scale_mode != scaling_type::None) {
     free(scale_host_a);
+  }
+  if (b_props.scale_mode != scaling_type::None) {
     free(scale_host_b);
+  }
+  if (c_props.scale_mode != scaling_type::None) {
     free(scale_host_c);
+  }
+  if (d_props.scale_mode != scaling_type::None) {
     free(scale_host_d);
   }
   for (auto mat : mat_ptrs) {
@@ -595,10 +601,16 @@ void cublaslt_gemm::free_mem() {
       cudaFree(mat.ptr_dev_d);
     }
     cudaFree(mat.devWork);
-    if (use_scaling) {
+    if (a_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_a);
+    }
+    if (b_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_b);
+    }
+    if (c_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_c);
+    }
+    if (d_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_d);
     }
     cublasLtMatmulDescDestroy(mat.desc_op);
