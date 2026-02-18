@@ -1,4 +1,7 @@
 #pragma once
+
+#include <cstdint>
+
 #include <cublasLt.h>
 #include <cuda_runtime.h>
 #include <cxxabi.h>
@@ -55,8 +58,12 @@ struct cublaslt_gemm_inst {
   cublasLtMatrixLayout_t desc_d;
   cublasLtMatmulPreference_t pref;
   cublasLtMatmulHeuristicResult_t algo;
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+    cublasLtEmulationDesc_t emulation_desc;
+    int32_t algo_emulation_support = 0;
+#endif
   void *devWork;
-  long wSZ;
+  uint64_t wSZ;
   cublaslt_gemm_inst(int devID) { devIDX = devID; }
 };
 
@@ -128,7 +135,17 @@ class cublaslt_gemm : public generic_gemm {
   uint64_t total_block_size_host;
   uint64_t total_block_size_dev;
 
-  int workspace_size = 64 * 1024 * 1024;
+  uint64_t workspace_size = 64 * 1024 * 1024;
+
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+    // Emulated FP64 configuration
+    bool use_f64_emulation = false;
+    int32_t emulation_strategy = 0;      // CUBLAS_EMULATION_STRATEGY_DEFAULT
+    int32_t emulation_mantissa_control = 0; // CUDA_EMULATION_MANTISSA_CONTROL_DYNAMIC
+    int32_t emulation_max_mantissa_bits = 0;
+    int32_t emulation_mantissa_bit_offset = 0;
+    int32_t emulation_special_values_support = 0xFFFF; // CUDA_EMULATION_SPECIAL_VALUES_SUPPORT_DEFAULT
+#endif
 
   static std::vector<matmul_prec_type> matmul_supported;
   std::vector<cublaslt_gemm_inst> mat_ptrs;

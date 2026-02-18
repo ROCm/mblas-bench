@@ -306,6 +306,24 @@ int main(int argc, char **argv) {
   opp_adder("yaml",
             "Use YAML file as problem input. Command line options will be overridden by YAML file input",
             cxxopts::value<string>()->default_value(""));
+  opp_adder("emulation_strategy",
+            "Emulation strategy for emulated compute types (e.g. CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT). "
+            "Options: 0=default, 1=performant, 2=eager",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_mantissa_control",
+            "Mantissa control for fixed-point emulation. "
+            "Options: 0=dynamic, 1=fixed",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_max_mantissa_bits",
+            "Maximum mantissa bits for fixed-point emulation (0=library default)",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_mantissa_bit_offset",
+            "Mantissa bit offset for dynamic mantissa control in fixed-point emulation",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_special_values",
+            "Special values support bitmask for emulation. "
+            "0xFFFF=default (inf+nan), 0=none, 1=infinity, 2=nan",
+            cxxopts::value<int>()->default_value("65535"));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
