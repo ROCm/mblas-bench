@@ -196,6 +196,7 @@ cublas_gemm::cublas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       c_type.get_packing_count(), 
       c_type.get_packing_count(), 
       true);
+  requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
 string cublas_gemm::prepare_array() {
@@ -226,6 +227,7 @@ string cublas_gemm::prepare_array() {
 
   run_threaded(&cublas_gemm::alloc_dev);
   run_threaded(&cublas_gemm::copy_host_to_dev);
+  returned_algo_count = 1; // cublas only returns one solution
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
   if (batched) {
@@ -355,7 +357,10 @@ void cublas_gemm::free_mem() {
   }
 }
 
-double cublas_gemm::test() {
+double cublas_gemm::test(const int &ith_solution) {
+  if (ith_solution != 0) {
+    throw std::invalid_argument("cublas_gemm::test: ith_solution must be 0");
+  }
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

@@ -284,6 +284,7 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
       c_type.get_packing_count(), 
       d_type.get_packing_count(), 
       inplace);
+  requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
 string cublaslt_gemm::prepare_array() {
@@ -314,10 +315,10 @@ string cublaslt_gemm::prepare_array() {
   run_threaded(&cublaslt_gemm::alloc_dev);
   run_threaded(&cublaslt_gemm::copy_host_to_dev);
   run_threaded(&cublaslt_gemm::prepare_matrix);
-  // Enable tuning with a parameter later
-  if (false) {
-  } else {
+  if (requested_solution_count == 1) {
     run_threaded(&cublaslt_gemm::no_tuning);
+  } else {
+    run_threaded(&cublaslt_gemm::auto_tuning);
   }
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,ldd,";
@@ -553,11 +554,26 @@ void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
   if (retResults == 0) {
     check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
   }
-  mat->algo = heuristicResult;
+  mat->algos = {heuristicResult};
+  returned_algo_count = retResults;
 }
+
 void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
-  // Not currently implemented, using simple method
-  no_tuning(mat);
+  cublasStatus_t stat;
+  cublasLtHandle_t handle;
+  check_cuda(cudaSetDevice(mat->devIDX));
+  check_cublas(cublasLtCreate(&handle));
+  int returnedAlgoCount = 0;
+  const int requestedAlgoCount = requested_solution_count < 0 ? 65536 : requested_solution_count;
+  std::vector<cublasLtMatmulHeuristicResult_t> algoList(requestedAlgoCount);
+  check_cublas(cublasLtMatmulAlgoGetHeuristic(
+      handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
+      mat->pref, requestedAlgoCount, algoList.data(), &returnedAlgoCount));
+  if (returnedAlgoCount == 0) {
+    check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
+  }
+  mat->algos = algoList;
+  returned_algo_count = returnedAlgoCount;
 }
 
 void cublaslt_gemm::free_mem() {
@@ -624,11 +640,15 @@ void cublaslt_gemm::free_mem() {
   }
 }
 
-double cublaslt_gemm::test() {
+double cublaslt_gemm::test(const int &ith_solution) {
+  if (ith_solution < 0 || returned_algo_count <= ith_solution) {
+    string errorString = "Solution index must be [0, " + std::to_string(returned_algo_count) +  ") but got " + std::to_string(ith_solution);
+    throw std::invalid_argument(errorString);
+  }
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
-    threads.push_back(thread(&cublaslt_gemm::test_matmul, this, &mat));
+    threads.push_back(thread(&cublaslt_gemm::test_matmul, this, &mat, ith_solution));
   }
   // Wait on running jobs
   for (auto &thread : threads) {
@@ -726,7 +746,7 @@ std::tuple<double, double, double> cublaslt_gemm::calculate_figure_of_merit(
                                             avgTime_us);
 }
 
-void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
+void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat, int ith_solution) {
   cublasStatus_t stat;
   cublasLtHandle_t handle;
   cudaStream_t stream;
@@ -738,7 +758,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
     int flush_index = rep % flush_batch_count;
     stat = cublasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo.algo, mat->devWork,
+                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algos[ith_solution].algo, mat->devWork,
                           mat->wSZ, stream);
     // Check for errors during the gemm run
     check_cublas(stat);
@@ -762,7 +782,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
     int flush_index = rep % flush_batch_count;
     stat = cublasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo.algo, mat->devWork,
+                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algos[ith_solution].algo, mat->devWork,
                           mat->wSZ, stream);
   }
   cudaEventRecord(stop, stream);

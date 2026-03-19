@@ -306,6 +306,9 @@ int main(int argc, char **argv) {
   opp_adder("yaml",
             "Use YAML file as problem input. Command line options will be overridden by YAML file input",
             cxxopts::value<string>()->default_value(""));
+  opp_adder("requested_solution_num,requested_solution",
+            "Number of solutions to request from the heuristic. Use -1 to request all solutions.",
+            cxxopts::value<int>()->default_value("1"));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
@@ -354,15 +357,17 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-
     gemm->create_gemm(result);
     string header = gemm->prepare_array();
     cout << header << flush;
-    gemm->test();
-    cout << std::fixed;
 
-    string results = gemm->get_result_string();
-    cout << results << flush;
+    for (int i = 0; i < gemm->get_returned_algo_count(); i++) {
+      gemm->test(i);
+      cout << std::fixed;
+
+      string results = gemm->get_result_string();
+      cout << results << flush;
+    }
 
     gemm->free_mem();
     delete gemm;
