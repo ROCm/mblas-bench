@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
   opp_adder("instances", "Number of instances to run on each GPU",
             cxxopts::value<int>()->default_value("1"));
   opp_adder("initialization",
-            "Intialize with random integers, trig functions sin and cos, or "
+            "Initialize with random integers, trig functions sin and cos, or "
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
             "uniform_dist, pow2_binomial, hpl, blasgemm, constant",
             cxxopts::value<string>()->default_value("rand_int"));
@@ -239,13 +239,13 @@ int main(int argc, char **argv) {
             "Options: constant, normal_float",
             cxxopts::value<string>()->default_value("constant"));
   opp_adder("filename_a",
-            "Intialize matrix A with contents of a csv file",
+            "Initialize matrix A with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
   opp_adder("filename_b",
-            "Intialize matrix B with contents of a csv file",
+            "Initialize matrix B with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
   opp_adder("filename_c",
-            "Intialize matrix C with contents of a csv file",
+            "Initialize matrix C with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
   opp_adder("constant_a",
             "Constant value used for the A matrix."
