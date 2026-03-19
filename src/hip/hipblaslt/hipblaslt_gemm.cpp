@@ -454,7 +454,6 @@ void hipblaslt_gemm::fill_host() {
                          batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
   type_call_host<initHost>(c_type, initialization, ptr_host_c, rows_c, cols_c, ldc,
                          batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
-  }
 #if HIP_VERSION >= 70000000
   // Initialize scale factors to 1.0 for all MX formats
   if (a_props.scale_mode != scaling_type::None) {
