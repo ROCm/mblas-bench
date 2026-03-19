@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
   opp_adder("initialization",
             "Intialize with random integers, trig functions sin and cos, or "
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
-            "hpl, blasgemm",
+            "uniform_dist, pow2_binomial, hpl, blasgemm, constant",
             cxxopts::value<string>()->default_value("rand_int"));
   opp_adder("mx_init",
             "Initialize any MX datatypes with this initialization strategy."
