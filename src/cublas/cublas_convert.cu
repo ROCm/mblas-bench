@@ -145,7 +145,8 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   {
 #if (ENABLE_CUDA_FP4)
     // Allocate memory in the device for host precision (float)
-    void *tmpA = allocate_host_dev_array(precision, x, y, batchsz);
+    void *tmpA;
+    check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz)));
     check_cuda(cudaMemcpy(tmpA, host_a, batchsz * x * y * hostsz,
                          cudaMemcpyHostToDevice));
     long num_elements = batchsz * x * y;

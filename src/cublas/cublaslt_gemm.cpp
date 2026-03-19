@@ -141,6 +141,7 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
     std::cerr << scaling_string(desc.scale_mode) << std::endl;
     throw std::invalid_argument(errorString);
   } else if (desc.scale_mode == scaling_type::Vector) {
+#if (CUDART_VERSION >= 12090)
     // Dependent on if this is the A or B matrix
     // Use the columns for B, rows for everything else (A,C,D)
     scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F; 
@@ -150,6 +151,14 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
     long scaling_vec_len = (matrix_id == "B") ? n : m;
     scale_size = std::make_pair<size_t, size_t>(1, scaling_vec_len);
     scale_type = MBLAS_R_32F;
+#else
+    string errorString =
+        "Vector scaling mode requires CUDA 12.9.0 or later. "
+        "Matrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    std::cerr << scaling_string(desc.scale_mode) << std::endl;
+    throw std::invalid_argument(errorString);
+#endif
   } else if (desc.scale_mode == scaling_type::Scalar) {
     scale_size = std::make_pair<size_t, size_t>(1, 1);
     scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F; 
@@ -318,6 +327,7 @@ string cublaslt_gemm::prepare_array() {
   ossHeader << "alpha,beta,";
   ossHeader << "a_type,b_type,c_type,d_type,compute_type,scalar_type,";
   ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
+  ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
   if (cuda_monitor::monitor::enabled()) {
@@ -421,26 +431,24 @@ void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::fill_host() {
-  for (int i = 0; i < flush_batch_count; i++){
-    type_call_host<initHost>(a_type, a_props.init, ptr_host_a[i], rows_a, cols_a, lda,
-                           batch_count, stride_a, control_a, constant_a, filename_a);
-    type_call_host<initHost>(b_type, b_props.init, ptr_host_b[i], rows_b, cols_b, ldb,
-                           batch_count, stride_b, control_b, constant_b, filename_b);
-    type_call_host<initHost>(c_type, c_props.init, ptr_host_c[i], rows_c, cols_c, ldc,
-                           batch_count, stride_c, control_c, constant_c, filename_c);
-    // D is just output, don't need to init
-  }
+  type_call_host<initHost>(a_type, a_props.init, ptr_host_a, rows_a, cols_a, lda,
+                         batch_count, stride_a, flush_batch_count, control_a, constant_a, filename_a);
+  type_call_host<initHost>(b_type, b_props.init, ptr_host_b, rows_b, cols_b, ldb,
+                         batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
+  type_call_host<initHost>(c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
+                         batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
+  // D is just output, don't need to init
   if (a_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(a_scale_type, scale_init, scale_host_a, a_scale_size.rows, a_scale_size.cols, a_scale_size.rows, 1, 0LL, false, scale_factor_a, string(""));
+    type_call_host<initHost>(a_scale_type, scale_init, &scale_host_a, a_scale_size.rows, a_scale_size.cols, a_scale_size.rows, 1, 0LL, 1, false, scale_factor_a, string(""));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(b_scale_type, scale_init, scale_host_b, b_scale_size.rows, b_scale_size.cols, b_scale_size.rows, 1, 0LL, false, scale_factor_b, string(""));
+    type_call_host<initHost>(b_scale_type, scale_init, &scale_host_b, b_scale_size.rows, b_scale_size.cols, b_scale_size.rows, 1, 0LL, 1, false, scale_factor_b, string(""));
   }
   if (c_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(c_scale_type, scale_init, scale_host_c, c_scale_size.rows, c_scale_size.cols, c_scale_size.rows, 1, 0LL, false, scale_factor_c, string(""));
+    type_call_host<initHost>(c_scale_type, scale_init, &scale_host_c, c_scale_size.rows, c_scale_size.cols, c_scale_size.rows, 1, 0LL, 1, false, scale_factor_c, string(""));
   }
   if (d_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(d_scale_type, scale_init, scale_host_d, d_scale_size.rows, d_scale_size.cols, d_scale_size.rows, 1, 0LL, false, scale_factor_d, string(""));
+    type_call_host<initHost>(d_scale_type, scale_init, &scale_host_d, d_scale_size.rows, d_scale_size.cols, d_scale_size.rows, 1, 0LL, 1, false, scale_factor_d, string(""));
   }
 }
 
@@ -565,10 +573,16 @@ void cublaslt_gemm::free_mem() {
   free(ptr_host_b);
   free(ptr_host_c);
   free(ptr_host_d);
-  if (use_scaling) {
+  if (a_props.scale_mode != scaling_type::None) {
     free(scale_host_a);
+  }
+  if (b_props.scale_mode != scaling_type::None) {
     free(scale_host_b);
+  }
+  if (c_props.scale_mode != scaling_type::None) {
     free(scale_host_c);
+  }
+  if (d_props.scale_mode != scaling_type::None) {
     free(scale_host_d);
   }
   for (auto mat : mat_ptrs) {
@@ -587,10 +601,16 @@ void cublaslt_gemm::free_mem() {
       cudaFree(mat.ptr_dev_d);
     }
     cudaFree(mat.devWork);
-    if (use_scaling) {
+    if (a_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_a);
+    }
+    if (b_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_b);
+    }
+    if (c_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_c);
+    }
+    if (d_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_d);
     }
     cublasLtMatmulDescDestroy(mat.desc_op);
@@ -655,6 +675,10 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << c_scale_type.to_string() << ',';
   ossValues << d_scale_type.to_string() << ',';
   ossValues << bias_type.to_string() << ',';
+  ossValues << scaling_string(scale_mode_a) << ',';
+  ossValues << scaling_string(scale_mode_b) << ',';
+  ossValues << scaling_string(scale_mode_c) << ',';
+  ossValues << scaling_string(scale_mode_d) << ',';
   ossValues << flush_memory_size << ','; // rotating buffer size
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';

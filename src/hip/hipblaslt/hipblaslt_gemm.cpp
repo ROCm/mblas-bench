@@ -448,15 +448,13 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
 }
 
 void hipblaslt_gemm::fill_host() {
-  for (int i = 0; i < flush_batch_count; i++){
-    type_call_host<initHost>(a_type, initialization, ptr_host_a[i], rows_a, cols_a, lda,
-                           batch_count, stride_a, control_a, constant_a, filename_a);
-    type_call_host<initHost>(b_type, initialization, ptr_host_b[i], rows_b, cols_b, ldb,
-                           batch_count, stride_b, control_b, constant_b, filename_b);
-    type_call_host<initHost>(c_type, initialization, ptr_host_c[i], rows_c, cols_c, ldc,
-                           batch_count, stride_c, control_c, constant_c, filename_c);
+  type_call_host<initHost>(a_type, initialization, ptr_host_a, rows_a, cols_a, lda,
+                         batch_count, stride_a, control_a, constant_a, filename_a);
+  type_call_host<initHost>(b_type, initialization, ptr_host_b, rows_b, cols_b, ldb,
+                         batch_count, stride_b, control_b, constant_b, filename_b);
+  type_call_host<initHost>(c_type, initialization, ptr_host_c, rows_c, cols_c, ldc,
+                         batch_count, stride_c, control_c, constant_c, filename_c);
   }
-  std::cout << "test" << std::endl; 
 #if HIP_VERSION >= 70000000
   // Initialize scale factors to 1.0 for all MX formats
   if (a_props.scale_mode != scaling_type::None) {
