@@ -449,12 +449,11 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
 
 void hipblaslt_gemm::fill_host() {
   type_call_host<initHost>(a_type, initialization, ptr_host_a, rows_a, cols_a, lda,
-                         batch_count, stride_a, control_a, constant_a, filename_a);
+                         batch_count, stride_a, flush_batch_count, control_a, constant_a, filename_a);
   type_call_host<initHost>(b_type, initialization, ptr_host_b, rows_b, cols_b, ldb,
-                         batch_count, stride_b, control_b, constant_b, filename_b);
+                         batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
   type_call_host<initHost>(c_type, initialization, ptr_host_c, rows_c, cols_c, ldc,
-                         batch_count, stride_c, control_c, constant_c, filename_c);
-  }
+                         batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
 #if HIP_VERSION >= 70000000
   // Initialize scale factors to 1.0 for all MX formats
   if (a_props.scale_mode != scaling_type::None) {
