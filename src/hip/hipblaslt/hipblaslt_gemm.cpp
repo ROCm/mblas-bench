@@ -449,11 +449,12 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
 
 void hipblaslt_gemm::fill_host() {
   type_call_host<initHost>(a_type, initialization, ptr_host_a, rows_a, cols_a, lda,
-                         batch_count, stride_a, flush_batch_count, control_a, constant_a, filename_a);
+                         batch_count, stride_a, control_a, constant_a, filename_a);
   type_call_host<initHost>(b_type, initialization, ptr_host_b, rows_b, cols_b, ldb,
-                         batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
+                         batch_count, stride_b, control_b, constant_b, filename_b);
   type_call_host<initHost>(c_type, initialization, ptr_host_c, rows_c, cols_c, ldc,
-                         batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
+                         batch_count, stride_c, control_c, constant_c, filename_c);
+  }
 #if HIP_VERSION >= 70000000
   // Initialize scale factors to 1.0 for all MX formats
   if (a_props.scale_mode != scaling_type::None) {
@@ -461,21 +462,21 @@ void hipblaslt_gemm::fill_host() {
     std::cout << "a_scale_size.cols: " << a_scale_size.cols << std::endl;
     std::cout << "a_scale_size.get_size: " << a_scale_size.get_size() << std::endl;
     type_call_host<initHost>(a_scale_type, "constant", &scale_host_a, a_scale_size.rows, a_scale_size.cols,
-                            a_scale_size.rows, 1, 0, 0.0, 1.0, "");
+                            a_scale_size.rows, 1, 0, 1, 0.0, 1.0, "");
   }
   if (b_props.scale_mode != scaling_type::None) {
     std::cout << "b_scale_size.rows: " << b_scale_size.rows << std::endl;
     std::cout << "b_scale_size.cols: " << b_scale_size.cols << std::endl;
     type_call_host<initHost>(b_scale_type, "constant", &scale_host_b, b_scale_size.rows, b_scale_size.cols,
-                            b_scale_size.rows, 1, 0, 0.0, 1.0, "");
+                            b_scale_size.rows, 1, 0, 1, 0.0, 1.0, "");
   }
   if (c_props.scale_mode != scaling_type::None) {
     type_call_host<initHost>(c_scale_type, "constant", &scale_host_c, c_scale_size.rows, c_scale_size.cols,
-                            c_scale_size.cols, 1, 0, 0.0, 1.0, "");
+                            c_scale_size.rows, 1, 0, 1, 0.0, 1.0, "");
   }
   if (d_props.scale_mode != scaling_type::None) {
     type_call_host<initHost>(d_scale_type, "constant", &scale_host_d, d_scale_size.rows, d_scale_size.cols,
-                            d_scale_size.cols, 1, 0, 0.0, 1.0, "");
+                            d_scale_size.rows, 1, 0, 1, 0.0, 1.0, "");
   }
 #endif
 }
