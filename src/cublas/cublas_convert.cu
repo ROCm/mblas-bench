@@ -168,7 +168,7 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     void *tmpA;
     check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
     check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz, cudaMemcpyHostToDevice));
-    long long num_elements = ceil_division(total_elements, 2l);
+    long long num_elements = ceil_division(total_elements, 2ll);
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_fp4<<<num_blocks, block_size>>>((float2 *)tmpA, num_elements, (__nv_fp4x2_storage_t *)devA);
