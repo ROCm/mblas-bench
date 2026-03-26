@@ -54,8 +54,8 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   if (batchsz * x * y == 0) {
     return;
   }
-  long base = x * y;
-  long total_elements =
+  long long base = x * y;
+  long long total_elements =
       (batchsz > 1 && stride > base) ? (stride * (batchsz - 1) + base) : (base * batchsz);
 
   long hostsz = type_call_host<sizeofCUDT>(precision);
@@ -66,9 +66,9 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
                        hipMemcpyHostToDevice));
-    long num_elements = total_elements;
-    long block_size = 256;
-    long num_blocks = (num_elements + block_size - 1) / block_size;
+    long long num_elements = total_elements;
+    long long block_size = 256;
+    long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_fp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
     check_hip(hipGetLastError());
     hipFree(tmpA);
@@ -80,9 +80,9 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
                        hipMemcpyHostToDevice));
-    long num_elements = total_elements;
-    long block_size = 256;
-    long num_blocks = (num_elements + block_size - 1) / block_size;
+    long long num_elements = total_elements;
+    long long block_size = 256;
+    long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_bf16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
     check_hip(hipGetLastError());
     hipFree(tmpA);
@@ -94,9 +94,9 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
                          hipMemcpyHostToDevice));
-    long num_elements = total_elements;
-    long block_size = 256;
-    long num_blocks = (num_elements + block_size - 1) / block_size;
+    long long num_elements = total_elements;
+    long long block_size = 256;
+    long long num_blocks = (num_elements + block_size - 1) / block_size;
     __hip_fp8_interpretation_t interp;
     if (precision == mblas_data_type::MBLAS_R_8F_E4M3)
     {
