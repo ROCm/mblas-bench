@@ -48,15 +48,17 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
 //   }
 // }
 
-void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x, long y, int batchsz,
-                      long long stride)
+void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x, long y,
+                      int batchsz, long long stride)
 {
-  if (batchsz * x * y == 0) {
+  if (batchsz * x * y == 0)
+  {
     return;
   }
   long long base = x * y;
   long long total_elements =
-      (batchsz > 1 && stride > base) ? (stride * (batchsz - 1) + base) : (base * batchsz);
+      (batchsz > 1 && stride > base) ? (stride * (batchsz - 1) + base)
+                                     : (base * batchsz);
 
   long hostsz = type_call_host<sizeofCUDT>(precision);
   if (precision == mblas_data_type(MBLAS_C_16F) || precision == mblas_data_type(MBLAS_R_16F))
@@ -64,8 +66,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
-                       hipMemcpyHostToDevice));
+    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz, hipMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
@@ -78,22 +79,21 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
-                       hipMemcpyHostToDevice));
+    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz, hipMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_bf16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
     check_hip(hipGetLastError());
     hipFree(tmpA);
-  } 
-  else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 || precision == mblas_data_type::MBLAS_R_8F_E5M2 )
+  }
+  else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 ||
+           precision == mblas_data_type::MBLAS_R_8F_E5M2)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
-                         hipMemcpyHostToDevice));
+    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz, hipMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
@@ -110,10 +110,11 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     check_hip(hipGetLastError());
     hipFree(tmpA);
   }
-  else 
+  else
   {
-    check_hip(hipMemcpy(devA, hostA, get_malloc_size_host(precision, x, y, batchsz, stride),
-                       hipMemcpyHostToDevice));
+    check_hip(hipMemcpy(devA, hostA,
+                        get_malloc_size_host(precision, x, y, batchsz, stride),
+                        hipMemcpyHostToDevice));
   }
 }
 

@@ -7,7 +7,7 @@
 #include <cuda_fp8.h>
 #if (ENABLE_CUDA_FP4)
 #include <cuda_fp4.h>
-#endif 
+#endif
 #include "cublas_create_allocate.h"
 #include "cuda_error.h"
 #include "mblas_cuda_data_type.h"
@@ -78,9 +78,11 @@ __global__ void float_to_fp4(float2 *input, size_t num_elements,
 }
 #endif
 
-void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, long x, long y, int batchsz, long long stride)
+void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, long x,
+                      long y, int batchsz, long long stride)
 {
-  if (batchsz * x * y == 0) {
+  if (batchsz * x * y == 0)
+  {
     // Matrix not used, don't copy
     return;
   }
@@ -88,14 +90,14 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   long devsz = type_call_dev<sizeofCUDT>(precision);
   long long base = x * y;
   long long total_elements =
-    (batchsz > 1 && stride > base) ? (stride * (batchsz - 1) + base) : (base * batchsz);
+      (batchsz > 1 && stride > base) ? (stride * (batchsz - 1) + base)
+                                     : (base * batchsz);
   if (precision == mblas_data_type::MBLAS_C_16F || precision == mblas_data_type::MBLAS_R_16F)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz,
-                         cudaMemcpyHostToDevice));
+    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz, cudaMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
@@ -108,8 +110,7 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz,
-                         cudaMemcpyHostToDevice));
+    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz, cudaMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
@@ -117,13 +118,14 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     check_cuda(cudaGetLastError());
     cudaFree(tmpA);
   }
-  else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 || precision == mblas_data_type::MBLAS_R_8F_E5M2 || precision == mblas_data_type::MBLAS_R_8F_UE4M3)
+  else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 ||
+           precision == mblas_data_type::MBLAS_R_8F_E5M2 ||
+           precision == mblas_data_type::MBLAS_R_8F_UE4M3)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz,
-                         cudaMemcpyHostToDevice));
+    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz, cudaMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
@@ -150,8 +152,7 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz,
-                         cudaMemcpyHostToDevice));
+    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz, cudaMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
@@ -162,13 +163,11 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   }
   else if (precision == mblas_data_type::MBLAS_R_4F_E2M1)
   {
-
 #if (ENABLE_CUDA_FP4)
     // Allocate memory in the device for host precision (float)
     void *tmpA;
     check_cuda(cudaMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
-    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz,
-                         cudaMemcpyHostToDevice));
+    check_cuda(cudaMemcpy(tmpA, host_a, total_elements * hostsz, cudaMemcpyHostToDevice));
     long long num_elements = ceil_division(total_elements, 2l);
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
@@ -176,7 +175,7 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
     check_cuda(cudaGetLastError());
     cudaFree(tmpA);
 #endif
-  } 
+  }
   // else if (precision == mblas_data_type::MBLAS_C_8I || precision == mblas_data_type::MBLAS_R_8I)
   //{
   //   // Allocate memory in the device for host precision (float)
@@ -191,9 +190,10 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   // }
   else
   {
-    check_cuda(cudaMemcpy(devA, host_a,
-                         static_cast<size_t>(get_malloc_size_host(precision, x, y, batchsz, stride)),
-                         cudaMemcpyHostToDevice));
+    check_cuda(cudaMemcpy(
+        devA, host_a,
+        static_cast<size_t>(get_malloc_size_host(precision, x, y, batchsz, stride)),
+        cudaMemcpyHostToDevice));
   }
 }
 

@@ -50,7 +50,7 @@ using std::string;
 // }
 
 long long get_malloc_size_host(mblas_data_type type, long x, long y, int batch,
-                          long long stride) {
+                               long long stride) {
   int typesize = type_call_host<sizeofCUDT>(type);
   long packing_count = type.get_packing_count();
   long long base = x * y;
@@ -64,7 +64,7 @@ long long get_malloc_size_host(mblas_data_type type, long x, long y, int batch,
 }
 
 long long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch,
-                         long long stride) {
+                              long long stride) {
   int typesize = type_call_dev<sizeofCUDT>(type);
   long packing_count = type.get_packing_count();
   long long base = x * y;
