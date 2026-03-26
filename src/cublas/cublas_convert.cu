@@ -219,17 +219,3 @@ void *convert_scalar(mblas_cuda_data_type precision, void *scalar)
     return scalar;
   }
 }
-
-// void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA,
-//                       long x, long y, int batchsz, long long stride)
-// {
-//   long base = x * y;
-//   long total_elements;
-//   if (batchsz > 1 && stride > base) {
-//     total_elements = stride * (batchsz - 1) + base;
-//   } else {
-//     total_elements = base * batchsz;
-//   }
-//   // Delegate to the original function with flattened dimensions
-//   copy_and_convert(precision, host_a, devA, total_elements, 1, 1);
-// }

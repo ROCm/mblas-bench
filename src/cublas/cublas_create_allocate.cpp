@@ -63,19 +63,6 @@ long get_malloc_size_scalar(mblas_data_type type) {
   return type_call_host<sizeofCUDT>(type);
 }
 
-// long get_malloc_size_host(mblas_data_type type, long x, long y, int batch) {
-//   int typesize = type_call_host<sizeofCUDT>(type);
-//   return x * y * batch * typesize;
-// }
-
-// long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch) {
-//   int typesize = type_call_dev<sizeofCUDT>(type);
-//   long packing_count = type.get_packing_count();
-//   // Compensate for packing of 4 bit dtypes
-//   return ceil_division(x * y * batch * typesize, packing_count);
-// }
-
-
 long get_malloc_size_host(mblas_data_type type, long x, long y, int batch, long long stride) {
   int typesize = type_call_host<sizeofCUDT>(type);
   long base = x * y;
