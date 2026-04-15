@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "generic_gemm.h"
 #include "mblas_hip_data_type.h"
@@ -67,12 +68,12 @@ struct hipblaslt_gemm_inst {
   void **ptr_dev_c;
   void **ptr_dev_d;
 #if HIP_VERSION >= 70000000
-  void *scale_dev_a;
-  void *scale_dev_b;
-  void *scale_dev_c;
-  void *scale_dev_d;
+  void **scale_dev_a;
+  void **scale_dev_b;
+  void **scale_dev_c;
+  void **scale_dev_d;
 #endif
-  hipblasLtMatmulDesc_t desc_op;
+  std::vector<hipblasLtMatmulDesc_t> desc_ops;
   hipblasLtMatrixLayout_t desc_a;
   hipblasLtMatrixLayout_t desc_b;
   hipblasLtMatrixLayout_t desc_c;
@@ -86,6 +87,7 @@ struct hipblaslt_gemm_inst {
     , scale_dev_a(nullptr), scale_dev_b(nullptr), scale_dev_c(nullptr), scale_dev_d(nullptr)
 #endif
   {}
+
 };
 
 class hipblaslt_gemm : public generic_gemm {
@@ -134,10 +136,10 @@ class hipblaslt_gemm : public generic_gemm {
   hipblasLtMatmulMatrixScale_t d_scale_mode;
 #endif
 
-  void *scale_host_a;
-  void *scale_host_b;
-  void *scale_host_c;
-  void *scale_host_d;
+  void **scale_host_a;
+  void **scale_host_b;
+  void **scale_host_c;
+  void **scale_host_d;
 
   int workspace_size = 64 * 1024 * 1024;
 
