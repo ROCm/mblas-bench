@@ -18,7 +18,6 @@
 #include "generic_setup.h"
 
 using std::cerr;
-using std::cout;
 using std::endl;
 using std::move;
 using std::string;
@@ -162,7 +161,6 @@ hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, st
   
   if (desc.scale_mode == scaling_type::Block) {
     scale_type = type.get_scale_type();  // Returns MBLAS_R_8F_UE8M0 for MX
-    std::cout << "scale_type: " << scale_type.to_string() << std::endl;
     scale_mode = get_scale_mode(type);  // Returns VEC32_UE8M0 for MX
     scale_size_result = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
   } else if (type.is_mx_possible()) {
@@ -276,9 +274,7 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
                 c_type.is_mx_possible() || d_type.is_mx_possible();
   if (use_scaling) {
     std::tie(a_scale_type, a_scale_mode, a_scale_size) = configure_scaling(a_props, a_type, "A");
-    std::cout << "a_scale_type: " << a_scale_type.to_string() << std::endl;
     std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
-    std::cout << "b_scale_type: " << b_scale_type.to_string() << std::endl;
     std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
     std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
   }
@@ -387,9 +383,6 @@ void hipblaslt_gemm::alloc_host() {
   
 #if HIP_VERSION >= 70000000
   if (a_props.scale_mode != scaling_type::None) {
-    std::cout << "a_scale_size.rows: " << a_scale_size.rows << std::endl;
-    std::cout << "a_scale_size.cols: " << a_scale_size.cols << std::endl;
-    std::cout << "a_scale_size.get_size: " << a_scale_size.get_size() << std::endl;
     scale_host_a = malloc(a_scale_size.get_size()*type_call_host<sizeofCUDT>(a_scale_type));
   }
   if (b_props.scale_mode != scaling_type::None) {
@@ -457,16 +450,11 @@ void hipblaslt_gemm::fill_host() {
 
 #if HIP_VERSION >= 70000000
   if (a_props.scale_mode != scaling_type::None) {
-    std::cout << "a_scale_size.rows: " << a_scale_size.rows << std::endl;
-    std::cout << "a_scale_size.cols: " << a_scale_size.cols << std::endl;
-    std::cout << "a_scale_size.get_size: " << a_scale_size.get_size() << std::endl;
     type_call_host<initHost>(a_scale_type, scale_init, &scale_host_a, a_scale_size.rows,
                              a_scale_size.cols, a_scale_size.rows, 1, 0LL, 1, false,
                              scale_factor_a, string(""));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    std::cout << "b_scale_size.rows: " << b_scale_size.rows << std::endl;
-    std::cout << "b_scale_size.cols: " << b_scale_size.cols << std::endl;
     type_call_host<initHost>(b_scale_type, scale_init, &scale_host_b, b_scale_size.rows,
                              b_scale_size.cols, b_scale_size.rows, 1, 0LL, 1, false,
                              scale_factor_b, string(""));
