@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "generic_gemm.h"
 #include "mblas_cuda_data_type.h"
@@ -47,11 +48,11 @@ struct cublaslt_gemm_inst {
   void **ptr_dev_b;
   void **ptr_dev_c;
   void **ptr_dev_d;
-  void *scale_dev_a;
-  void *scale_dev_b;
-  void *scale_dev_c;
-  void *scale_dev_d;
-  cublasLtMatmulDesc_t desc_op;
+  void **scale_dev_a;
+  void **scale_dev_b;
+  void **scale_dev_c;
+  void **scale_dev_d;
+  std::vector<cublasLtMatmulDesc_t> desc_ops;
   cublasLtMatrixLayout_t desc_a;
   cublasLtMatrixLayout_t desc_b;
   cublasLtMatrixLayout_t desc_c;
@@ -64,7 +65,9 @@ struct cublaslt_gemm_inst {
 #endif
   void *devWork;
   uint64_t wSZ;
-  cublaslt_gemm_inst(int devID) { devIDX = devID; }
+  cublaslt_gemm_inst(int devID)
+    : devIDX(devID), scale_dev_a(nullptr), scale_dev_b(nullptr),
+      scale_dev_c(nullptr), scale_dev_d(nullptr) {}
 };
 
 struct scale_size {
@@ -84,10 +87,10 @@ class cublaslt_gemm : public generic_gemm {
   void **ptr_host_c;
   void **ptr_host_d;
 
-  void *scale_host_a;
-  void *scale_host_b;
-  void *scale_host_c;
-  void *scale_host_d;
+  void **scale_host_a;
+  void **scale_host_b;
+  void **scale_host_c;
+  void **scale_host_d;
 
   void *alpha;
   void *beta;
