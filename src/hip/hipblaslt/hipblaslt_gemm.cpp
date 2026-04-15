@@ -209,31 +209,20 @@ void hipblaslt_gemm::validate_parameters() {
     // Check MX format configurations
     auto mx_result = std::find(begin(mx_matmul_supported), end(mx_matmul_supported), selType);
     if (mx_result != end(mx_matmul_supported)) {
+      if (batch_count != 1) {
+        throw std::invalid_argument("MX formats currently only support batch_count=1 (rocroller limitation)");
+      }
+      if (m % 16 != 0 || n % 16 != 0) {
+        throw std::invalid_argument("MX formats require M and N divisible by 16");
+      }
+      if (k % 32 != 0) {
+        throw std::invalid_argument("MX formats require K divisible by 32");
+      }
+      if (!(c_type == mblas_hip_data_type::MBLAS_R_32F || c_type == mblas_hip_data_type::MBLAS_R_16F || c_type == mblas_hip_data_type::MBLAS_R_16BF) ||
+          !(d_type == mblas_hip_data_type::MBLAS_R_32F || d_type == mblas_hip_data_type::MBLAS_R_16F || d_type == mblas_hip_data_type::MBLAS_R_16BF)) {
+        throw std::invalid_argument("MX formats require C and D types to be FP32, FP16, or BF16");
+      }
       return;
-    }
-  }
-  
-  // Validate MX format constraints (initial implementation)
-  if (use_scaling) {
-    // Check batch size = 1
-    if (batch_count != 1) {
-      throw std::invalid_argument("MX formats currently only support batch_count=1");
-    }
-    
-    // Check M, N divisible by 16
-    if (m % 16 != 0 || n % 16 != 0) {
-      throw std::invalid_argument("MX formats require M and N divisible by 16");
-    }
-    
-    // Check K divisible by 32
-    if (k % 32 != 0) {
-      throw std::invalid_argument("MX formats require K divisible by 32");
-    }
-    
-    // Check C and D types (must be FP32, FP16, or BF16)
-    if (!(c_type == mblas_hip_data_type::MBLAS_R_32F || c_type == mblas_hip_data_type::MBLAS_R_16F || c_type == mblas_hip_data_type::MBLAS_R_16BF) ||
-        !(d_type == mblas_hip_data_type::MBLAS_R_32F || d_type == mblas_hip_data_type::MBLAS_R_16F || d_type == mblas_hip_data_type::MBLAS_R_16BF)) {
-      throw std::invalid_argument("MX formats require C and D types to be FP32, FP16, or BF16");
     }
   }
 #endif
@@ -251,7 +240,8 @@ void hipblaslt_gemm::validate_parameters() {
 }
 
 hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result),
-  scale_host_a(nullptr), scale_host_b(nullptr), scale_host_c(nullptr), scale_host_d(nullptr) {
+  scale_host_a(nullptr), scale_host_b(nullptr),
+  scale_host_c(nullptr), scale_host_d(nullptr) {
   // Grab precision from command line
   precision = mblas_hip_data_type(result["precision"].as<string>());
   // Grab compute type from command line
@@ -383,16 +373,28 @@ void hipblaslt_gemm::alloc_host() {
   
 #if HIP_VERSION >= 70000000
   if (a_props.scale_mode != scaling_type::None) {
-    scale_host_a = malloc(a_scale_size.get_size()*type_call_host<sizeofCUDT>(a_scale_type));
+    scale_host_a = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      scale_host_a[i] = malloc(a_scale_size.get_size() * batch_count
+                               * type_call_host<sizeofCUDT>(a_scale_type));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    scale_host_b = malloc(b_scale_size.get_size()*type_call_host<sizeofCUDT>(b_scale_type));
+    scale_host_b = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      scale_host_b[i] = malloc(b_scale_size.get_size() * batch_count
+                               * type_call_host<sizeofCUDT>(b_scale_type));
   }
   if (c_props.scale_mode != scaling_type::None) {
-    scale_host_c = malloc(c_scale_size.get_size()*type_call_host<sizeofCUDT>(c_scale_type));
+    scale_host_c = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      scale_host_c[i] = malloc(c_scale_size.get_size() * batch_count
+                               * type_call_host<sizeofCUDT>(c_scale_type));
   }
   if (d_props.scale_mode != scaling_type::None) {
-    scale_host_d = malloc(d_scale_size.get_size()*type_call_host<sizeofCUDT>(d_scale_type));
+    scale_host_d = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      scale_host_d[i] = malloc(d_scale_size.get_size() * batch_count
+                               * type_call_host<sizeofCUDT>(d_scale_type));
   }
 #endif
 }
@@ -426,16 +428,28 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
   
 #if HIP_VERSION >= 70000000
   if (a_props.scale_mode != scaling_type::None) {
-    hipMalloc(&mat->scale_dev_a, a_scale_size.get_size()*type_call_dev<sizeofCUDT>(a_scale_type));
+    mat->scale_dev_a = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      hipMalloc(&mat->scale_dev_a[i], a_scale_size.get_size() * batch_count
+                                      * type_call_dev<sizeofCUDT>(a_scale_type));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    hipMalloc(&mat->scale_dev_b, b_scale_size.get_size()*type_call_dev<sizeofCUDT>(b_scale_type));
+    mat->scale_dev_b = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      hipMalloc(&mat->scale_dev_b[i], b_scale_size.get_size() * batch_count
+                                      * type_call_dev<sizeofCUDT>(b_scale_type));
   }
   if (c_props.scale_mode != scaling_type::None) {
-    hipMalloc(&mat->scale_dev_c, c_scale_size.get_size()*type_call_dev<sizeofCUDT>(c_scale_type));
+    mat->scale_dev_c = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      hipMalloc(&mat->scale_dev_c[i], c_scale_size.get_size() * batch_count
+                                      * type_call_dev<sizeofCUDT>(c_scale_type));
   }
   if (d_props.scale_mode != scaling_type::None) {
-    hipMalloc(&mat->scale_dev_d, d_scale_size.get_size()*type_call_dev<sizeofCUDT>(d_scale_type));
+    mat->scale_dev_d = (void**)malloc(flush_batch_count * sizeof(void*));
+    for (int i = 0; i < flush_batch_count; i++)
+      hipMalloc(&mat->scale_dev_d[i], d_scale_size.get_size() * batch_count
+                                      * type_call_dev<sizeofCUDT>(d_scale_type));
   }
 #endif
 }
@@ -450,24 +464,28 @@ void hipblaslt_gemm::fill_host() {
 
 #if HIP_VERSION >= 70000000
   if (a_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(a_scale_type, scale_init, &scale_host_a, a_scale_size.rows,
-                             a_scale_size.cols, a_scale_size.rows, 1, 0LL, 1, false,
-                             scale_factor_a, string(""));
+    type_call_host<initHost>(a_scale_type, scale_init, scale_host_a,
+                             a_scale_size.rows, a_scale_size.cols, a_scale_size.rows,
+                             batch_count, (long long)a_scale_size.get_size(),
+                             flush_batch_count, false, scale_factor_a, string(""));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(b_scale_type, scale_init, &scale_host_b, b_scale_size.rows,
-                             b_scale_size.cols, b_scale_size.rows, 1, 0LL, 1, false,
-                             scale_factor_b, string(""));
+    type_call_host<initHost>(b_scale_type, scale_init, scale_host_b,
+                             b_scale_size.rows, b_scale_size.cols, b_scale_size.rows,
+                             batch_count, (long long)b_scale_size.get_size(),
+                             flush_batch_count, false, scale_factor_b, string(""));
   }
   if (c_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(c_scale_type, scale_init, &scale_host_c, c_scale_size.rows,
-                             c_scale_size.cols, c_scale_size.rows, 1, 0LL, 1, false,
-                             scale_factor_c, string(""));
+    type_call_host<initHost>(c_scale_type, scale_init, scale_host_c,
+                             c_scale_size.rows, c_scale_size.cols, c_scale_size.rows,
+                             batch_count, (long long)c_scale_size.get_size(),
+                             flush_batch_count, false, scale_factor_c, string(""));
   }
   if (d_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(d_scale_type, scale_init, &scale_host_d, d_scale_size.rows,
-                             d_scale_size.cols, d_scale_size.rows, 1, 0LL, 1, false,
-                             scale_factor_d, string(""));
+    type_call_host<initHost>(d_scale_type, scale_init, scale_host_d,
+                             d_scale_size.rows, d_scale_size.cols, d_scale_size.rows,
+                             batch_count, (long long)d_scale_size.get_size(),
+                             flush_batch_count, false, scale_factor_d, string(""));
   }
 #endif
 }
@@ -481,42 +499,39 @@ void hipblaslt_gemm::copy_host_to_dev(hipblaslt_gemm_inst *mat) {
   }
   
 #if HIP_VERSION >= 70000000
-  // Copy scale factors to device
   if (a_props.scale_mode != scaling_type::None) {
-    copy_and_convert(a_scale_type, scale_host_a, mat->scale_dev_a, a_scale_size.rows, a_scale_size.cols, 1);
+    for (int i = 0; i < flush_batch_count; i++)
+      copy_and_convert(a_scale_type, scale_host_a[i], mat->scale_dev_a[i],
+                       a_scale_size.rows, a_scale_size.cols, batch_count);
   }
   if (b_props.scale_mode != scaling_type::None) {
-    copy_and_convert(b_scale_type, scale_host_b, mat->scale_dev_b, b_scale_size.rows, b_scale_size.cols, 1);
+    for (int i = 0; i < flush_batch_count; i++)
+      copy_and_convert(b_scale_type, scale_host_b[i], mat->scale_dev_b[i],
+                       b_scale_size.rows, b_scale_size.cols, batch_count);
   }
   if (c_props.scale_mode != scaling_type::None) {
-    copy_and_convert(c_scale_type, scale_host_c, mat->scale_dev_c, c_scale_size.rows, c_scale_size.cols, 1);
+    for (int i = 0; i < flush_batch_count; i++)
+      copy_and_convert(c_scale_type, scale_host_c[i], mat->scale_dev_c[i],
+                       c_scale_size.rows, c_scale_size.cols, batch_count);
   }
   if (d_props.scale_mode != scaling_type::None) {
-    copy_and_convert(d_scale_type, scale_host_d, mat->scale_dev_d, d_scale_size.rows, d_scale_size.cols, 1);
+    for (int i = 0; i < flush_batch_count; i++)
+      copy_and_convert(d_scale_type, scale_host_d[i], mat->scale_dev_d[i],
+                       d_scale_size.rows, d_scale_size.cols, batch_count);
   }
 #endif
 }
 
 void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
-  check_hipblas(hipblasLtMatmulDescCreate(&mat->desc_op, compute, scalar));
-  // These values are read in with no type, so they need to be convirted first
-  // Thanks for the wonderful standard Nvidia :D!
   hipblasOperation_t transA_local = transA.convert_to_hip();
   hipblasOperation_t transB_local = transB.convert_to_hip();
-  check_hipblas(hipblasLtMatmulDescSetAttribute(
-      mat->desc_op, HIPBLASLT_MATMUL_DESC_TRANSA, &transA_local, sizeof(transA)));
-  check_hipblas(hipblasLtMatmulDescSetAttribute(
-      mat->desc_op, HIPBLASLT_MATMUL_DESC_TRANSB, &transB_local, sizeof(transB)));
 
-  check_hipblas(
-      hipblasLtMatrixLayoutCreate(&mat->desc_a, a_type, rows_a, cols_a, lda));
-  check_hipblas(
-      hipblasLtMatrixLayoutCreate(&mat->desc_b, b_type, rows_b, cols_b, ldb));
-  check_hipblas(
-      hipblasLtMatrixLayoutCreate(&mat->desc_c, c_type, rows_c, cols_c, ldc));
+  // Matrix layout descriptors are shared across rotation slots (shape/type only, no data ptr).
+  check_hipblas(hipblasLtMatrixLayoutCreate(&mat->desc_a, a_type, rows_a, cols_a, lda));
+  check_hipblas(hipblasLtMatrixLayoutCreate(&mat->desc_b, b_type, rows_b, cols_b, ldb));
+  check_hipblas(hipblasLtMatrixLayoutCreate(&mat->desc_c, c_type, rows_c, cols_c, ldc));
   if (!inplace) {
-    check_hipblas(
-        hipblasLtMatrixLayoutCreate(&mat->desc_d, d_type, rows_d, cols_d, ldd));
+    check_hipblas(hipblasLtMatrixLayoutCreate(&mat->desc_d, d_type, rows_d, cols_d, ldd));
   } else {
     mat->desc_d = mat->desc_c;
   }
@@ -534,44 +549,31 @@ void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
 
   check_hipblas(hipblasLtMatmulPreferenceCreate(&mat->pref));
   check_hipblas(hipblasLtMatmulPreferenceSetAttribute(
-      mat->pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES, &mat->wSZ,
-      sizeof(mat->wSZ)));
-      
+      mat->pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES, &mat->wSZ, sizeof(mat->wSZ)));
+
+  // Build one matmul descriptor per rotation slot, each wired to its own scale pointer.
+  mat->desc_ops.resize(flush_batch_count);
+  for (int i = 0; i < flush_batch_count; i++) {
+    check_hipblas(hipblasLtMatmulDescCreate(&mat->desc_ops[i], compute, scalar));
+    check_hipblas(hipblasLtMatmulDescSetAttribute(
+        mat->desc_ops[i], HIPBLASLT_MATMUL_DESC_TRANSA, &transA_local, sizeof(transA_local)));
+    check_hipblas(hipblasLtMatmulDescSetAttribute(
+        mat->desc_ops[i], HIPBLASLT_MATMUL_DESC_TRANSB, &transB_local, sizeof(transB_local)));
 #if HIP_VERSION >= 70000000
-  // Set scaling attributes for MX formats
-  if (a_props.scale_mode != scaling_type::None) {
-    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op,  
-        HIPBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
-    //check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_a, 
-    //    HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &a_scale_type, sizeof(a_scale_type)));
-    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op, 
-        HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a, sizeof(mat->scale_dev_a)));
-  }
-  if (b_props.scale_mode != scaling_type::None) {
-    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op, 
-        HIPBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
-    //check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_b, 
-    //    HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &b_scale_type, sizeof(b_scale_type)));
-    check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_op, 
-        HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER, &mat->scale_dev_b, sizeof(mat->scale_dev_b)));
-  }
-  //if (c_props.scale_mode != scaling_type::None) {
-  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_c, 
-  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_MODE, &c_scale_mode, sizeof(c_scale_mode)));
-  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_c, 
-  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &c_scale_type, sizeof(c_scale_type)));
-  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_c, 
-  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE, &mat->scale_dev_c, sizeof(mat->scale_dev_c)));
-  //}
-  //if (d_props.scale_mode != scaling_type::None && !inplace) {
-  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_d, 
-  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_MODE, &d_scale_mode, sizeof(d_scale_mode)));
-  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_d, 
-  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE_TYPE, &d_scale_type, sizeof(d_scale_type)));
-  //  check_hipblas(hipblasLtMatrixLayoutSetAttribute(mat->desc_d, 
-  //      HIPBLASLT_MATRIX_LAYOUT_MATRIX_SCALE, &mat->scale_dev_d, sizeof(mat->scale_dev_d)));
-  //}
+    if (a_props.scale_mode != scaling_type::None) {
+      check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
+          HIPBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
+      check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
+          HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a[i], sizeof(void*)));
+    }
+    if (b_props.scale_mode != scaling_type::None) {
+      check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
+          HIPBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
+      check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
+          HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER, &mat->scale_dev_b[i], sizeof(void*)));
+    }
 #endif
+  }
 }
 
 void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
@@ -583,7 +585,7 @@ void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
   hipblasLtMatmulHeuristicResult_t heuristicResult = {0};
 
   check_hipblas(hipblasLtMatmulAlgoGetHeuristic(
-      handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
+      handle, mat->desc_ops[0], mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
       mat->pref, 1, &heuristicResult, &retResults));
 
   if (retResults == 0) {
@@ -616,11 +618,26 @@ void hipblaslt_gemm::free_mem() {
   }
   
 #if HIP_VERSION >= 70000000
-  // Free scale host buffers
-  if (scale_host_a) free(scale_host_a);
-  if (scale_host_b) free(scale_host_b);
-  if (scale_host_c) free(scale_host_c);
-  if (scale_host_d) free(scale_host_d);
+  if (scale_host_a) {
+    for (int i = 0; i < flush_batch_count; i++) free(scale_host_a[i]);
+    free(scale_host_a);
+    scale_host_a = nullptr;
+  }
+  if (scale_host_b) {
+    for (int i = 0; i < flush_batch_count; i++) free(scale_host_b[i]);
+    free(scale_host_b);
+    scale_host_b = nullptr;
+  }
+  if (scale_host_c) {
+    for (int i = 0; i < flush_batch_count; i++) free(scale_host_c[i]);
+    free(scale_host_c);
+    scale_host_c = nullptr;
+  }
+  if (scale_host_d) {
+    for (int i = 0; i < flush_batch_count; i++) free(scale_host_d[i]);
+    free(scale_host_d);
+    scale_host_d = nullptr;
+  }
 #endif
   
   for (auto mat : mat_ptrs) {
@@ -640,16 +657,27 @@ void hipblaslt_gemm::free_mem() {
       free(mat.ptr_dev_d);
     }
     hipFree(mat.devWork);
-    
+
 #if HIP_VERSION >= 70000000
-    // Free scale device buffers
-    if (mat.scale_dev_a) hipFree(mat.scale_dev_a);
-    if (mat.scale_dev_b) hipFree(mat.scale_dev_b);
-    if (mat.scale_dev_c) hipFree(mat.scale_dev_c);
-    if (mat.scale_dev_d) hipFree(mat.scale_dev_d);
+    if (mat.scale_dev_a) {
+      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_a[i]);
+      free(mat.scale_dev_a);
+    }
+    if (mat.scale_dev_b) {
+      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_b[i]);
+      free(mat.scale_dev_b);
+    }
+    if (mat.scale_dev_c) {
+      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_c[i]);
+      free(mat.scale_dev_c);
+    }
+    if (mat.scale_dev_d) {
+      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_d[i]);
+      free(mat.scale_dev_d);
+    }
 #endif
-    
-    hipblasLtMatmulDescDestroy(mat.desc_op);
+
+    for (auto &d : mat.desc_ops) hipblasLtMatmulDescDestroy(d);
     hipblasLtMatrixLayoutDestroy(mat.desc_a);
     hipblasLtMatrixLayoutDestroy(mat.desc_b);
     hipblasLtMatrixLayoutDestroy(mat.desc_c);
@@ -751,10 +779,12 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
     int flush_index = rep % flush_batch_count;
-    stat = hipblasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo.algo, mat->devWork,
-                          mat->wSZ, stream);
+    stat = hipblasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
+                          mat->ptr_dev_a[flush_index], mat->desc_a,
+                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
+                          mat->ptr_dev_c[flush_index], mat->desc_c,
+                          mat->ptr_dev_d[flush_index], mat->desc_d,
+                          &mat->algo.algo, mat->devWork, mat->wSZ, stream);
     // Check for errors during the gemm run
     check_hipblas(stat);
     check_hip(hipGetLastError());
@@ -771,10 +801,12 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
   hipEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
     int flush_index = rep % flush_batch_count;
-    stat = hipblasLtMatmul(handle, mat->desc_op, alpha, mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta, mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d, &mat->algo.algo, mat->devWork,
-                          mat->wSZ, stream);
+    stat = hipblasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
+                          mat->ptr_dev_a[flush_index], mat->desc_a,
+                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
+                          mat->ptr_dev_c[flush_index], mat->desc_c,
+                          mat->ptr_dev_d[flush_index], mat->desc_d,
+                          &mat->algo.algo, mat->devWork, mat->wSZ, stream);
   }
   hipEventRecord(stop, stream);
   hipEventSynchronize(stop);
