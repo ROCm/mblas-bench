@@ -28,39 +28,6 @@ using std::string;
 using std::thread;
 using std::vector;
 
-// Reference - https://github.com/NVIDIA/CUDALibrarySamples/blob/main/cuBLAS/utils/cublas_utils.h#L348
-uint64_t getFixedPointWorkspaceSizeInBytes(
-    int m, int n, int k, int batchCount, bool isComplex, int mantissaControl, int maxMantissaBitCount) 
-{
-    uint64_t mult = isComplex ? 2 : 1;
-    if (maxMantissaBitCount == 0) {
-        maxMantissaBitCount = 79;
-    }
-    uint64_t numSlices = ceil_division(maxMantissaBitCount + 1, 8);
-    uint64_t padded_m = ceil_division(m, 1024) * 1024;
-    uint64_t padded_n = ceil_division(n, 1024) * 1024;
-    uint64_t padded_k = ceil_division(k, 128) * 128;
-    uint64_t num_blocks_k = ceil_division(k, 64);
-
-    uint64_t gemm_workspace = sizeof(int8_t) *
-        ((uint64_t)padded_m * padded_k + (uint64_t)padded_n * padded_k) * mult * numSlices;
-
-    gemm_workspace += sizeof(int32_t) * ((uint64_t)padded_m + padded_n) * mult;
-    if (isComplex) {
-        gemm_workspace += sizeof(double) * (uint64_t)m * n * mult * mult;
-    }
-
-    uint64_t adp_workspace = 0;
-    if (mantissaControl == 0) {
-        adp_workspace = sizeof(int32_t) * ((uint64_t)m * num_blocks_k + (uint64_t)n * num_blocks_k + (uint64_t)m * n) * mult;
-    }
-
-    constexpr uint64_t CONSTANT_SIZE = 128 * 1024 * 1024;
-    uint64_t min_workspace = std::max(gemm_workspace, adp_workspace) * batchCount;
-    uint64_t total_workspace = min_workspace + min_workspace / 4 + CONSTANT_SIZE; // 1.25x (avoiding double rounding/precision loss) plus constant size for safety margin (CUDA sample code)
-    return total_workspace;
-}
-
 // clang-format off
 std::vector<matmul_prec_type> cublaslt_gemm::matmul_supported = {
   // Compute type                   Scale Type    A Type            B Type            C Type        D Type            Bias Type
@@ -318,7 +285,7 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
       || c_type == mblas_data_type::MBLAS_C_64F
       || d_type == mblas_data_type::MBLAS_C_64F
     );
-    workspace_size = getFixedPointWorkspaceSizeInBytes(m, n, k, batch_count, is_complex, emulation_mantissa_control, emulation_max_mantissa_bits);
+    workspace_size = get_fixed_point_workspace_size_in_bytes(m, n, k, batch_count, is_complex, emulation_mantissa_control, emulation_max_mantissa_bits);
   }
 #endif
 
