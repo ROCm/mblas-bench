@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <cstring>
 #include <future>
 #include <iomanip>
 #include <limits>
@@ -27,6 +28,35 @@ using std::move;
 using std::string;
 using std::thread;
 using std::vector;
+
+namespace {
+
+// cuBLASLt doc: FP8 matmul expects TN (transA=T, transB=N) on Ada (8.9), Hopper (9.0),
+// and Blackwell GeForce (12.x). CC is from the runtime device; "GeForce" is inferred from name
+// https://docs.nvidia.com/cuda/cublas/index.html#cublasltmatmul
+bool device_requires_fp8_tn_layout(const cudaDeviceProp& prop) {
+  const int major = prop.major;
+  const int minor = prop.minor;
+  if (major == 8 && minor == 9)
+    return true;
+  if (major == 9 && minor == 0)
+    return true;
+  if (major == 12 && std::strstr(prop.name, "GeForce") != nullptr)
+    return true;
+  return false;
+}
+
+bool any_selected_device_requires_fp8_tn(const std::vector<cublaslt_gemm_inst>& insts) {
+  for (const auto& inst : insts) {
+    cudaDeviceProp prop{};
+    check_cuda(cudaGetDeviceProperties(&prop, inst.devIDX));
+    if (device_requires_fp8_tn_layout(prop))
+      return true;
+  }
+  return false;
+}
+
+}  // namespace
 
 // clang-format off
 std::vector<matmul_prec_type> cublaslt_gemm::matmul_supported = {
@@ -236,13 +266,13 @@ void cublaslt_gemm::validate_parameters() {
         "\nD type: " + d_type.to_string();
     throw std::invalid_argument(errorString);
   }
-  // Validate that FP8 kernels will use TN format only
-  // GEMM fails if not
+  // FP8 TN requirement (see cuBLASLt matmul docs)
   if ((a_type.is_fp8() || b_type.is_fp8() || c_type.is_fp8() || d_type.is_fp8()) &&
+      any_selected_device_requires_fp8_tn(mat_ptrs) &&
       (transA != mblas_operation::MBLAS_OP_T || transB != mblas_operation::MBLAS_OP_N)) {
     string errorString =
         "Transpose operation selection not supported"
-        "\nOnly TN format is supported"
+        "\nOnly TN format is supported on this GPU (per cuBLASLt FP8 rules)"
         "\nTransA: " +
         transA.to_string() + "\nTransB: " + transB.to_string();
     throw std::invalid_argument(errorString);
