@@ -122,6 +122,11 @@ class cublaslt_gemm : public generic_gemm {
   cublasLtMatmulMatrixScale_t c_scale_mode;
   cublasLtMatmulMatrixScale_t d_scale_mode;
 #endif
+  // Strided batched GEMM with block scales (FP8/FP4): one scale grid per batch, contiguous.
+  int a_scale_batch_rep = 1;
+  int b_scale_batch_rep = 1;
+  int c_scale_batch_rep = 1;
+  int d_scale_batch_rep = 1;
   uint64_t a_offset_host;
   uint64_t b_offset_host;
   uint64_t c_offset_host;
