@@ -14,3 +14,5 @@ std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, cublasLtMatm
 #endif
 
 static size_t roundoff(size_t  x, size_t granul);
+
+uint64_t get_fixed_point_workspace_size_in_bytes(int m, int n, int k, int batchCount, bool isComplex, int mantissaControl, int maxMantissaBitCount);
