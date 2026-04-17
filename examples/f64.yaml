@@ -1,0 +1,241 @@
+# Emulated FP64 GEMM benchmark - all combinations
+# M=N=K=4096, driver=cublaslt, function=matmul
+
+# === Baseline: Native FP64 ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F
+
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_PEDANTIC
+
+# === Emulated FP64: Strategy=default(0), MantissaControl=dynamic(0) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 0
+  emulation_mantissa_control: 0
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=default(0), MantissaControl=fixed(1) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 0
+  emulation_mantissa_control: 1
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=performant(1), MantissaControl=dynamic(0) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 1
+  emulation_mantissa_control: 0
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=performant(1), MantissaControl=fixed(1) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 1
+  emulation_mantissa_control: 1
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), MantissaControl=dynamic(0) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 0
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), MantissaControl=fixed(1) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), dynamic, special_values=none(0) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 0
+  emulation_special_values: 0
+
+# === Emulated FP64: Strategy=eager(2), dynamic, special_values=infinity(1) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 0
+  emulation_special_values: 1
+
+# === Emulated FP64: Strategy=eager(2), dynamic, special_values=nan(2) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 0
+  emulation_special_values: 2
+
+# === Emulated FP64: Strategy=eager(2), fixed, special_values=none(0) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_special_values: 0
+
+# === Emulated FP64: Strategy=eager(2), fixed, special_values=infinity(1) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_special_values: 1
+
+# === Emulated FP64: Strategy=eager(2), fixed, special_values=nan(2) ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_special_values: 2
+
+# === Emulated FP64: Strategy=eager(2), dynamic, mantissa_bit_offset=+4 ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 0
+  emulation_mantissa_bit_offset: 4
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), dynamic, mantissa_bit_offset=-4 ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 0
+  emulation_mantissa_bit_offset: -4
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), fixed, max_mantissa_bits=32 ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_max_mantissa_bits: 32
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), fixed, max_mantissa_bits=39 ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_max_mantissa_bits: 39
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), fixed, max_mantissa_bits=47 ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_max_mantissa_bits: 47
+  emulation_special_values: 65535
+
+# === Emulated FP64: Strategy=eager(2), fixed, max_mantissa_bits=55 ===
+- driver: cublaslt
+  function: matmul
+  m: 4096
+  n: 4096
+  k: 4096
+  precision: f64_r
+  compute_type: CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT
+  emulation_strategy: 2
+  emulation_mantissa_control: 1
+  emulation_max_mantissa_bits: 55
+  emulation_special_values: 65535

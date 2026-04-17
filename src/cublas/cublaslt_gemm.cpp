@@ -3,8 +3,11 @@
 #include <cublasLt.h>
 #include <cuda_runtime.h>
 
+#include <algorithm>
+#include <cstring>
 #include <future>
 #include <iomanip>
+#include <limits>
 #include <numeric>
 #include <regex>
 #include <string>
@@ -25,6 +28,35 @@ using std::move;
 using std::string;
 using std::thread;
 using std::vector;
+
+namespace {
+
+// cuBLASLt doc: FP8 matmul expects TN (transA=T, transB=N) on Ada (8.9), Hopper (9.0),
+// and Blackwell GeForce (12.x). CC is from the runtime device; "GeForce" is inferred from name
+// https://docs.nvidia.com/cuda/cublas/index.html#cublasltmatmul
+bool device_requires_fp8_tn_layout(const cudaDeviceProp& prop) {
+  const int major = prop.major;
+  const int minor = prop.minor;
+  if (major == 8 && minor == 9)
+    return true;
+  if (major == 9 && minor == 0)
+    return true;
+  if (major == 12 && std::strstr(prop.name, "GeForce") != nullptr)
+    return true;
+  return false;
+}
+
+bool any_selected_device_requires_fp8_tn(const std::vector<cublaslt_gemm_inst>& insts) {
+  for (const auto& inst : insts) {
+    cudaDeviceProp prop{};
+    check_cuda(cudaGetDeviceProperties(&prop, inst.devIDX));
+    if (device_requires_fp8_tn_layout(prop))
+      return true;
+  }
+  return false;
+}
+
+}  // namespace
 
 // clang-format off
 std::vector<matmul_prec_type> cublaslt_gemm::matmul_supported = {
@@ -234,13 +266,13 @@ void cublaslt_gemm::validate_parameters() {
         "\nD type: " + d_type.to_string();
     throw std::invalid_argument(errorString);
   }
-  // Validate that FP8 kernels will use TN format only
-  // GEMM fails if not
+  // FP8 TN requirement (see cuBLASLt matmul docs)
   if ((a_type.is_fp8() || b_type.is_fp8() || c_type.is_fp8() || d_type.is_fp8()) &&
+      any_selected_device_requires_fp8_tn(mat_ptrs) &&
       (transA != mblas_operation::MBLAS_OP_T || transB != mblas_operation::MBLAS_OP_N)) {
     string errorString =
         "Transpose operation selection not supported"
-        "\nOnly TN format is supported"
+        "\nOnly TN format is supported on this GPU (per cuBLASLt FP8 rules)"
         "\nTransA: " +
         transA.to_string() + "\nTransB: " + transB.to_string();
     throw std::invalid_argument(errorString);
@@ -265,6 +297,27 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
   transA = mblas_cuda_operation(result["transposeA"].as<std::string>());
   transB = mblas_cuda_operation(result["transposeB"].as<std::string>());
   validate_parameters();
+
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+  // Parse emulation parameters for CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT matmuls
+  emulation_strategy = result["emulation_strategy"].as<int>();
+  emulation_mantissa_control = result["emulation_mantissa_control"].as<int>();
+  emulation_max_mantissa_bits = result["emulation_max_mantissa_bits"].as<int>();
+  emulation_mantissa_bit_offset = result["emulation_mantissa_bit_offset"].as<int>();
+  emulation_special_values_support = result["emulation_special_values"].as<int>();
+
+  // Automatically enable emulation when using emulated compute types
+  if (compute == mblas_compute_type::MBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT) {
+    use_f64_emulation = true;
+    bool is_complex = (
+      a_type == mblas_data_type::MBLAS_C_64F
+      || b_type == mblas_data_type::MBLAS_C_64F
+      || c_type == mblas_data_type::MBLAS_C_64F
+      || d_type == mblas_data_type::MBLAS_C_64F
+    );
+    workspace_size = get_fixed_point_workspace_size_in_bytes(m, n, k, batch_count, is_complex, emulation_mantissa_control, emulation_max_mantissa_bits);
+  }
+#endif
 
   // Pull in alpha and beta, alloc memory and save to pointers
   string salpha = result["alpha"].as<string>();
@@ -332,6 +385,11 @@ string cublaslt_gemm::prepare_array() {
   ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+  if (use_f64_emulation) {
+    ossHeader << "emulation_strategy,emulation_mantissa_control,emulation_max_mantissa_bits,emulation_mantissa_bit_offset,emulation_special_values_support,algo_emulation_support,";
+  }
+#endif
   if (cuda_monitor::monitor::enabled()) {
     ossHeader << "avg_sysclk_mhz,med_sysclk_mhz,avg_memclk_mhz,med_memclk_mhz,";
   }
@@ -538,6 +596,47 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
     cublasLtMatmulDescSetAttribute(mat->desc_op, CUBLASLT_MATMUL_DESC_FAST_ACCUM,
                                    &fastAccuMode, sizeof(fastAccuMode));
   }
+
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+  // Configure emulation descriptor for emulated compute types (e.g. emulated FP64)
+  if (use_f64_emulation) {
+    check_cublas(cublasLtEmulationDescCreate(&mat->emulation_desc));
+
+    // Set emulation strategy (default/performant/eager)
+    check_cublas(cublasLtEmulationDescSetAttribute(
+        mat->emulation_desc, CUBLASLT_EMULATION_DESC_STRATEGY,
+        &emulation_strategy, sizeof(emulation_strategy)));
+
+    // Set special values support mask
+    check_cublas(cublasLtEmulationDescSetAttribute(
+        mat->emulation_desc, CUBLASLT_EMULATION_DESC_SPECIAL_VALUES_SUPPORT,
+        &emulation_special_values_support, sizeof(emulation_special_values_support)));
+
+    // Set mantissa control (dynamic or fixed)
+    check_cublas(cublasLtEmulationDescSetAttribute(
+        mat->emulation_desc, CUBLASLT_EMULATION_DESC_FIXEDPOINT_MANTISSA_CONTROL,
+        &emulation_mantissa_control, sizeof(emulation_mantissa_control)));
+
+    // Set max mantissa bit count (0 = library selects)
+    if (emulation_max_mantissa_bits > 0) {
+      check_cublas(cublasLtEmulationDescSetAttribute(
+          mat->emulation_desc, CUBLASLT_EMULATION_DESC_FIXEDPOINT_MAX_MANTISSA_BIT_COUNT,
+          &emulation_max_mantissa_bits, sizeof(emulation_max_mantissa_bits)));
+    }
+
+    // Set mantissa bit offset for dynamic control
+    if (emulation_mantissa_bit_offset != 0) {
+      check_cublas(cublasLtEmulationDescSetAttribute(
+          mat->emulation_desc, CUBLASLT_EMULATION_DESC_FIXEDPOINT_MANTISSA_BIT_OFFSET,
+          &emulation_mantissa_bit_offset, sizeof(emulation_mantissa_bit_offset)));
+    }
+
+    // Attach emulation descriptor to the matmul operation descriptor
+    check_cublas(cublasLtMatmulDescSetAttribute(
+        mat->desc_op, CUBLASLT_MATMUL_DESC_EMULATION_DESCRIPTOR,
+        &mat->emulation_desc, sizeof(mat->emulation_desc)));
+  }
+#endif
 }
 
 void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
@@ -556,6 +655,16 @@ void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
     check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
   }
   mat->algo = heuristicResult;
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+  if (use_f64_emulation) {
+    size_t _size_written = 0;
+    check_cublas(cublasLtMatmulAlgoCapGetAttribute(
+        &mat->algo.algo,
+        CUBLASLT_ALGO_CAP_FLOATING_POINT_EMULATION_SUPPORT,
+        &mat->algo_emulation_support, sizeof(mat->algo_emulation_support),
+        &_size_written));
+  }
+#endif
 }
 void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
   // Not currently implemented, using simple method
@@ -615,6 +724,11 @@ void cublaslt_gemm::free_mem() {
     if (d_props.scale_mode != scaling_type::None) {
       cudaFree(mat.scale_dev_d);
     }
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+    if (use_f64_emulation) {
+      cublasLtEmulationDescDestroy(mat.emulation_desc);
+    }
+#endif
     cublasLtMatmulDescDestroy(mat.desc_op);
     cublasLtMatrixLayoutDestroy(mat.desc_a);
     cublasLtMatrixLayoutDestroy(mat.desc_b);
@@ -685,6 +799,17 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+  if (use_f64_emulation) {
+    ossValues << emulation_strategy << ',';
+    ossValues << emulation_mantissa_control << ',';
+    ossValues << emulation_max_mantissa_bits << ',';
+    ossValues << emulation_mantissa_bit_offset << ',';
+    ossValues << emulation_special_values_support << ',';
+    assert(mat_ptrs.size() > 0);
+    ossValues << mat_ptrs[0].algo_emulation_support << ',';
+  }
+#endif
   if (cuda_monitor::monitor::enabled()) {
     ossValues << avg_sysclk_mhz << ',';
     ossValues << med_sysclk_mhz << ',';
