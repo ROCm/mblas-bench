@@ -21,8 +21,6 @@
 #include "cxxopts.hpp"
 #include "cuda_monitor.h"
 
-#include <cstring>
-
 using std::cerr;
 using std::cout;
 using std::endl;
