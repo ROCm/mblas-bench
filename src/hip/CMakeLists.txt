@@ -11,7 +11,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set the GPU to compile for
 #set(GPU_TARGETS "gfx908:sramecc+:xnack-" CACHE STRING "GPU targets to compile for")
-set(GPU_TARGETS "gfx90a,gfx942,gfx950" CACHE STRING "GPU targets to compile for")
+#set(GPU_TARGETS "gfx90a,gfx942,gfx950" CACHE STRING "GPU targets to compile for")
+set(GPU_TARGETS "gfx950" CACHE STRING "GPU targets to compile for")
 # Search for rocm in common locations
 list(PREPEND CMAKE_PREFIX_PATH /opt/rocm)
 set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
@@ -27,6 +28,8 @@ find_package(OpenMP REQUIRED)
 # Base hip sources (always included)
 set(ROCM_SOURCES
     hip_convert.hip
+    hip_convert_fp4.hip
+    hip_convert_fp6.hip
     hip_create_allocate.cpp
     hip_datatype_utils.cpp
     hip_error.cpp
