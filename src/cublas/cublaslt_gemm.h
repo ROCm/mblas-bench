@@ -87,10 +87,10 @@ class cublaslt_gemm : public generic_gemm {
   void **ptr_host_c;
   void **ptr_host_d;
 
-  void **scale_host_a;
-  void **scale_host_b;
-  void **scale_host_c;
-  void **scale_host_d;
+  void **scale_host_a = nullptr;
+  void **scale_host_b = nullptr;
+  void **scale_host_c = nullptr;
+  void **scale_host_d = nullptr;
 
   void *alpha;
   void *beta;
