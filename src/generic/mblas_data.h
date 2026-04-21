@@ -84,3 +84,7 @@ const std::map<mblas_data_type_enum, mblas_compute_type_enum> precToCompute = {
     {MBLAS_R_32I, MBLAS_COMPUTE_32I},
 };
 
+enum mblas_fp6_interpretation_t {
+  MBLAS_F6_E3M2 = 0, /**< FP6 E3M2 Type*/
+  MBLAS_F6_E2M3 = 1, /**< FP6 E2M3 Type */
+};
