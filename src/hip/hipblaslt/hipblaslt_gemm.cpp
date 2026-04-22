@@ -455,18 +455,21 @@ std::tuple<double, double, double> hipblaslt_gemm::calculate_figure_of_merit(
 
   int a_sz = type_call_dev<sizeofCUDT>(a_type);
   int b_sz = type_call_dev<sizeofCUDT>(b_type);
-  int c_sz = type_call_dev<sizeofCUDT>(c_type);
+  int d_sz = type_call_dev<sizeofCUDT>(d_type);
+  int a_pack = a_type.get_packing_count();
+  int b_pack = b_type.get_packing_count();
+  int d_pack = d_type.get_packing_count();
 
   int flopPerSize = 2;
   if (!precision.is_real()) {
-    int flopPerSize = 8;
+    flopPerSize = 8;
   }
-  double gbytes = ((static_cast<double>(a_sz) * static_cast<double>(m) *
-                    static_cast<double>(k)) +
-                   (static_cast<double>(b_sz) * static_cast<double>(k) *
-                    static_cast<double>(n)) +
-                   (static_cast<double>(c_sz) * static_cast<double>(n) *
-                    static_cast<double>(m))) /
+  double gbytes = (((static_cast<double>(a_sz) / static_cast<double>(a_pack)) *
+                    static_cast<double>(m) * static_cast<double>(k)) +
+                   ((static_cast<double>(b_sz) / static_cast<double>(b_pack)) *
+                    static_cast<double>(k) * static_cast<double>(n)) +
+                   ((static_cast<double>(d_sz) / static_cast<double>(d_pack)) *
+                    static_cast<double>(n) * static_cast<double>(m))) /
                   1e9;
   double gflops = static_cast<double>(flopPerSize) *
                   (static_cast<double>(m) * static_cast<double>(n) *
