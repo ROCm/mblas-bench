@@ -40,8 +40,8 @@ struct sizeofCUDTP {
 
 // Helper functions for local memory allocation (avoiding cross-library malloc/free)
 long get_malloc_size_scalar(mblas_data_type type);
-long get_malloc_size_host(mblas_data_type type, long x, long y, int batch);
-long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch);
+long long get_malloc_size_host(mblas_data_type type, long x, long y, int batch, long long stride);
+long long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch, long long stride);
 
 //template <typename T>
 //struct batchedPtrCopy {
