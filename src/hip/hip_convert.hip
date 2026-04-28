@@ -43,16 +43,40 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
 }
 
 #if HIP_VERSION >= 70000000
+// Convert float to OCP UE8M0 (8-bit unsigned exponent, no mantissa, bias 127).
+// Mirrors cuda's __nv_cvt_float_to_e8m0(x, __NV_SATFINITE, cudaRoundNearest):
+// abs(x) -> nearest representable 2^e with round-to-nearest-even, sat-to-finite,
+// NaN propagates as 0xFF. Sign is dropped because UE8M0 is unsigned.
 __global__ void float_to_ue8m0(float *input, size_t num_elements,
                                 __hip_fp8_storage_t *output)
 {
   long idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < num_elements)
-  {
-    uint32_t float_bits = __float_as_uint(input[idx]);
-    uint8_t ue8m0_value = (float_bits >> 23) & 0xFF;
-    output[idx] = (__hip_fp8_storage_t)ue8m0_value;
+  if (idx >= num_elements) return;
+
+  const uint32_t bits = __float_as_uint(input[idx]);
+  const uint32_t abs_bits = bits & 0x7FFFFFFFu;
+  const uint32_t exp_field = (abs_bits >> 23) & 0xFFu;
+  const uint32_t mant_field = abs_bits & 0x7FFFFFu;
+
+  uint32_t result;
+  if (exp_field == 0xFFu) {
+    result = (mant_field != 0u) ? 0xFFu : 0xFEu;
+  } else if (exp_field == 0u) {
+    // Zero or float subnormal -> smallest representable scale (no zero in UE8M0).
+    result = 0x00u;
+  } else {
+    // Linear-distance midpoint between 2^e and 2^(e+1) is at mantissa == 0x400000.
+    uint32_t rounded = exp_field;
+    if (mant_field > 0x400000u) {
+      rounded += 1u;
+    } else if (mant_field == 0x400000u) {
+      rounded += (exp_field & 1u);
+    }
+    if (rounded > 0xFEu) rounded = 0xFEu;
+    result = rounded;
   }
+
+  output[idx] = (__hip_fp8_storage_t)result;
 }
 #endif
 
