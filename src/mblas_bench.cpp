@@ -236,7 +236,8 @@ int main(int argc, char **argv) {
             cxxopts::value<string>()->default_value(""));
   opp_adder("scale_init",
             "Initialize the block scaling factors with a particular distribution "
-            "Options: constant, normal_float",
+            "Options: constant, normal_float, pow2_binomial[_n[_center]] "
+            "(pow2_binomial defaults: n=10, center=0; e.g. pow2_binomial_2_-1)",
             cxxopts::value<string>()->default_value("constant"));
   opp_adder("filename_a",
             "Initialize matrix A with contents of a csv file",

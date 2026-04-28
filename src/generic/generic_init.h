@@ -147,7 +147,7 @@ void fill_rand_host_uniform(void **ptr_array, long rows_A, long cols_A, long ld,
 
 template <typename T>
 void fill_rand_host_pow2_binomial(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
-                                   long long int stride, int flush_batch_count, int n = 10) {
+                                   long long int stride, int flush_batch_count, int n = 10, int center = 0) {
   std::random_device r;
   int random_dev_seed = r();
   #pragma omp parallel
@@ -162,7 +162,7 @@ void fill_rand_host_pow2_binomial(void **ptr_array, long rows_A, long cols_A, lo
           for (size_t i = 0; i < rows_A; ++i) {
             T *A = (T *)ptr_array[flush_idx];
             int binomial_value = binomial_dist(gen);
-            int offset_value = binomial_value - (n + 1);
+            int offset_value = binomial_value - (n + 1) + center;
             A[i + j * ld + i_batch * stride] = T(std::ldexp(T(1), offset_value));
           }
         }
@@ -258,8 +258,9 @@ void initHost<T>::operator()(std::string initialization, void **ptr_array, long 
   // Uniform defaults
   float min_val = 0.0;
   float max_val = 1.0;
-  // Pow2 binomial default
+  // Pow2 binomial defaults
   int pow2_n = 10;
+  int pow2_center = 0;
   
   if (!filename.empty()) {
     fill_rand_host_csv<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, filename);
@@ -289,9 +290,9 @@ void initHost<T>::operator()(std::string initialization, void **ptr_array, long 
       throw std::invalid_argument(error_string);
     }
   } else if (parse_parameterized_init(initialization, 
-            {"pow2_binomial"}, pow2_n)) {
+            {"pow2_binomial"}, pow2_n, pow2_center)) {
     if constexpr (std::is_floating_point_v<T>) {
-      fill_rand_host_pow2_binomial<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, pow2_n);
+      fill_rand_host_pow2_binomial<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, pow2_n, pow2_center);
     } else {
       std::string error_string = "Error: pow2_binomial distribution not supported for non-floating-point types";
       throw std::invalid_argument(error_string);
