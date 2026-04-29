@@ -233,6 +233,10 @@ std::string generic_gemm::set_init(matrix_desc desc, std::string init, std::stri
 //  }
 //}
 
+int generic_gemm::get_returned_algo_count(){
+  return returned_algo_count;
+}
+
 std::string scaling_string(scaling_type input){
   if (input == scaling_type::None) {
     return "None";

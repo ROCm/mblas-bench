@@ -165,6 +165,7 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       c_type.get_packing_count(), 
       d_type.get_packing_count(), 
       inplace);
+  requested_solution_count = result["requested_solution_num"].as<int>();
 }
 
 string rocblas_gemm::prepare_array() {
@@ -195,6 +196,7 @@ string rocblas_gemm::prepare_array() {
 
   run_threaded(&rocblas_gemm::alloc_dev);
   run_threaded(&rocblas_gemm::copy_host_to_dev);
+  returned_algo_count = 1; // rocblas only returns one solution
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
   if (batched) {
@@ -322,7 +324,10 @@ void rocblas_gemm::free_mem() {
   }
 }
 
-double rocblas_gemm::test() {
+double rocblas_gemm::test(const int &ith_solution) {
+  if (ith_solution != 0) {
+    throw std::invalid_argument("rocblas_gemm::test: ith_solution must be 0");
+  }
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
