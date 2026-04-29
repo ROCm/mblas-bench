@@ -13,7 +13,7 @@ jobs:
   build:
     strategy:
       matrix:
-        cuda_version: [12.8.1, 12.9.1, 13.0.1]
+        cuda_version: [12.8.1, 12.9.1, 13.0.1, 13.0.2]
         #arch: [x86_64, arm64]
         arch: [x86_64]
       fail-fast: false

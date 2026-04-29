@@ -18,6 +18,7 @@ class mblas_compute_type {
     static const mblas_compute_type MBLAS_COMPUTE_32F_FAST_TF32;
     static const mblas_compute_type MBLAS_COMPUTE_32F_EMULATED_16BFX9;
     static const mblas_compute_type MBLAS_COMPUTE_64F;
+    static const mblas_compute_type MBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT;
     static const mblas_compute_type MBLAS_COMPUTE_64F_PEDANTIC;
     static const mblas_compute_type MBLAS_COMPUTE_32I;
     static const mblas_compute_type MBLAS_COMPUTE_32I_PEDANTIC;
@@ -60,6 +61,7 @@ constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32F_FAST_16
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32F_FAST_TF32{mblas_compute_type_enum::MBLAS_COMPUTE_32F_FAST_TF32};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32F_EMULATED_16BFX9{mblas_compute_type_enum::MBLAS_COMPUTE_32F_EMULATED_16BFX9};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_64F{mblas_compute_type_enum::MBLAS_COMPUTE_64F};
+constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT{mblas_compute_type_enum::MBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_64F_PEDANTIC{mblas_compute_type_enum::MBLAS_COMPUTE_64F_PEDANTIC};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32I{mblas_compute_type_enum::MBLAS_COMPUTE_32I};
 constexpr const mblas_compute_type mblas_compute_type::MBLAS_COMPUTE_32I_PEDANTIC{mblas_compute_type_enum::MBLAS_COMPUTE_32I_PEDANTIC};

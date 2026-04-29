@@ -14,7 +14,27 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(GPU_TARGETS "gfx90a" CACHE STRING "GPU targets to compile for")
 # Find packages
 find_package(CUDAToolkit REQUIRED)
-find_package(Threads REQUIRED) 
+find_package(Threads REQUIRED)
+
+# Check for CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT enum in CUDA headers
+# This is more reliable than parsing version numbers since patch levels can vary
+if(CUDAToolkit_INCLUDE_DIRS)
+    set(CUBLAS_HEADER "${CUDAToolkit_INCLUDE_DIRS}/cublas_api.h")
+    if(EXISTS "${CUBLAS_HEADER}")
+        file(READ "${CUBLAS_HEADER}" CUBLAS_HEADER_CONTENT)
+        string(FIND "${CUBLAS_HEADER_CONTENT}" "CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT" ENUM_FOUND)
+        if(NOT ENUM_FOUND EQUAL -1)
+            message(STATUS "Found CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT in ${CUBLAS_HEADER}")
+            add_definitions(-DHAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+        else()
+            message(STATUS "CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT not found in ${CUBLAS_HEADER}")
+        endif()
+    else()
+        message(WARNING "Could not find cublas_v2.h at ${CUBLAS_HEADER}")
+    endif()
+else()
+    message(WARNING "CUDAToolkit_INCLUDE_DIRS not set, cannot check for CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT")
+endif() 
 
 add_library(mblascuda SHARED
     cublas_gemm.cpp

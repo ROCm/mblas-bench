@@ -225,9 +225,9 @@ int main(int argc, char **argv) {
   opp_adder("instances", "Number of instances to run on each GPU",
             cxxopts::value<int>()->default_value("1"));
   opp_adder("initialization",
-            "Intialize with random integers, trig functions sin and cos, or "
+            "Initialize with random integers, trig functions sin and cos, or "
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
-            "hpl, blasgemm",
+            "uniform_dist, pow2_binomial, hpl, blasgemm, constant",
             cxxopts::value<string>()->default_value("rand_int"));
   opp_adder("mx_init",
             "Initialize any MX datatypes with this initialization strategy."
@@ -239,13 +239,13 @@ int main(int argc, char **argv) {
             "Options: constant, normal_float",
             cxxopts::value<string>()->default_value("constant"));
   opp_adder("filename_a",
-            "Intialize matrix A with contents of a csv file",
+            "Initialize matrix A with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
   opp_adder("filename_b",
-            "Intialize matrix B with contents of a csv file",
+            "Initialize matrix B with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
   opp_adder("filename_c",
-            "Intialize matrix C with contents of a csv file",
+            "Initialize matrix C with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
   opp_adder("constant_a",
             "Constant value used for the A matrix."
@@ -309,6 +309,24 @@ int main(int argc, char **argv) {
   opp_adder("requested_solution_num,requested_solution",
             "Number of solutions to request from the heuristic. Use -1 to request all solutions.",
             cxxopts::value<int>()->default_value("1"));
+  opp_adder("emulation_strategy",
+            "Emulation strategy for emulated compute types (e.g. CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT). "
+            "Options: 0=default, 1=performant, 2=eager",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_mantissa_control",
+            "Mantissa control for fixed-point emulation. "
+            "Options: 0=dynamic, 1=fixed",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_max_mantissa_bits",
+            "Maximum mantissa bits for fixed-point emulation (0=library default)",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_mantissa_bit_offset",
+            "Mantissa bit offset for dynamic mantissa control in fixed-point emulation",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("emulation_special_values",
+            "Special values support bitmask for emulation. "
+            "0xFFFF=default (inf+nan), 0=none, 1=infinity, 2=nan",
+            cxxopts::value<int>()->default_value("65535"));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);

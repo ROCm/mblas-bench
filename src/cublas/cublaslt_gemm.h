@@ -1,4 +1,7 @@
 #pragma once
+
+#include <cstdint>
+
 #include <cublasLt.h>
 #include <cuda_runtime.h>
 #include <cxxabi.h>
@@ -6,6 +9,7 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "generic_gemm.h"
 #include "mblas_cuda_data_type.h"
@@ -44,20 +48,26 @@ struct cublaslt_gemm_inst {
   void **ptr_dev_b;
   void **ptr_dev_c;
   void **ptr_dev_d;
-  void *scale_dev_a;
-  void *scale_dev_b;
-  void *scale_dev_c;
-  void *scale_dev_d;
-  cublasLtMatmulDesc_t desc_op;
+  void **scale_dev_a;
+  void **scale_dev_b;
+  void **scale_dev_c;
+  void **scale_dev_d;
+  std::vector<cublasLtMatmulDesc_t> desc_ops;
   cublasLtMatrixLayout_t desc_a;
   cublasLtMatrixLayout_t desc_b;
   cublasLtMatrixLayout_t desc_c;
   cublasLtMatrixLayout_t desc_d;
   cublasLtMatmulPreference_t pref;
   std::vector<cublasLtMatmulHeuristicResult_t> algos;
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+    cublasLtEmulationDesc_t emulation_desc;
+    int32_t algo_emulation_support = 0;
+#endif
   void *devWork;
-  long wSZ;
-  cublaslt_gemm_inst(int devID) { devIDX = devID; }
+  uint64_t wSZ;
+  cublaslt_gemm_inst(int devID)
+    : devIDX(devID), scale_dev_a(nullptr), scale_dev_b(nullptr),
+      scale_dev_c(nullptr), scale_dev_d(nullptr) {}
 };
 
 struct scale_size {
@@ -77,10 +87,10 @@ class cublaslt_gemm : public generic_gemm {
   void **ptr_host_c;
   void **ptr_host_d;
 
-  void *scale_host_a;
-  void *scale_host_b;
-  void *scale_host_c;
-  void *scale_host_d;
+  void **scale_host_a = nullptr;
+  void **scale_host_b = nullptr;
+  void **scale_host_c = nullptr;
+  void **scale_host_d = nullptr;
 
   void *alpha;
   void *beta;
@@ -128,7 +138,17 @@ class cublaslt_gemm : public generic_gemm {
   uint64_t total_block_size_host;
   uint64_t total_block_size_dev;
 
-  int workspace_size = 64 * 1024 * 1024;
+  uint64_t workspace_size = 64 * 1024 * 1024;
+
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+    // Emulated FP64 configuration
+    bool use_f64_emulation = false;
+    int32_t emulation_strategy = 0;      // CUBLAS_EMULATION_STRATEGY_DEFAULT
+    int32_t emulation_mantissa_control = 0; // CUDA_EMULATION_MANTISSA_CONTROL_DYNAMIC
+    int32_t emulation_max_mantissa_bits = 0;
+    int32_t emulation_mantissa_bit_offset = 0;
+    int32_t emulation_special_values_support = 0xFFFF; // CUDA_EMULATION_SPECIAL_VALUES_SUPPORT_DEFAULT
+#endif
 
   static std::vector<matmul_prec_type> matmul_supported;
   std::vector<cublaslt_gemm_inst> mat_ptrs;
