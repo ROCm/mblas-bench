@@ -120,7 +120,9 @@ class generic_gemm {
 
   virtual std::string prepare_array() = 0;
 
+  virtual void initialize_algos(int requested_solution_num) = 0;
   virtual double test(const int &ith_solution) = 0;
+  void run_solutions(int requested_solution_num);
 
   virtual std::string get_result_string() = 0;
   virtual void free_mem() = 0;
@@ -130,11 +132,9 @@ class generic_gemm {
   static scaling_type set_scale_mode(std::string input);
   static std::string set_init(matrix_desc desc, std::string init, std::string mx_init);
 
-  void set_flush_batch_count(int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
-                        int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing, 
+  void set_flush_batch_count(int a_type_size,  int b_type_size, int c_type_size, int d_type_size,
+                        int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing,
                         bool inplace);
-
-  int get_returned_algo_count();
 
 };
 

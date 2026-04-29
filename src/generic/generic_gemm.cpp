@@ -233,8 +233,12 @@ std::string generic_gemm::set_init(matrix_desc desc, std::string init, std::stri
 //  }
 //}
 
-int generic_gemm::get_returned_algo_count(){
-  return returned_algo_count;
+void generic_gemm::run_solutions(int requested_solution_num) {
+  initialize_algos(requested_solution_num);
+  for (int i = 0; i < returned_algo_count; i++) {
+    test(i);
+    std::cout << std::fixed << get_result_string() << std::flush;
+  }
 }
 
 std::string scaling_string(scaling_type input){

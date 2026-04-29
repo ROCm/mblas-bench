@@ -29,6 +29,8 @@ using std::string;
 using std::thread;
 using std::vector;
 
+static constexpr int kMaxAlgoSearchResults = 65536;
+
 namespace {
 
 // cuBLASLt doc: FP8 matmul expects TN (transA=T, transB=N) on Ada (8.9), Hopper (9.0),
@@ -370,11 +372,6 @@ string cublaslt_gemm::prepare_array() {
   run_threaded(&cublaslt_gemm::alloc_dev);
   run_threaded(&cublaslt_gemm::copy_host_to_dev);
   run_threaded(&cublaslt_gemm::prepare_matrix);
-  if (requested_solution_count == 1) {
-    run_threaded(&cublaslt_gemm::no_tuning);
-  } else {
-    run_threaded(&cublaslt_gemm::auto_tuning);
-  }
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,ldd,";
   // if (batched) {
@@ -704,21 +701,37 @@ void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
-  cublasStatus_t stat;
-  cublasLtHandle_t handle;
-  check_cuda(cudaSetDevice(mat->devIDX));
-  check_cublas(cublasLtCreate(&handle));
-  int returnedAlgoCount = 0;
-  const int requestedAlgoCount = requested_solution_count < 0 ? 65536 : requested_solution_count;
-  std::vector<cublasLtMatmulHeuristicResult_t> algoList(requestedAlgoCount);
-  check_cublas(cublasLtMatmulAlgoGetHeuristic(
-      handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
-      mat->pref, requestedAlgoCount, algoList.data(), &returnedAlgoCount));
-  if (returnedAlgoCount == 0) {
-    check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
+  // Delegates to no_tuning — kept for compatibility; use initialize_algos for multi-solution.
+  no_tuning(mat);
+}
+
+void cublaslt_gemm::initialize_algos(int requested_solution_num) {
+  for (auto &mat : mat_ptrs) {
+    cublasLtHandle_t handle;
+    check_cuda(cudaSetDevice(mat.devIDX));
+    check_cublas(cublasLtCreate(&handle));
+    int returnedAlgoCount = 0;
+    const int requestedAlgoCount = requested_solution_num < 0 ? kMaxAlgoSearchResults : requested_solution_num;
+    std::vector<cublasLtMatmulHeuristicResult_t> algoList(requestedAlgoCount);
+    check_cublas(cublasLtMatmulAlgoGetHeuristic(
+        handle, mat.desc_ops[0], mat.desc_a, mat.desc_b, mat.desc_c, mat.desc_d,
+        mat.pref, requestedAlgoCount, algoList.data(), &returnedAlgoCount));
+    if (returnedAlgoCount == 0) {
+      check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
+    }
+    mat.algos.assign(algoList.begin(), algoList.begin() + returnedAlgoCount);
+#if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
+    if (use_f64_emulation) {
+      size_t _size_written = 0;
+      check_cublas(cublasLtMatmulAlgoCapGetAttribute(
+          &mat.algos[0].algo,
+          CUBLASLT_ALGO_CAP_FLOATING_POINT_EMULATION_SUPPORT,
+          &mat.algo_emulation_support, sizeof(mat.algo_emulation_support),
+          &_size_written));
+    }
+#endif
+    returned_algo_count = returnedAlgoCount;
   }
-  mat->algos = algoList;
-  returned_algo_count = returnedAlgoCount;
 }
 
 void cublaslt_gemm::free_mem() {

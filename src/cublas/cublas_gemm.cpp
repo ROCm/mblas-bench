@@ -357,6 +357,10 @@ void cublas_gemm::free_mem() {
   }
 }
 
+void cublas_gemm::initialize_algos(int /*requested_solution_num*/) {
+  returned_algo_count = 1;
+}
+
 double cublas_gemm::test(const int &ith_solution) {
   if (ith_solution != 0) {
     throw std::invalid_argument("cublas_gemm::test: ith_solution must be 0");

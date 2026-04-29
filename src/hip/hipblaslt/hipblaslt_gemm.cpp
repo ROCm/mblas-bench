@@ -24,6 +24,8 @@ using std::string;
 using std::thread;
 using std::vector;
 
+static constexpr int kMaxAlgoSearchResults = 65536;
+
 // clang-format off
 std::vector<matmul_prec_type> hipblaslt_gemm::matmul_supported = {
   // Compute type                 Scale Type    A Type        B Type        C Type        D Type        Bias Type
@@ -199,12 +201,6 @@ string hipblaslt_gemm::prepare_array() {
   run_threaded(&hipblaslt_gemm::alloc_dev);
   run_threaded(&hipblaslt_gemm::copy_host_to_dev);
   run_threaded(&hipblaslt_gemm::prepare_matrix);
-  // Enable tuning with a parameter later
-  if (requested_solution_count == 1) {
-    run_threaded(&hipblaslt_gemm::no_tuning);
-  } else {
-    run_threaded(&hipblaslt_gemm::auto_tuning);
-  }
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,";
   if (batched) {
@@ -357,21 +353,28 @@ void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
 }
 
 void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
-  hipblasStatus_t stat;
-  hipblasLtHandle_t handle;
-  check_hip(hipSetDevice(mat->devIDX));
-  check_hipblas(hipblasLtCreate(&handle));
-  int retResults = 0;
-  const int requested_algo_count = requested_solution_count < 0 ? 65536 : requested_solution_count;
-  std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults(requested_algo_count);
-  check_hipblas(hipblasLtMatmulAlgoGetHeuristic(
-      handle, mat->desc_op, mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
-      mat->pref, requested_algo_count, heuristicResults.data(), &retResults));
-  if (retResults == 0) {
-    check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
+  // Delegates to no_tuning — kept for compatibility; use initialize_algos for multi-solution.
+  no_tuning(mat);
+}
+
+void hipblaslt_gemm::initialize_algos(int requested_solution_num) {
+  for (auto &mat : mat_ptrs) {
+    hipblasLtHandle_t handle;
+    check_hip(hipSetDevice(mat.devIDX));
+    check_hipblas(hipblasLtCreate(&handle));
+    int returnedAlgoCount = 0;
+    const int requestedAlgoCount = requested_solution_num < 0 ? kMaxAlgoSearchResults : requested_solution_num;
+    std::vector<hipblasLtMatmulHeuristicResult_t> algoList(requestedAlgoCount);
+    check_hipblas(hipblasLtMatmulAlgoGetHeuristic(
+        handle, mat.desc_op, mat.desc_a, mat.desc_b, mat.desc_c, mat.desc_d,
+        mat.pref, requestedAlgoCount, algoList.data(), &returnedAlgoCount));
+    if (returnedAlgoCount == 0) {
+      check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
+    }
+    mat.algos.assign(algoList.begin(), algoList.begin() + returnedAlgoCount);
+    returned_algo_count = returnedAlgoCount;
+    check_hipblas(hipblasLtDestroy(handle));
   }
-  mat->algos = heuristicResults;
-  returned_algo_count = retResults;
 }
 
 void hipblaslt_gemm::free_mem() {

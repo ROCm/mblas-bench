@@ -324,6 +324,10 @@ void rocblas_gemm::free_mem() {
   }
 }
 
+void rocblas_gemm::initialize_algos(int /*requested_solution_num*/) {
+  returned_algo_count = 1;
+}
+
 double rocblas_gemm::test(const int &ith_solution) {
   if (ith_solution != 0) {
     throw std::invalid_argument("rocblas_gemm::test: ith_solution must be 0");

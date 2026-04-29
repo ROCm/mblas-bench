@@ -379,13 +379,8 @@ int main(int argc, char **argv) {
     string header = gemm->prepare_array();
     cout << header << flush;
 
-    for (int i = 0; i < gemm->get_returned_algo_count(); i++) {
-      gemm->test(i);
-      cout << std::fixed;
-
-      string results = gemm->get_result_string();
-      cout << results << flush;
-    }
+    int requested_solution_num = result["requested_solution_num"].as<int>();
+    gemm->run_solutions(requested_solution_num);
 
     gemm->free_mem();
     delete gemm;
