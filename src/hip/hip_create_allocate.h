@@ -1,6 +1,4 @@
 #pragma once
-#include <rocblas/rocblas.h>
-#include <hipblaslt/hipblaslt.h>
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 #include <hip/hip_fp8.h>
@@ -12,6 +10,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include "generic_init.h"
 #include "mblas_data_type.h"
@@ -58,12 +57,12 @@ struct set_scalar {
 };
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type;
+auto type_call_host(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...>;
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_dev(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type;
+auto type_call_dev(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...>;
 
 long get_malloc_size_scalar(mblas_data_type type);
 
@@ -182,8 +181,8 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
 //                              long long int stride);
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type {
+auto type_call_host(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...> {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case MBLAS_R_64F:
@@ -246,8 +245,8 @@ auto type_call_host(mblas_data_type type, Args... args) ->
 //}
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_dev(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type {
+auto type_call_dev(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...> {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case MBLAS_R_64F:
