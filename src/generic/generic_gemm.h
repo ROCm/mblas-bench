@@ -97,6 +97,10 @@ class generic_gemm {
   double gbyte_per_second = 0;
   double iter_time_us = 0;
 
+  int current_solution_index = 0;
+  int total_solution_count = 1;
+  int requested_solution_num = 1;
+
   float avg_sysclk_mhz = 0;
   float med_sysclk_mhz = 0;
   float avg_memclk_mhz = 0;
@@ -117,7 +121,8 @@ class generic_gemm {
 
   virtual std::string prepare_array() = 0;
 
-  virtual double test() = 0;
+  virtual double test(const int &ith_solution) = 0;
+  void run_solutions();
 
   virtual std::string get_result_string() = 0;
   virtual void free_mem() = 0;

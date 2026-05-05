@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 
 #include <bitset>
+#include <cassert>
 #include <future>
 #include <iomanip>
 #include <numeric>
@@ -232,6 +233,10 @@ string cublas_gemm::prepare_array() {
     ossHeader << "batch_count,";
   }
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us," << endl;
+  if (requested_solution_num > 1 || requested_solution_num == -1) {
+    std::cerr << "Warning: Multi-solution is not supported for cuBLAS backend. Running 1 solution." << std::endl;
+  }
+  total_solution_count = 1;
   return ossHeader.str();
 }
 
@@ -355,7 +360,8 @@ void cublas_gemm::free_mem() {
   }
 }
 
-double cublas_gemm::test() {
+double cublas_gemm::test(const int &ith_solution) {
+  assert(ith_solution == 0);
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {

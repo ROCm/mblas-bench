@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <climits>
 #include <cstring>
 #include <future>
 #include <iomanip>
@@ -370,10 +371,22 @@ string cublaslt_gemm::prepare_array() {
   run_threaded(&cublaslt_gemm::copy_host_to_dev);
   run_threaded(&cublaslt_gemm::prepare_matrix);
   // Enable tuning with a parameter later
-  if (false) {
+  if (requested_solution_num > 1 || requested_solution_num == -1) {
+    run_threaded(&cublaslt_gemm::no_tuning_multiple_solutions);
   } else {
     run_threaded(&cublaslt_gemm::no_tuning);
   }
+  // Compute total_solution_count as min algos across devices
+  std::vector<int> solution_counts;
+  for (auto &mat : mat_ptrs) {
+    solution_counts.push_back(mat.algos.size());
+  }
+  // Ensure all solution_counts are the same
+  if (std::any_of(solution_counts.begin(), solution_counts.end(), [&](int count) { return count != solution_counts[0]; })) {
+    throw std::runtime_error("Solution counts are not the same across devices");
+  }
+  total_solution_count = solution_counts[0];
+
   std::ostringstream ossHeader;
   ossHeader << "transA_option,transB_option,M,N,K,lda,ldb,ldc,ldd,";
   // if (batched) {
@@ -384,6 +397,7 @@ string cublaslt_gemm::prepare_array() {
   ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
   ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
+  ossHeader << "solution_index,";
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
   if (use_f64_emulation) {
@@ -674,31 +688,46 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
+  prepare_solutions(mat, 1);
+}
+
+void cublaslt_gemm::no_tuning_multiple_solutions(cublaslt_gemm_inst *mat) {
+  prepare_solutions(mat, requested_solution_num);
+}
+
+void cublaslt_gemm::prepare_solutions(cublaslt_gemm_inst *mat, int requested_algo_count) {
   cublasStatus_t stat;
   cublasLtHandle_t handle;
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasLtCreate(&handle));
   int retResults = 0;
-  cublasLtMatmulHeuristicResult_t heuristicResult = {0};
+
+  int request_count = (requested_algo_count == -1) ? 65536 : requested_algo_count;
+  std::vector<cublasLtMatmulHeuristicResult_t> heuristicResults(request_count);
 
   check_cublas(cublasLtMatmulAlgoGetHeuristic(
       handle, mat->desc_ops[0], mat->desc_a, mat->desc_b, mat->desc_c, mat->desc_d,
-      mat->pref, 1, &heuristicResult, &retResults));
+      mat->pref, request_count, heuristicResults.data(), &retResults));
 
   if (retResults == 0) {
     check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
   }
-  mat->algo = heuristicResult;
+  heuristicResults.resize(retResults);
+  mat->algos = std::move(heuristicResults);
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
   if (use_f64_emulation) {
-    size_t _size_written = 0;
-    check_cublas(cublasLtMatmulAlgoCapGetAttribute(
-        &mat->algo.algo,
-        CUBLASLT_ALGO_CAP_FLOATING_POINT_EMULATION_SUPPORT,
-        &mat->algo_emulation_support, sizeof(mat->algo_emulation_support),
-        &_size_written));
+    mat->algo_emulation_support.resize(mat->algos.size());
+    for (size_t i = 0; i < mat->algos.size(); i++) {
+      size_t _size_written = 0;
+      check_cublas(cublasLtMatmulAlgoCapGetAttribute(
+          &mat->algos[i].algo,
+          CUBLASLT_ALGO_CAP_FLOATING_POINT_EMULATION_SUPPORT,
+          &mat->algo_emulation_support[i], sizeof(mat->algo_emulation_support[i]),
+          &_size_written));
+    }
   }
 #endif
+  check_cublas(cublasLtDestroy(handle));
 }
 void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
   // Not currently implemented, using simple method
@@ -787,11 +816,11 @@ void cublaslt_gemm::free_mem() {
   }
 }
 
-double cublaslt_gemm::test() {
+double cublaslt_gemm::test(const int &ith_solution) {
   vector<thread> threads;
   double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
-    threads.push_back(thread(&cublaslt_gemm::test_matmul, this, &mat));
+    threads.push_back(thread(&cublaslt_gemm::test_matmul, this, &mat, ith_solution));
   }
   // Wait on running jobs
   for (auto &thread : threads) {
@@ -843,6 +872,7 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << scaling_string(scale_mode_c) << ',';
   ossValues << scaling_string(scale_mode_d) << ',';
   ossValues << flush_memory_size << ','; // rotating buffer size
+  ossValues << current_solution_index << ',';
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
@@ -854,7 +884,7 @@ std::string cublaslt_gemm::get_result_string() {
     ossValues << emulation_mantissa_bit_offset << ',';
     ossValues << emulation_special_values_support << ',';
     assert(mat_ptrs.size() > 0);
-    ossValues << mat_ptrs[0].algo_emulation_support << ',';
+    ossValues << mat_ptrs[0].algo_emulation_support[current_solution_index] << ',';
   }
 #endif
   if (cuda_monitor::monitor::enabled()) {
@@ -903,7 +933,7 @@ std::tuple<double, double, double> cublaslt_gemm::calculate_figure_of_merit(
                                             avgTime_us);
 }
 
-void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
+void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat, int ith_solution) {
   cublasStatus_t stat;
   cublasLtHandle_t handle;
   cudaStream_t stream;
@@ -918,7 +948,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta,
                           mat->ptr_dev_c[flush_index], mat->desc_c,
                           mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algo.algo, mat->devWork, mat->wSZ, stream);
+                          &mat->algos[ith_solution].algo, mat->devWork, mat->wSZ, stream);
     // Check for errors during the gemm run
     check_cublas(stat);
     check_cuda(cudaGetLastError());
@@ -934,7 +964,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   */
   auto freq_monitor = cuda_monitor::monitor();
   freq_monitor.set_device_id(mat->devIDX);
-  
+
   freq_monitor.start();
   cudaEventRecord(start, stream);
   for (int rep = 0; rep < iters; rep++) {
@@ -944,7 +974,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
                           mat->ptr_dev_b[flush_index], mat->desc_b, beta,
                           mat->ptr_dev_c[flush_index], mat->desc_c,
                           mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algo.algo, mat->devWork, mat->wSZ, stream);
+                          &mat->algos[ith_solution].algo, mat->devWork, mat->wSZ, stream);
   }
   cudaEventRecord(stop, stream);
   cudaEventSynchronize(stop);
