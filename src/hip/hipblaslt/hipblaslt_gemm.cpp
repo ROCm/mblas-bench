@@ -3,6 +3,7 @@
 #include <hipblaslt/hipblaslt.h>
 #include <hip/hip_runtime.h>
 
+#include <chrono>
 #include <future>
 #include <iomanip>
 #include <numeric>
@@ -23,6 +24,42 @@ using std::move;
 using std::string;
 using std::thread;
 using std::vector;
+
+namespace {
+struct timed_result { int iters; double gpu_ms; };
+
+timed_result run_timed(hipStream_t stream, int time_ms, std::function<void(int)> fn) {
+  hipEvent_t start, stop;
+  check_hip(hipEventCreate(&start));
+  check_hip(hipEventCreate(&stop));
+
+  auto t0 = std::chrono::steady_clock::now();
+  int completed = 0;
+  double total_ms = 0.0;
+
+  while (true) {
+    check_hip(hipEventRecord(start, stream));
+    fn(completed);
+    check_hip(hipEventRecord(stop, stream));
+    check_hip(hipEventSynchronize(stop));
+
+    float iter_ms = 0.0f;
+    check_hip(hipEventElapsedTime(&iter_ms, start, stop));
+
+    auto wall_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - t0)
+                       .count();
+    if (wall_ms > time_ms) break;
+
+    total_ms += static_cast<double>(iter_ms);
+    completed++;
+  }
+
+  check_hip(hipEventDestroy(start));
+  check_hip(hipEventDestroy(stop));
+  return {completed, total_ms};
+}
+} // namespace
 
 // clang-format off
 std::vector<matmul_prec_type> hipblaslt_gemm::matmul_supported = {
@@ -350,7 +387,7 @@ void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
     check_hipblas(HIPBLAS_STATUS_NOT_SUPPORTED);
   }
   mat->algo = heuristicResult;
-  hipblasLtDestroy(handle);
+  check_hipblas(hipblasLtDestroy(handle));
 }
 void hipblaslt_gemm::auto_tuning(hipblaslt_gemm_inst *mat) {
   // Not currently implemented, using simple method
@@ -448,8 +485,11 @@ std::string hipblaslt_gemm::get_result_string() {
 }
 
 std::tuple<double, double, double> hipblaslt_gemm::calculate_figure_of_merit(
-    double totalTime_ms) {
-  double avgTime_ms = totalTime_ms / iters;
+    double totalTime_ms, int iters_completed) {
+  if (iters_completed <= 0) {
+    return std::tuple<double, double, double>(0.0, 0.0, 0.0);
+  }
+  double avgTime_ms = totalTime_ms / iters_completed;
   double avgTime_s = avgTime_ms / 1000.0f;
   double avgTime_us = avgTime_ms * 1000.0f;
 
@@ -490,6 +530,34 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
   check_hip(hipSetDevice(mat->devIDX));
   check_hipblas(hipblasLtCreate(&handle));
   check_hip(hipStreamCreate(&stream));
+
+  if (iters_time_ms > 0) {
+    auto kernel = [&](int rep) {
+      int flush_index = rep % flush_batch_count;
+      stat = hipblasLtMatmul(handle, mat->desc_op, alpha,
+                             mat->ptr_dev_a[flush_index], mat->desc_a,
+                             mat->ptr_dev_b[flush_index], mat->desc_b, beta,
+                             mat->ptr_dev_c[flush_index], mat->desc_c,
+                             mat->ptr_dev_d[flush_index], mat->desc_d,
+                             &mat->algo.algo, mat->devWork, mat->wSZ, stream);
+      check_hipblas(stat);
+      check_hip(hipGetLastError());
+    };
+
+    if (cold_iters_time_ms > 0)
+      run_timed(stream, cold_iters_time_ms, kernel);
+
+    auto result = run_timed(stream, iters_time_ms, kernel);
+    std::tie(mat->gflops, mat->gbytes, mat->time_us) =
+        calculate_figure_of_merit(result.gpu_ms, result.iters);
+
+    // Cleanup
+    check_hip(hipStreamSynchronize(stream));
+    check_hipblas(hipblasLtDestroy(handle));
+    check_hip(hipStreamDestroy(stream));
+    return;
+  }
+
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
     int flush_index = rep % flush_batch_count;
@@ -501,7 +569,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
     check_hipblas(stat);
     check_hip(hipGetLastError());
   }
-  hipStreamSynchronize(stream);
+  check_hip(hipStreamSynchronize(stream));
 
   hipEvent_t start, stop;
   check_hip(hipEventCreate(&start));
@@ -529,11 +597,12 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat) {
   float elapsedTime_ms;
   hipEventElapsedTime(&elapsedTime_ms, start, stop);
   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms), iters);
   
   // Cleanup
   check_hip(hipEventDestroy(start));
   check_hip(hipEventDestroy(stop));
-  check_hip(hipStreamDestroy(stream));
+  check_hip(hipStreamSynchronize(stream));
   check_hipblas(hipblasLtDestroy(handle));
+  check_hip(hipStreamDestroy(stream));
 }

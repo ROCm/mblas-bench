@@ -117,7 +117,8 @@ class cublas_gemm : public generic_gemm {
   void fill_host();
   void copy_host_to_dev(cublasgemmInst *);
   void run_threaded(void (cublas_gemm::*func)(cublasgemmInst *));
-  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
+  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms,
+                                                               int iters_completed);
 
 
   double testGemmExBatched();

@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "cxxopts.hpp"
+
 enum class scaling_type {None, Scalar, Vector, Block};
 std::string scaling_string(scaling_type input);
 class generic_gemm {
@@ -39,11 +40,11 @@ class generic_gemm {
   int & cols_d = d_props.cols;
 
   int & rows_mem_a = a_props.rows_mem;
-  int & cols_mem_a = a_props.cols;
+  int & cols_mem_a = a_props.cols_mem;
   int & rows_mem_b = b_props.rows_mem;
-  int & cols_mem_b = b_props.cols;
+  int & cols_mem_b = b_props.cols_mem;
   int & rows_mem_c = c_props.rows_mem;
-  int & cols_mem_c = c_props.cols;
+  int & cols_mem_c = c_props.cols_mem;
   int & rows_mem_d = d_props.rows_mem;
   int & cols_mem_d = d_props.cols_mem;
 
@@ -63,6 +64,9 @@ class generic_gemm {
 
   int iters;
   int cold_iters;
+
+  int iters_time_ms = 0;
+  int cold_iters_time_ms = 0;
 
   int batch_count;
   int flush_batch_count;
@@ -132,4 +136,3 @@ class generic_gemm {
                         bool inplace);
 
 };
-

@@ -1,5 +1,6 @@
 #include "generic_gemm.h"
 
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -53,6 +54,41 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
 
   iters = result["iters"].as<int>();
   cold_iters = result["cold_iters"].as<int>();
+
+  // Time-based iteration control (ms). When > 0, enables time-budgeted
+  // warmup/measurement. Fixed-count and time-budget modes are mutually exclusive
+  // when active.
+  iters_time_ms = result["iters_time"].as<int>();
+  cold_iters_time_ms = result["cold_iters_time"].as<int>();
+  if (iters_time_ms < 0 || cold_iters_time_ms < 0) {
+    throw std::invalid_argument("iters_time and cold_iters_time must be >= 0");
+  }
+
+  // Disallow "timed warmup but fixed measurement" (ambiguous mix of modes).
+  if (cold_iters_time_ms > 0 && iters_time_ms == 0) {
+    throw std::invalid_argument(
+        "Cannot use --cold_iters_time without also setting --iters_time > 0.");
+  }
+
+  const bool time_mode = (iters_time_ms > 0) || (cold_iters_time_ms > 0);
+  const bool fixed_mode_overridden =
+      (result.count("iters") != 0) || (result.count("cold_iters") != 0);
+
+  if (time_mode) {
+    // If time mode is enabled, reject explicitly-specified fixed-count options.
+    // (Defaults for --iters/--cold_iters are fine as long as the user didn't pass
+    // them, since cxxopts will set count()=0 in that case.)
+    if (fixed_mode_overridden) {
+      throw std::invalid_argument(
+          "Cannot mix fixed-count (--iters/--cold_iters) with time-based "
+          "(--iters_time/--cold_iters_time) options.");
+    }
+    if (iters_time_ms <= 0) {
+      throw std::invalid_argument(
+          "Time-based iteration mode requires --iters_time > 0.");
+    }
+    // Allow cold_iters_time_ms == 0 to mean "no warmup" in time mode.
+  }
 
   batch_count = result["batch_count"].as<int>();
   if (function.find("Batched") != string::npos || function.find("batched") != string::npos || batch_count > 1 ) {
@@ -166,7 +202,8 @@ void generic_gemm::set_flush_batch_count(
   if (new_flush_batch_count == 0) {
     std::cerr << "Note: Unable to set flush_batch_count from flush_memory_size (rotating). "
     "Problem does not fit into memory size of " << flush_memory_size << "MiB" << std::endl;
-  } else if (new_flush_batch_count > std::max(cold_iters, iters)) {
+  } else if (iters_time_ms == 0 && new_flush_batch_count > std::max(cold_iters, iters)) {
+    // In fixed-count mode, cap to avoid allocating more buffers than iterations
     flush_batch_count = std::max(cold_iters, iters);
     std::cout << "Note: flush_batch_count reduced from " << new_flush_batch_count << " to " << flush_batch_count << " to avoid excessive memory allocation." << std::endl;
   } else {
@@ -243,4 +280,5 @@ std::string scaling_string(scaling_type input){
   } else if (input == scaling_type::Block) {
     return "Block";
   }
+  return "None";
 }

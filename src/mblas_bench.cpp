@@ -296,11 +296,19 @@ int main(int argc, char **argv) {
             "Scale factor for D matrix.",
             cxxopts::value<float>()->default_value("1"));
   opp_adder("i,iters",
-            "Iterations to run inside timing loop  (Default value is: 10)",
+            "Iterations to run inside timing loop (Default value is: 10). Not compatible with timed iter args.",
             cxxopts::value<int>()->default_value("10"));
+  opp_adder("iters_time",
+            "Time (ms) to run inside timing loop. "
+            "Only fully-completed iterations within the time budget are counted. "
+            "Not compatible with fixed iter args.",
+            cxxopts::value<int>()->default_value("0"));
   opp_adder("j,cold_iters",
-            " Cold Iterations to run before entering the timing loop ",
+            " Cold Iterations to run before entering the timing loop. Not compatible with timed iter args.",
             cxxopts::value<int>()->default_value("2"));
+  opp_adder("cold_iters_time",
+            "Time (ms) to run before entering the timing loop. Not compatible with fixed iter args.",
+            cxxopts::value<int>()->default_value("0"));
   opp_adder("driver", "Backend to run the GEMM test with",
             cxxopts::value<string>()->default_value("rocblas"));
   opp_adder("yaml",
@@ -328,7 +336,7 @@ int main(int argc, char **argv) {
 
   cxxopts::ParseResult result = options.parse(argc, argv);
 
-  if (result.count("help")) {
+  if (result.count("help") || argc == 1) {
     cout << options.help() << endl;
     exit(0);
   }
@@ -352,6 +360,11 @@ int main(int argc, char **argv) {
     generic_gemm_factory *gemm;
     // Select backend implementation
     string driver = s_to_lower(result["driver"].as<string>());
+
+    if (!result.count("function")) {
+      cerr << "Error: --function (-f) is required. Use --help for usage information." << endl;
+      return 1;
+    }
     string function = s_to_lower(result["function"].as<string>());
 
     if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
