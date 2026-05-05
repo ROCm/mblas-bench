@@ -174,7 +174,7 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
   string aT = result["a_type"].as<string>();
   string bT = result["b_type"].as<string>();
   string cT = result["c_type"].as<string>();
-  string dT = result["c_type"].as<string>();
+  string dT = result["d_type"].as<string>();
   parse_problem_type(computeT, scalarT, aT, bT, cT, dT);
 
   parse_dev_iters(result["device"].as<string>());
