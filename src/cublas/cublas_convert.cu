@@ -89,9 +89,7 @@ void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, 
   long hostsz = type_call_host<sizeofCUDT>(precision);
   long devsz = type_call_dev<sizeofCUDT>(precision);
   long long base = x * y;
-  long long total_elements =
-      (batchsz > 1 && stride > base) ? (stride * (batchsz - 1) + base)
-                                     : (base * batchsz);
+  long long total_elements = stride * (batchsz - 1) + base;
   if (precision == mblas_data_type::MBLAS_C_16F || precision == mblas_data_type::MBLAS_R_16F)
   {
     // Allocate memory in the device for host precision (float)
