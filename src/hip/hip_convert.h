@@ -16,7 +16,7 @@ __global__ void float_to_fp16(float *input, size_t num_elements, __half *output)
 __global__ void float_to_fp8(float *input, size_t num_elements,
                            __hip_fp8_storage_t *output, __hip_fp8_interpretation_t interp);
 void copy_and_convert(mblas_data_type precision, void *host_a, void *devA, long x,
-                    long y, int batchsz);
+                    long y, int batchsz, long long stride);
 //void copy_and_convert(hipblasDatatype_t precision, void *host_a, void *devA, int x,
 //                    int y, int batchsz);
 void *convert_scalar(mblas_data_type precision, void *scalar);

@@ -22,8 +22,10 @@
 // void *allocate_dev_array(mblas_data_type type, long x, long y, int batch = 1);
 // void *allocate_host_dev_array(mblas_data_type type, long x, long y, int batch = 1);
 
-long get_malloc_size_host(mblas_data_type type, long x, long y, int batch);
-long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch);
+long long get_malloc_size_host(mblas_data_type type, long x, long y, int batch,
+                               long long stride);
+long long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch,
+                              long long stride);
 
 // void initHostH(mblas_data_type precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
