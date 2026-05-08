@@ -13,6 +13,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include "generic_init.h"
 #include "mblas_data_type.h"
@@ -68,12 +69,12 @@ struct set_scalar {
 };
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type;
+auto type_call_host(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...>;
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_dev(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type;
+auto type_call_dev(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...>;
 
 // DEPRECATED: alloc_set_scalar_val performs malloc in the wrong library context.
 // Use malloc + set_scalar_val instead to keep allocation in the calling library.
@@ -189,8 +190,8 @@ void batched_pointer_magic_generic(void **hptr, void *dAr, int batch_count, long
 //}
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type {
+auto type_call_host(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...> {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case mblas_data_type::MBLAS_R_64F:
@@ -235,8 +236,8 @@ auto type_call_host(mblas_data_type type, Args... args) ->
 }
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_dev(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type {
+auto type_call_dev(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...> {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case mblas_data_type::MBLAS_R_64F:

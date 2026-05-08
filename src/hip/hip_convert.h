@@ -1,7 +1,5 @@
 #pragma once
 
-#include <rocblas/rocblas.h>
-#include <hipblaslt/hipblaslt.h>
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 #include <hip/hip_fp8.h>
@@ -25,4 +23,3 @@ void copyAndConvertScalar(mblas_data_type scalarPrecision, void *hostScalar,
                           void *devScalar);
 //void copyAndConvertScalar(hipblasDatatype_t scalarPrecision, void *hostScalar,
 //                          void *devScalar);
-                          

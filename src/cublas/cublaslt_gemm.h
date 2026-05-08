@@ -169,7 +169,8 @@ class cublaslt_gemm : public generic_gemm {
   void no_tuning(cublaslt_gemm_inst *);
   void auto_tuning(cublaslt_gemm_inst *);
   void run_threaded(void (cublaslt_gemm::*func)(cublaslt_gemm_inst *));
-  std::tuple<double, double, double> calculate_figure_of_merit(double total_time_ms);
+  std::tuple<double, double, double> calculate_figure_of_merit(double total_time_ms,
+                                                               int iters_completed);
   void test_matmul(cublaslt_gemm_inst *mat);
   std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc desc, mblas_cuda_data_type type, std::string matrix_id);
   //static std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc desc, mblas_cuda_data_type type, std::string matrix_id);

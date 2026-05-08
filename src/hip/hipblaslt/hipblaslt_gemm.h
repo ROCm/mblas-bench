@@ -117,7 +117,8 @@ class hipblaslt_gemm : public generic_gemm {
   void no_tuning(hipblaslt_gemm_inst *);
   void auto_tuning(hipblaslt_gemm_inst *);
   void run_threaded(void (hipblaslt_gemm::*func)(hipblaslt_gemm_inst *));
-  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
+  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms,
+                                                               int iters_completed);
   void test_matmul(hipblaslt_gemm_inst *mat);
 
  public:

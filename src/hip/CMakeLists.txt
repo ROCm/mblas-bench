@@ -16,13 +16,19 @@ set(GPU_TARGETS "gfx90a,gfx942,gfx950" CACHE STRING "GPU targets to compile for"
 list(PREPEND CMAKE_PREFIX_PATH /opt/rocm)
 set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
 
-# Find hip packages
+# Find HIP/ROCm packages (conditionally based on enabled backends)
 find_package(hip REQUIRED)
-find_package(rocblas REQUIRED)
 find_package(hipblas REQUIRED)
-find_package(hipblaslt REQUIRED)
-find_package(Threads REQUIRED) 
+find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
+
+if(WITH_ROCBLAS)
+    find_package(rocblas REQUIRED)
+endif()
+
+if(WITH_HIPBLASLT)
+    find_package(hipblaslt REQUIRED)
+endif()
 
 # Base hip sources (always included)
 set(ROCM_SOURCES
@@ -67,15 +73,28 @@ target_include_directories(mblaship PUBLIC
     ../generic
 )
 
-target_link_libraries(mblaship PRIVATE
-	hip::device
+set(ROCM_LINK_LIBS
+    hip::device
     hip::host
-    roc::rocblas
     roc::hipblas
-    roc::hipblaslt
     Threads::Threads
     OpenMP::OpenMP_CXX
     -lpthread
     -fopenmp
     mblasgeneric
 )
+
+target_compile_definitions(mblaship PRIVATE
+    MBLAS_WITH_ROCBLAS=$<BOOL:${WITH_ROCBLAS}>
+    MBLAS_WITH_HIPBLASLT=$<BOOL:${WITH_HIPBLASLT}>
+)
+
+if(WITH_ROCBLAS)
+    list(APPEND ROCM_LINK_LIBS roc::rocblas)
+endif()
+
+if(WITH_HIPBLASLT)
+    list(APPEND ROCM_LINK_LIBS roc::hipblaslt)
+endif()
+
+target_link_libraries(mblaship PRIVATE ${ROCM_LINK_LIBS})

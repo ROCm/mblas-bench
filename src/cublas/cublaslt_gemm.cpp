@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <chrono>
 #include <future>
 #include <iomanip>
 #include <limits>
@@ -56,7 +57,40 @@ bool any_selected_device_requires_fp8_tn(const std::vector<cublaslt_gemm_inst>& 
   return false;
 }
 
-}  // namespace
+struct timed_result { int iters; double gpu_ms; };
+
+timed_result run_timed(cudaStream_t stream, int time_ms, std::function<void(int)> fn) {
+  cudaEvent_t start, stop;
+  check_cuda(cudaEventCreate(&start));
+  check_cuda(cudaEventCreate(&stop));
+
+  auto t0 = std::chrono::steady_clock::now();
+  int completed = 0;
+  double total_ms = 0.0;
+
+  while (true) {
+    check_cuda(cudaEventRecord(start, stream));
+    fn(completed);
+    check_cuda(cudaEventRecord(stop, stream));
+    check_cuda(cudaEventSynchronize(stop));
+
+    float iter_ms = 0.0f;
+    check_cuda(cudaEventElapsedTime(&iter_ms, start, stop));
+
+    auto wall_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - t0)
+                       .count();
+    if (wall_ms > time_ms) break;
+
+    total_ms += static_cast<double>(iter_ms);
+    completed++;
+  }
+
+  check_cuda(cudaEventDestroy(start));
+  check_cuda(cudaEventDestroy(stop));
+  return {completed, total_ms};
+}
+} // namespace
 
 // clang-format off
 std::vector<matmul_prec_type> cublaslt_gemm::matmul_supported = {
@@ -868,8 +902,11 @@ std::string cublaslt_gemm::get_result_string() {
 }
 
 std::tuple<double, double, double> cublaslt_gemm::calculate_figure_of_merit(
-    double totalTime_ms) {
-  double avgTime_ms = totalTime_ms / iters;
+    double totalTime_ms, int iters_completed) {
+  if (iters_completed <= 0) {
+    return std::tuple<double, double, double>(0.0, 0.0, 0.0);
+  }
+  double avgTime_ms = totalTime_ms / iters_completed;
   double avgTime_s = avgTime_ms / 1000.0f;
   double avgTime_us = avgTime_ms * 1000.0f;
 
@@ -910,6 +947,41 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasLtCreate(&handle));
   check_cuda(cudaStreamCreate(&stream));
+
+  if (iters_time_ms > 0) {
+    auto kernel = [&](int rep) {
+      int flush_index = rep % flush_batch_count;
+      stat = cublasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
+                            mat->ptr_dev_a[flush_index], mat->desc_a,
+                            mat->ptr_dev_b[flush_index], mat->desc_b, beta,
+                            mat->ptr_dev_c[flush_index], mat->desc_c,
+                            mat->ptr_dev_d[flush_index], mat->desc_d,
+                            &mat->algo.algo, mat->devWork, mat->wSZ, stream);
+      check_cublas(stat);
+      check_cuda(cudaGetLastError());
+    };
+
+    if (cold_iters_time_ms > 0)
+      run_timed(stream, cold_iters_time_ms, kernel);
+
+    auto freq_monitor = cuda_monitor::monitor();
+    freq_monitor.set_device_id(mat->devIDX);
+    freq_monitor.start();
+    auto result = run_timed(stream, iters_time_ms, kernel);
+    freq_monitor.stop();
+
+    std::tie(mat->gflops, mat->gbytes, mat->time_us) =
+        calculate_figure_of_merit(result.gpu_ms, result.iters);
+
+    if (cuda_monitor::monitor::enabled()) {
+      avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
+      med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
+      avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
+      med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
+    }
+    return;
+  }
+
   // Cold iters
   for (int rep = 0; rep < cold_iters; rep++) {
     int flush_index = rep % flush_batch_count;
@@ -958,7 +1030,7 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat) {
   float elapsedTime_ms;
   cudaEventElapsedTime(&elapsedTime_ms, start, stop);
   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms), iters);
 
   if (cuda_monitor::monitor::enabled()) {
     avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
