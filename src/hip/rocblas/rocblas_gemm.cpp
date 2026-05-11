@@ -313,11 +313,11 @@ void rocblas_gemm::free_mem() {
         hipFree(mat.ptr_dev_d[i]);
       }
     }
-    hipFree(mat.ptr_dev_a);
-    hipFree(mat.ptr_dev_b);
-    hipFree(mat.ptr_dev_c);
+    free(mat.ptr_dev_a);
+    free(mat.ptr_dev_b);
+    free(mat.ptr_dev_c);
     if (!inplace) {
-      hipFree(mat.ptr_dev_d);
+      free(mat.ptr_dev_d);
     }
     hipFree(mat.devWork);
     // if (batched && !strided) {
