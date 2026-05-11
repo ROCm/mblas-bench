@@ -128,7 +128,7 @@ int generic_gemm::set_ld(std::string ld, std::string OP, int x, int y) {
 long long int generic_gemm::fix_stride(long long int stride, long rows_x, long cols_x, std::string matrix_id) {
   long long rows_x_long = rows_x;
   long long cols_x_long = cols_x;
-  long long stride_x = rows_x * cols_x;
+  long long stride_x = rows_x_long * cols_x_long;
   if (stride == 0) {
     std::cout << "Note: Matrix " << matrix_id << "'s stride automatically set to " << stride_x << std::endl;
     return stride_x;
