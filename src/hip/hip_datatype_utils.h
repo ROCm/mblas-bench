@@ -1,28 +1,35 @@
-#include <rocblas/rocblas.h>
-//#include <hipblaslt/hipblaslt.h>
+#pragma once
+
 #include <hipblas/hipblas.h>
 #include <hip/hip_runtime.h>
 
 #include <map>
 #include <string>
 
+#if MBLAS_WITH_ROCBLAS
+#include <rocblas/rocblas.h>
+#endif
+
 
 // data
 
 // clang-format off
-const std::map<std::string, rocblas_operation> rocblasOpType = {
-  {"N", rocblas_operation_none},
-  {"T", rocblas_operation_transpose},
-  {"C", rocblas_operation_conjugate_transpose},
+#if MBLAS_WITH_ROCBLAS
+inline const std::map<std::string, rocblas_operation> rocblasOpType = {
+    {"N", rocblas_operation_none},
+    {"T", rocblas_operation_transpose},
+    {"C", rocblas_operation_conjugate_transpose},
+};
+#endif
+
+inline const std::map<std::string, hipblasOperation_t> hipblasOpType = {
+    {"N", HIPBLAS_OP_N},
+    {"T", HIPBLAS_OP_T},
+    {"C", HIPBLAS_OP_C},
 };
 
-const std::map<std::string, hipblasOperation_t> hipblasOpType = {
-  {"N", HIPBLAS_OP_N},
-  {"T", HIPBLAS_OP_T},
-  {"C", HIPBLAS_OP_C},
-};
-
-const std::map<std::string, rocblas_datatype> precRocblasDType = {
+#if MBLAS_WITH_ROCBLAS
+inline const std::map<std::string, rocblas_datatype> precRocblasDType = {
     {"h", rocblas_datatype_f16_r},       {"s", rocblas_datatype_f32_r},     {"d", rocblas_datatype_f64_r},
     {"c", rocblas_datatype_f32_c},       {"z", rocblas_datatype_f64_c},     {"f16_r", rocblas_datatype_f16_r},
     {"f16_c", rocblas_datatype_f16_c},   {"f32_r", rocblas_datatype_f32_r}, {"f32_c", rocblas_datatype_f32_c},
@@ -46,8 +53,9 @@ const std::map<std::string, rocblas_datatype> precRocblasDType = {
     {"rocblas_datatype_u32_r",  rocblas_datatype_u32_r},
     {"rocblas_datatype_u32_c",  rocblas_datatype_u32_c},
 };
+#endif
 
-const std::map<std::string, hipDataType> precHipblasDType = {
+inline const std::map<std::string, hipDataType> precHipblasDType = {
     {"h", HIP_R_16F},       {"s", HIP_R_32F},       {"d", HIP_R_64F},
     {"c", HIP_C_32F},       {"z", HIP_C_64F},       {"f16_r", HIP_R_16F},
     {"f16_c", HIP_C_16F},   {"f32_r", HIP_R_32F},   {"f32_c", HIP_C_32F},
@@ -72,7 +80,8 @@ const std::map<std::string, hipDataType> precHipblasDType = {
     {"HIPBLAS_C_32U",   HIP_C_32U},
 };
 
-const std::map<std::string, rocblas_datatype> computeRocblasDType = {
+#if MBLAS_WITH_ROCBLAS
+inline const std::map<std::string, rocblas_datatype> computeRocblasDType = {
     {"rocblas_datatype_f16_r", rocblas_datatype_f16_r},
     {"rocblas_datatype_f32_r", rocblas_datatype_f32_r},
     {"rocblas_datatype_f64_r", rocblas_datatype_f64_r},
@@ -82,13 +91,15 @@ const std::map<std::string, rocblas_datatype> computeRocblasDType = {
     {"f64_r", rocblas_datatype_f64_r},
     {"i32_r", rocblas_datatype_i32_r},
 };
+#endif
 
-const std::map<std::string, hipblasComputeType_t> computeHipblasDType = {
+inline const std::map<std::string, hipblasComputeType_t> computeHipblasDType = {
     {"HIPBLASLT_COMPUTE_F32", HIPBLAS_COMPUTE_32F},
     {"f32_r", HIPBLAS_COMPUTE_32F},
 };
 
-const std::map<rocblas_datatype, rocblas_datatype> precToRocblasCompute = {
+#if MBLAS_WITH_ROCBLAS
+inline const std::map<rocblas_datatype, rocblas_datatype> precToRocblasCompute = {
     {rocblas_datatype_f64_r, rocblas_datatype_f64_r},
     {rocblas_datatype_f64_c, rocblas_datatype_f64_r},
     {rocblas_datatype_f32_r, rocblas_datatype_f32_r},
@@ -99,8 +110,9 @@ const std::map<rocblas_datatype, rocblas_datatype> precToRocblasCompute = {
     {rocblas_datatype_f16_c, rocblas_datatype_f16_r},
     {rocblas_datatype_i32_r, rocblas_datatype_i32_r},
 };
+#endif
 
-const std::map<hipDataType, hipblasComputeType_t> precToHipblasCompute = {
+inline const std::map<hipDataType, hipblasComputeType_t> precToHipblasCompute = {
     {HIP_R_32F, HIPBLAS_COMPUTE_32F},
     {HIP_C_32F, HIPBLAS_COMPUTE_32F},
 };
