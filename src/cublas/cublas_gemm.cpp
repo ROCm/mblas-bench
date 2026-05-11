@@ -340,9 +340,9 @@ void cublas_gemm::free_mem() {
       cudaFree(mat.ptr_dev_b[i]);
       cudaFree(mat.ptr_dev_c[i]);
     }
-    cudaFree(mat.ptr_dev_a);
-    cudaFree(mat.ptr_dev_b);
-    cudaFree(mat.ptr_dev_c);
+    free(mat.ptr_dev_a);
+    free(mat.ptr_dev_b);
+    free(mat.ptr_dev_c);
     cudaFree(mat.devWork);
     //if (batched && !strided) {
     //  free(mat.ptr_host_a);
