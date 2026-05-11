@@ -114,7 +114,7 @@ void cublas_gemm::parse_problem_type(string computeTStr, string scalarTStr, stri
     string errorString = "A Type must the same as B Type";
     throw std::invalid_argument(errorString);
   }
-  if (function.find("GemmEx") || function.find("gemm_ex")) {
+  if (function.find("GemmEx") != string::npos || function.find("gemm_ex") != string::npos) {
     /*
       Possible functions:
         cublasGemmEx
@@ -134,7 +134,7 @@ void cublas_gemm::parse_problem_type(string computeTStr, string scalarTStr, stri
           "\nB type: " + bStr + "\nC type: " + cStr;
       throw std::invalid_argument(errorString);
     }
-  } else if (function.find("gemmEx")) {
+  } else if (function.find("gemmEx") != string::npos) {
     TgemmPrecType selType = {a_type, c_type};
     auto result =
         std::find(begin(Tgemm_ex_supported), end(Tgemm_ex_supported), selType);
