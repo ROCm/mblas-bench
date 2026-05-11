@@ -222,14 +222,20 @@ void rocblas_gemm::alloc_host() {
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(b_type));
   ptr_host_c =
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(c_type));
-  ptr_host_d =
-      (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(d_type));
+  if (!inplace) {
+    ptr_host_d =
+        (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(d_type));
+  } else {
+    ptr_host_d = ptr_host_c;
+  }
 
   for (int i = 0; i < flush_batch_count; i++) {
     ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
     ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
     ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
-    ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+    if (!inplace) {
+      ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+    }
   }
 }
 
@@ -253,7 +259,9 @@ void rocblas_gemm::alloc_dev(rocblas_gemm_inst *mat) {
     hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
     hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
     hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
-    hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+    if (!inplace) {
+      hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+    }
   }
 
   mat->wSZ = workspace_size;
