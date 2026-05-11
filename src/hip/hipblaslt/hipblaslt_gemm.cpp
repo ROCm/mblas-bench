@@ -300,9 +300,9 @@ void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
   hipblasOperation_t transA_local = transA.convert_to_hip();
   hipblasOperation_t transB_local = transB.convert_to_hip();
   check_hipblas(hipblasLtMatmulDescSetAttribute(
-      mat->desc_op, HIPBLASLT_MATMUL_DESC_TRANSA, &transA_local, sizeof(transA)));
+      mat->desc_op, HIPBLASLT_MATMUL_DESC_TRANSA, &transA_local, sizeof(transA_local)));
   check_hipblas(hipblasLtMatmulDescSetAttribute(
-      mat->desc_op, HIPBLASLT_MATMUL_DESC_TRANSB, &transB_local, sizeof(transB)));
+      mat->desc_op, HIPBLASLT_MATMUL_DESC_TRANSB, &transB_local, sizeof(transB_local)));
 
   check_hipblas(
       hipblasLtMatrixLayoutCreate(&mat->desc_a, a_type, rows_a, cols_a, lda));
