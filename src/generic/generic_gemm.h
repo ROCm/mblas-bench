@@ -13,7 +13,7 @@ class generic_gemm {
     int rows_mem;
     int cols_mem;
     long long int stride;
-    bool control;
+    bool control = false;
     float constant;
     float scale_factor;
     scaling_type scale_mode = scaling_type::None;

@@ -12,6 +12,7 @@ uint64_t round_up(uint64_t numToRound, uint64_t multiple)
     //assert(multiple && ((multiple & (multiple - 1)) == 0));
     //return (numToRound + multiple - 1) & -multiple;
   uint64_t remainder = numToRound % multiple;
+  if (remainder == 0) return numToRound;
   uint64_t new_num = numToRound + (multiple - remainder);
   assert(new_num % multiple == 0);
   return new_num;
