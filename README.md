@@ -61,6 +61,21 @@ Use the below commands to run "4k" gemms on ROCm or CUDA. You'll need to make su
 | FP8       | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA T --transposeB N --initialization trig_float --iters 10 --cold_iters 2 --a_type f8_r --b_type f8_r --c_type bf16_r --d_type bf16_r --compute_type f32_r --function matmul --rotating 512 --driver ${DRIVER}      |
 | INT8      | build/mblas-bench -m 4096 -n 4096 -k 4096 --alpha 1 --beta 0 --transposeA T --transposeB N --initialization rand_int --iters 10 --cold_iters 2 --a_type i8_r --b_type i8_r --c_type i32_r --d_type i32_r --compute_type i32_r --function matmul --rotating 512 --driver ${DRIVER}         |
 
+#### Benchmarking multiple algorithm solutions
+For cuBLASLt and hipBLASLt backends, you can request multiple heuristic solutions and benchmark each one to find the fastest kernel for your problem:
+
+```
+# Benchmark the top 5 solutions
+build/mblas-bench -m 4096 -n 4096 -k 4096 --a_type f16_r --b_type f16_r --c_type f16_r --d_type f16_r --compute_type f32_r --function matmul --driver ${DRIVER} --requested_solution_num 5
+
+# Benchmark all available solutions
+build/mblas-bench -m 4096 -n 4096 -k 4096 --a_type f16_r --b_type f16_r --c_type f16_r --d_type f16_r --compute_type f32_r --function matmul --driver ${DRIVER} --requested_solution_num -1
+```
+
+When multiple solutions are requested, a `solution_index` column is added to the CSV output. This option can also be specified per-problem in YAML files using the `requested_solution` field.
+
+> **Note:** cuBLAS and rocBLAS backends do not support multiple solutions. If `--requested_solution_num` is not equal to 1 with these backends, a warning is printed and the single available solution is benchmarked.
+
 #### Running gemms from a YAML file
 Instead of specifying all parameters on the command line, you can use the `--yaml` argument to provide a configuration file that defines one or more GEMM operations. This is especially useful for running benchmarks across multiple matrix sizes, data types, or configurations.
 

@@ -19,7 +19,6 @@ class generic_gemm_factory {
 
  public:
   std::string prepare_array() { return gemm->prepare_array(); }
-  void test() { gemm->test(); } 
-  std::string get_result_string() { return gemm->get_result_string(); }
+  void run_solutions() { gemm->run_solutions(); }
   void free_mem() { gemm->free_mem(); }
 };
