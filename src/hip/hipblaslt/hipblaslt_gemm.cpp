@@ -502,7 +502,7 @@ void hipblaslt_gemm::fill_host() {
     if (compound) {
       const scale_policy policy = parse_scale_policy(scale_init);
       for (int i = 0; i < flush_batch_count; i++) {
-        compound_init_block_ue8m0(
+        compound_init_block_pow2(
             (float*)ptr_host[i], (float*)scale_host[i],
             (size_t)rows_mem, (size_t)cols_mem, (size_t)batch_count,
             (size_t)sz.rows, (size_t)sz.cols, /*block_size=*/32, policy);

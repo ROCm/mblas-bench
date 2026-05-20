@@ -24,20 +24,23 @@ inline int floor_log2_abs(float x) {
   return e - 1;
 }
 
-// Joint data + scale init for UE8M0 block scaling. For each block of
+// Joint data + scale init for block-scaled formats with a power-of-two scale
+// (e.g. UE8M0 with block_size=32, UE4M3 with block_size=16). For each block of
 // `block_size` floats along the rows (leading) dim of a column-major
 // rows_mem x cols_mem x batch data tensor, derives a power-of-two float scale
 // (max_abs or mean_exp of element exponents), divides the block by it, and
 // writes the scale into the s_rows x s_cols x batch column-major scale tensor
 // at the corresponding (row_block, col, batch) position. Padding entries in
 // the scale tensor (rows past rows_mem/block_size, cols past cols_mem) are
-// left untouched. All buffers are float; conversion to UE8M0 happens later in
-// copy_and_convert.
-inline void compound_init_block_ue8m0(float* data, float* scale,
-                                      size_t rows_mem, size_t cols_mem,
-                                      size_t batch, size_t s_rows,
-                                      size_t s_cols, size_t block_size,
-                                      scale_policy policy) {
+// left untouched. All buffers are float; conversion to the on-device scale
+// representation (UE8M0 / UE4M3) happens later in copy_and_convert. UE4M3's
+// sub-power-of-two mantissa is intentionally unused here; finer-grained
+// policies that exploit it can be added in the future.
+inline void compound_init_block_pow2(float* data, float* scale,
+                                     size_t rows_mem, size_t cols_mem,
+                                     size_t batch, size_t s_rows,
+                                     size_t s_cols, size_t block_size,
+                                     scale_policy policy) {
   const size_t row_blocks = rows_mem / block_size;
   const size_t scale_batch_stride = s_rows * s_cols;
   const size_t data_batch_stride = rows_mem * cols_mem;
