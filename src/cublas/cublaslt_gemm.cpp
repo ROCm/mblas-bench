@@ -371,8 +371,7 @@ string cublaslt_gemm::prepare_array() {
   run_threaded(&cublaslt_gemm::copy_host_to_dev);
   run_threaded(&cublaslt_gemm::prepare_matrix);
   // Enable tuning with a parameter later
-  if (requested_solution_num > 1 || requested_solution_num == -1) {
-    run_threaded(&cublaslt_gemm::no_tuning_multiple_solutions);
+  if (false) {
   } else {
     run_threaded(&cublaslt_gemm::no_tuning);
   }
@@ -688,21 +687,13 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
-  prepare_solutions(mat, 1);
-}
-
-void cublaslt_gemm::no_tuning_multiple_solutions(cublaslt_gemm_inst *mat) {
-  prepare_solutions(mat, requested_solution_num);
-}
-
-void cublaslt_gemm::prepare_solutions(cublaslt_gemm_inst *mat, int requested_algo_count) {
   cublasStatus_t stat;
   cublasLtHandle_t handle;
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasLtCreate(&handle));
   int retResults = 0;
 
-  int request_count = (requested_algo_count == -1) ? 65536 : requested_algo_count;
+  int request_count = (requested_solution_num == -1) ? 65536 : requested_solution_num;
   std::vector<cublasLtMatmulHeuristicResult_t> heuristicResults(request_count);
 
   check_cublas(cublasLtMatmulAlgoGetHeuristic(

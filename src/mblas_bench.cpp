@@ -351,13 +351,6 @@ int main(int argc, char **argv) {
 
   for (const auto &result: input_problems)
   {
-    int requested_solution_num = result["requested_solution_num"].as<int>();
-    if (requested_solution_num == 0 || requested_solution_num < -1) {
-      cerr << "Invalid --requested_solution_num: " << requested_solution_num
-           << ". Must be -1 (all) or a positive integer." << endl;
-      return 1;
-    }
-
     generic_gemm_factory *gemm;
     // Select backend implementation
     string driver = s_to_lower(result["driver"].as<string>());

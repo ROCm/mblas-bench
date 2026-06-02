@@ -167,8 +167,6 @@ class cublaslt_gemm : public generic_gemm {
   void copy_host_to_dev(cublaslt_gemm_inst *);
   void prepare_matrix(cublaslt_gemm_inst *);
   void no_tuning(cublaslt_gemm_inst *);
-  void no_tuning_multiple_solutions(cublaslt_gemm_inst *);
-  void prepare_solutions(cublaslt_gemm_inst *, int requested_algo_count);
   void auto_tuning(cublaslt_gemm_inst *);
   void run_threaded(void (cublaslt_gemm::*func)(cublaslt_gemm_inst *));
   std::tuple<double, double, double> calculate_figure_of_merit(double total_time_ms);

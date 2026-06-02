@@ -107,6 +107,9 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   d_props.init = set_init(d_props, result["initialization"].as<string>(), result["mx_init"].as<string>());
 
   requested_solution_num = result["requested_solution_num"].as<int>();
+  if (requested_solution_num == 0 || requested_solution_num < -1) {
+    throw std::invalid_argument("Invalid --requested_solution_num. Must be -1 (all) or a positive integer.");
+  }
 
   // Set init control information
   if (initialization == "rand_int") {

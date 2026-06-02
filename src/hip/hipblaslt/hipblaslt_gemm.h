@@ -115,8 +115,6 @@ class hipblaslt_gemm : public generic_gemm {
   void copy_host_to_dev(hipblaslt_gemm_inst *);
   void prepare_matrix(hipblaslt_gemm_inst *);
   void no_tuning(hipblaslt_gemm_inst *);
-  void no_tuning_multiple_solutions(hipblaslt_gemm_inst *);
-  void prepare_solutions(hipblaslt_gemm_inst *, int requested_algo_count);
   void auto_tuning(hipblaslt_gemm_inst *);
   void run_threaded(void (hipblaslt_gemm::*func)(hipblaslt_gemm_inst *));
   std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);

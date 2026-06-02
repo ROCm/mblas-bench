@@ -200,8 +200,7 @@ string hipblaslt_gemm::prepare_array() {
   run_threaded(&hipblaslt_gemm::copy_host_to_dev);
   run_threaded(&hipblaslt_gemm::prepare_matrix);
   // Enable tuning with a parameter later
-  if (requested_solution_num > 1 || requested_solution_num == -1) {
-    run_threaded(&hipblaslt_gemm::no_tuning_multiple_solutions);
+  if (false) {
   } else {
     run_threaded(&hipblaslt_gemm::no_tuning);
   }
@@ -350,19 +349,13 @@ void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
 }
 
 void hipblaslt_gemm::no_tuning(hipblaslt_gemm_inst *mat) {
-  prepare_solutions(mat, 1);
-}
-void hipblaslt_gemm::no_tuning_multiple_solutions(hipblaslt_gemm_inst *mat) {
-  prepare_solutions(mat, requested_solution_num);
-}
-void hipblaslt_gemm::prepare_solutions(hipblaslt_gemm_inst *mat, int requested_algo_count) {
   hipblasStatus_t stat;
   hipblasLtHandle_t handle;
   check_hip(hipSetDevice(mat->devIDX));
   check_hipblas(hipblasLtCreate(&handle));
   int retResults = 0;
 
-  int request_count = (requested_algo_count == -1) ? 65536 : requested_algo_count;
+  int request_count = (requested_solution_num == -1) ? 65536 : requested_solution_num;
   std::vector<hipblasLtMatmulHeuristicResult_t> heuristicResults(request_count);
 
   check_hipblas(hipblasLtMatmulAlgoGetHeuristic(
