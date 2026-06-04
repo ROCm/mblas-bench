@@ -115,7 +115,7 @@ void cublas_gemm::parse_problem_type(string computeTStr, string scalarTStr, stri
     string errorString = "A Type must the same as B Type";
     throw std::invalid_argument(errorString);
   }
-  if (function.find("GemmEx") || function.find("gemm_ex")) {
+  if (function.find("GemmEx") != string::npos || function.find("gemm_ex") != string::npos) {
     /*
       Possible functions:
         cublasGemmEx
@@ -135,7 +135,7 @@ void cublas_gemm::parse_problem_type(string computeTStr, string scalarTStr, stri
           "\nB type: " + bStr + "\nC type: " + cStr;
       throw std::invalid_argument(errorString);
     }
-  } else if (function.find("gemmEx")) {
+  } else if (function.find("gemmEx") != string::npos) {
     TgemmPrecType selType = {a_type, c_type};
     auto result =
         std::find(begin(Tgemm_ex_supported), end(Tgemm_ex_supported), selType);
@@ -189,13 +189,15 @@ cublas_gemm::cublas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
   beta = malloc(get_malloc_size_scalar(precision));
   type_call_host<set_scalar>(precision, beta, sbeta, sbetai);
   
-  set_flush_batch_count( 
-      type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
-      type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(c_type), 
-      a_type.get_packing_count(), 
-      b_type.get_packing_count(), 
-      c_type.get_packing_count(), 
-      c_type.get_packing_count(), 
+  // Legacy cuBLAS has no scale tensors, so pass 0 for all four.
+  set_flush_batch_count(
+      type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type),
+      type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(c_type),
+      a_type.get_packing_count(),
+      b_type.get_packing_count(),
+      c_type.get_packing_count(),
+      c_type.get_packing_count(),
+      0, 0, 0, 0,
       true);
 }
 
@@ -259,9 +261,9 @@ void cublas_gemm::alloc_host() {
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(c_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count));
-    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count));
-    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count));
+    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
+    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
+    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
   }
 }
 
@@ -276,9 +278,9 @@ void cublas_gemm::alloc_dev(cublasgemmInst *mat) {
       (void **)malloc(batch_count * flush_batch_count * type_call_dev<sizeofCUDTP>(c_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    cudaMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count));
-    cudaMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count));
-    cudaMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count));
+    cudaMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
+    cudaMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
+    cudaMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
   }
 
   mat->wSZ = workspace_size;
@@ -299,9 +301,9 @@ void cublas_gemm::copy_host_to_dev(cublasgemmInst *mat) {
   cudaSetDevice(mat->devIDX);
 
   for (int i = 0; i < flush_batch_count; i++) {
-    copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], rows_mem_a, cols_mem_a, batch_count);
-    copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count);
-    copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], rows_mem_c, cols_mem_c, batch_count);
+    copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], rows_mem_a, cols_mem_a, batch_count, stride_a);
+    copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count, stride_b);
+    copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], rows_mem_c, cols_mem_c, batch_count, stride_c);
   }
 
   //if (batched && !strided) {
@@ -345,9 +347,9 @@ void cublas_gemm::free_mem() {
       cudaFree(mat.ptr_dev_b[i]);
       cudaFree(mat.ptr_dev_c[i]);
     }
-    cudaFree(mat.ptr_dev_a);
-    cudaFree(mat.ptr_dev_b);
-    cudaFree(mat.ptr_dev_c);
+    free(mat.ptr_dev_a);
+    free(mat.ptr_dev_b);
+    free(mat.ptr_dev_c);
     cudaFree(mat.devWork);
     //if (batched && !strided) {
     //  free(mat.ptr_host_a);

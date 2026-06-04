@@ -1,6 +1,4 @@
 #pragma once
-#include <rocblas/rocblas.h>
-#include <hipblaslt/hipblaslt.h>
 #include <hip/hip_bfloat16.h>
 #include <hip/hip_fp16.h>
 #include <hip/hip_fp8.h>
@@ -12,6 +10,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include "generic_init.h"
 #include "mblas_data_type.h"
@@ -22,8 +21,10 @@
 // void *allocate_dev_array(mblas_data_type type, long x, long y, int batch = 1);
 // void *allocate_host_dev_array(mblas_data_type type, long x, long y, int batch = 1);
 
-long get_malloc_size_host(mblas_data_type type, long x, long y, int batch);
-long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch);
+long long get_malloc_size_host(mblas_data_type type, long x, long y, int batch,
+                               long long stride);
+long long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch,
+                              long long stride);
 
 // void initHostH(mblas_data_type precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
@@ -58,12 +59,12 @@ struct set_scalar {
 };
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type;
+auto type_call_host(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...>;
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_dev(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type;
+auto type_call_dev(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...>;
 
 long get_malloc_size_scalar(mblas_data_type type);
 
@@ -182,8 +183,8 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
 //                              long long int stride);
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type {
+auto type_call_host(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...> {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case MBLAS_R_64F:
@@ -202,6 +203,16 @@ auto type_call_host(mblas_data_type type, Args... args) ->
       return tFunc<float>()(args...);
     case mblas_data_type::MBLAS_R_8F_E5M2:
       return tFunc<float>()(args...);
+#if HIP_VERSION >= 70000000
+    case mblas_data_type::MBLAS_R_8F_UE8M0:
+      return tFunc<float>()(args...);
+    case mblas_data_type::MBLAS_R_6F_E2M3:
+      return tFunc<float>()(args...);
+    case mblas_data_type::MBLAS_R_6F_E3M2:
+      return tFunc<float>()(args...);
+    case mblas_data_type::MBLAS_R_4F_E2M1:
+      return tFunc<float>()(args...);
+#endif
     case MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
     case MBLAS_R_8U:
@@ -246,8 +257,8 @@ auto type_call_host(mblas_data_type type, Args... args) ->
 //}
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_dev(mblas_data_type type, Args... args) ->
-    typename std::result_of<tFunc<double>(Args...)>::type {
+auto type_call_dev(mblas_data_type type, Args... args)
+    -> std::invoke_result_t<tFunc<double>, Args...> {
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case MBLAS_R_64F:
@@ -274,6 +285,17 @@ auto type_call_dev(mblas_data_type type, Args... args) ->
       return tFunc<__hip_fp8_storage_t>()(args...);
     case mblas_data_type::MBLAS_R_8F_E5M2:
       return tFunc<__hip_fp8_storage_t>()(args...);
+#if HIP_VERSION >= 70000000
+    // These are all typedef __hip_fp8_storage_t anyway
+    case mblas_data_type::MBLAS_R_8F_UE8M0:
+      return tFunc<__hip_fp8_storage_t>()(args...);
+    case mblas_data_type::MBLAS_R_6F_E2M3:
+      return tFunc<__hip_fp8_storage_t>()(args...);
+    case mblas_data_type::MBLAS_R_6F_E3M2:
+      return tFunc<__hip_fp8_storage_t>()(args...);
+    case mblas_data_type::MBLAS_R_4F_E2M1:
+      return tFunc<__hip_fp8_storage_t>()(args...);
+#endif
     case MBLAS_R_8I:
       return tFunc<__int8_t>()(args...);
     case MBLAS_R_8U:

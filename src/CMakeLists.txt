@@ -13,6 +13,8 @@ option(WITH_HIPBLASLT "Build with hipblaslt support" OFF)
 option(WITH_ROCBLAS "Build with rocblas support" OFF)
 option(WITH_CUDA "Build with CUDA support" OFF)
 
+option(ALLOW_NO_BACKENDS "Allow building without GPU backends (dummy headers only)" OFF)
+
 if(WITH_ROCM)
     set(WITH_HIPBLASLT ON)
     set(WITH_ROCBLAS ON)
@@ -23,8 +25,8 @@ if(WITH_HIPBLASLT OR WITH_ROCBLAS)
     set(WITH_HIP ON)
 endif()
 
-if(NOT WITH_HIP AND NOT WITH_CUDA)
-    message(FATAL_ERROR "No backends enabled. Please enable at least one backend (WITH_ROCM, WITH_HIPBLASLT, WITH_ROCBLAS, WITH_CUDA).")
+if(NOT WITH_HIP AND NOT WITH_CUDA AND NOT ALLOW_NO_BACKENDS)
+    message(FATAL_ERROR "No backends enabled. Please enable at least one backend (WITH_ROCM, WITH_HIPBLASLT, WITH_ROCBLAS, WITH_CUDA) or set ALLOW_NO_BACKENDS=ON.")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")

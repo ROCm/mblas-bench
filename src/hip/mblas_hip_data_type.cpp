@@ -41,6 +41,14 @@ mblas_hip_data_type::operator hipDataType() const {
   return convert_to_hip(this);
 }
 
+mblas_hip_data_type mblas_hip_data_type::get_scale_type() {
+  // All MX formats use E8M0 scale type
+  if (is_mx_possible()) {
+    return mblas_data_type_enum::MBLAS_R_8F_UE8M0;
+  }
+  return mblas_data_type_enum::MBLAS_R_32F;
+}
+
 const std::map<mblas_data_type, hipDataType> mblas_hip_data_type::prec_mappings = {
     {MBLAS_R_16F,  HIP_R_16F},
     {MBLAS_C_16F,  HIP_C_16F},
@@ -72,9 +80,10 @@ const std::map<mblas_data_type, hipDataType> mblas_hip_data_type::prec_mappings 
     {MBLAS_C_64U,  HIP_C_64U},
     {MBLAS_R_8F_E4M3, HIP_R_8F_E4M3},
     {MBLAS_R_8F_E5M2, HIP_R_8F_E5M2},
-    #if defined(HIPRT_VERSION) && HIPRT_VERSION >= 70000000
+#if HIP_VERSION >= 70000000
     {MBLAS_R_6F_E2M3, HIP_R_6F_E2M3},
     {MBLAS_R_6F_E3M2, HIP_R_6F_E3M2},
     {MBLAS_R_4F_E2M1, HIP_R_4F_E2M1},
-    #endif
+    {MBLAS_R_8F_UE8M0, HIP_R_8F_UE8M0},
+#endif
 };

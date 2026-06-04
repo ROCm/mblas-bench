@@ -1,11 +1,13 @@
 #include <assert.h>
-#include <rocblas/rocblas.h>
-#include <hipblaslt/hipblaslt.h>
+#include <hipblas/hipblas.h>
 #include <hip/hip_runtime.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <iostream>
+
+#if MBLAS_WITH_ROCBLAS
+#include <rocblas/rocblas.h>
 
 const char *rocblas_get_error_string(rocblas_status status) {
   switch (status) {
@@ -44,6 +46,7 @@ const char *rocblas_get_error_string(rocblas_status status) {
   }
   return "unknown error";
 }
+#endif
 
 const char *hipblas_get_error_string(hipblasStatus_t status) {
   switch (status) {

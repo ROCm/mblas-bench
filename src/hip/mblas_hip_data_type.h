@@ -22,4 +22,6 @@ class mblas_hip_data_type: public mblas_data_type {
   mblas_hip_data_type & operator = (const mblas_hip_data_type& mdt);
 
   std::string to_string() const override { return mblas_data_type::to_string("HIP"); }
+  
+  mblas_hip_data_type get_scale_type();
 };

@@ -1,5 +1,7 @@
 #include "generic_gemm.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <utility>
@@ -80,6 +82,17 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   flush_batch_count = result["flush_batch_count"].as<int>();
   flush_memory_size = result["flush_memory_size"].as<int>();
 
+  // Determine whether this GEMM accumulates into C (beta != 0). We parse
+  // the beta strings here once so every backend (and set_flush_batch_count)
+  // can read the resulting `accumulate` member without duplicating the
+  // logic. Empty / unparseable strings are treated as 0.
+  auto safe_stod = [](const string & s) -> double {
+    if (s.empty()) return 0.0;
+    try { return std::stod(s); } catch (...) { return 0.0; }
+  };
+  accumulate = (safe_stod(result["beta"].as<string>())  != 0.0) ||
+               (safe_stod(result["betai"].as<string>()) != 0.0);
+
   initialization = result["initialization"].as<string>();
   scale_init = result["scale_init"].as<string>();
   filename_a = result["filename_a"].as<string>();
@@ -134,7 +147,7 @@ int generic_gemm::set_ld(std::string ld, std::string OP, int x, int y) {
 long long int generic_gemm::fix_stride(long long int stride, long rows_x, long cols_x, std::string matrix_id) {
   long long rows_x_long = rows_x;
   long long cols_x_long = cols_x;
-  long long stride_x = rows_x * cols_x;
+  long long stride_x = rows_x_long * cols_x_long;
   if (stride == 0) {
     std::cout << "Note: Matrix " << matrix_id << "'s stride automatically set to " << stride_x << std::endl;
     return stride_x;
@@ -155,29 +168,66 @@ std::pair<int, int> generic_gemm::set_row_col(std::string OP, int d1, int d2) {
 }
 
 void generic_gemm::set_flush_batch_count(
-                      int a_type_size,  int b_type_size, int c_type_size, int d_type_size, 
+                      int a_type_size,  int b_type_size, int c_type_size, int d_type_size,
                       int a_type_packing,  int b_type_packing, int c_type_packing, int d_type_packing,
+                      uint64_t a_scale_bytes, uint64_t b_scale_bytes,
+                      uint64_t c_scale_bytes, uint64_t d_scale_bytes,
                       bool inplace) {
-  // test
-  uint64_t single_block_size = calculate_offsets(rows_mem_a, cols_mem_a, rows_mem_b, cols_mem_b, rows_mem_c, cols_mem_c, rows_mem_d, cols_mem_d, 
-                    a_type_size, b_type_size, c_type_size, d_type_size,
-                    a_type_packing, b_type_packing, c_type_packing, d_type_packing, batch_count, inplace);
-  uint64_t flush_memory_size_bytes = (uint64_t)flush_memory_size * 1024 * 1024;
-  if (flush_memory_size == 0) {
-    // Not specified, return
-    return;
-  } 
+  // Compute the rotating buffer's per-block memory footprint. Every
+  // rotating block holds A, B, optionally C (only when beta != 0, just
+  // like hipblaslt-bench), D (skipped when inplace shares memory with C),
+  // and each backend's per-matrix scale tensors. All sizes are padded to
+  // a 16-byte boundary so allocations land on aligned addresses.
+  auto round16 = [](uint64_t v) -> uint64_t { return (v + 15ULL) & ~15ULL; };
 
-  int new_flush_batch_count = flush_memory_size_bytes / single_block_size;
-  if (new_flush_batch_count == 0) {
-    std::cerr << "Note: Unable to set flush_batch_count from flush_memory_size (rotating). "
-    "Problem does not fit into memory size of " << flush_memory_size << "MiB" << std::endl;
-  } else if (new_flush_batch_count > std::max(cold_iters, iters)) {
-    flush_batch_count = std::max(cold_iters, iters);
-    std::cout << "Note: flush_batch_count reduced from " << new_flush_batch_count << " to " << flush_batch_count << " to avoid excessive memory allocation." << std::endl;
+  uint64_t a_sz = round16(ceil_division(
+      (uint64_t)rows_mem_a * cols_mem_a * batch_count * a_type_size,
+      uint64_t(a_type_packing)));
+  uint64_t b_sz = round16(ceil_division(
+      (uint64_t)rows_mem_b * cols_mem_b * batch_count * b_type_size,
+      uint64_t(b_type_packing)));
+  uint64_t c_sz = accumulate
+      ? round16(ceil_division(
+          (uint64_t)rows_mem_c * cols_mem_c * batch_count * c_type_size,
+          uint64_t(c_type_packing)))
+      : 0;
+  uint64_t d_sz = inplace
+      ? 0
+      : round16(ceil_division(
+          (uint64_t)rows_mem_d * cols_mem_d * batch_count * d_type_size,
+          uint64_t(d_type_packing)));
+  uint64_t scale_sz = round16(a_scale_bytes) + round16(b_scale_bytes)
+                    + round16(c_scale_bytes) + round16(d_scale_bytes);
+
+  uint64_t single_block_size = a_sz + b_sz + c_sz + d_sz + scale_sz;
+
+  if (flush_memory_size == 0) {
+    // Not specified, leave flush_batch_count at its user-provided value.
+    return;
+  }
+  if (single_block_size == 0) {
+    // Degenerate problem; nothing to flush.
+    return;
+  }
+
+  uint64_t flush_memory_size_bytes = (uint64_t)flush_memory_size * 1024 * 1024;
+  // Ceil division matches hipblaslt-bench so that a partial fit still
+  // yields at least one rotating block instead of rounding down to zero.
+  uint64_t new_flush_batch_count = ceil_division(flush_memory_size_bytes, single_block_size);
+  int max_iters = std::max(cold_iters, iters);
+
+  if (flush_memory_size_bytes < single_block_size) {
+    std::cerr << "Note: Problem does not fit into memory size of "
+              << flush_memory_size << "MiB; clamping flush_batch_count to 1" << std::endl;
+    flush_batch_count = 1;
+  } else if ((int64_t)new_flush_batch_count > max_iters) {
+    flush_batch_count = max_iters;
+    std::cout << "Note: flush_batch_count reduced from " << new_flush_batch_count
+              << " to " << flush_batch_count
+              << " to avoid excessive memory allocation." << std::endl;
   } else {
-    flush_batch_count = new_flush_batch_count;
-  } 
+    flush_batch_count = (int)new_flush_batch_count;
+  }
   std::cout << "Using flush_batch_count = " << flush_batch_count << std::endl;
 }
 

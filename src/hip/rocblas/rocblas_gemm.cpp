@@ -74,6 +74,7 @@ void rocblas_gemm::parse_problem_type(string computeTStr, string scalarTStr, str
     a_type = precision;
     b_type = precision;
     c_type = precision;
+    d_type = precision;
     inplace = true;
     return;
   }
@@ -98,7 +99,7 @@ void rocblas_gemm::parse_problem_type(string computeTStr, string scalarTStr, str
     string errorString = "C Type must the same as D Type";
     throw std::invalid_argument(errorString);
   }
-  if (function.find("gemm_ex") || function.find("gemm_batched_ex") || function.find("gemm_strided_batched_ex")) {
+  if (function.find("gemm_ex") != string::npos || function.find("gemm_batched_ex") != string::npos || function.find("gemm_strided_batched_ex") != string::npos) {
     /*
       Possible functions:
         rocblas_gemm_ex
@@ -138,7 +139,7 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
   string aT = result["a_type"].as<string>();
   string bT = result["b_type"].as<string>();
   string cT = result["c_type"].as<string>();
-  string dT = result["c_type"].as<string>();
+  string dT = result["d_type"].as<string>();
   parse_problem_type(computeT, scalarT, aT, bT, cT, dT);
 
   parse_dev_iters(result["device"].as<string>());
@@ -158,13 +159,15 @@ rocblas_gemm::rocblas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
   beta = malloc(get_malloc_size_scalar(precision));
   type_call_host<set_scalar>(precision, beta, sbeta, sbetai);
 
-  set_flush_batch_count( 
-      type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type), 
-      type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(d_type), 
-      a_type.get_packing_count(), 
-      b_type.get_packing_count(), 
-      c_type.get_packing_count(), 
-      d_type.get_packing_count(), 
+  // Legacy rocBLAS has no scale tensors, so pass 0 for all four.
+  set_flush_batch_count(
+      type_call_dev<sizeofCUDT>(a_type), type_call_dev<sizeofCUDT>(b_type),
+      type_call_dev<sizeofCUDT>(c_type), type_call_dev<sizeofCUDT>(d_type),
+      a_type.get_packing_count(),
+      b_type.get_packing_count(),
+      c_type.get_packing_count(),
+      d_type.get_packing_count(),
+      0, 0, 0, 0,
       inplace);
 }
 
@@ -226,14 +229,20 @@ void rocblas_gemm::alloc_host() {
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(b_type));
   ptr_host_c =
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(c_type));
-  ptr_host_d =
-      (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(d_type));
+  if (!inplace) {
+    ptr_host_d =
+        (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(d_type));
+  } else {
+    ptr_host_d = ptr_host_c;
+  }
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count));
-    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count));
-    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count));
-    ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count));
+    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
+    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
+    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
+    if (!inplace) {
+      ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+    }
   }
 }
 
@@ -254,10 +263,12 @@ void rocblas_gemm::alloc_dev(rocblas_gemm_inst *mat) {
   }
 
   for (int i = 0; i < flush_batch_count; i++) {
-    hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count));
-    hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count));
-    hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count));
-    hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count));
+    hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
+    hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
+    hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
+    if (!inplace) {
+      hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+    }
   }
 
   mat->wSZ = workspace_size;
@@ -277,9 +288,9 @@ void rocblas_gemm::fill_host() {
 void rocblas_gemm::copy_host_to_dev(rocblas_gemm_inst *mat) {
   hipSetDevice(mat->devIDX);
   for (int i = 0; i < flush_batch_count; i++) {
-    copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], rows_mem_a, cols_mem_a, batch_count);
-    copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count);
-    copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], rows_mem_c, cols_mem_c, batch_count);
+    copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], rows_mem_a, cols_mem_a, batch_count, stride_a);
+    copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count, stride_b);
+    copy_and_convert(c_type, ptr_host_c[i], mat->ptr_dev_c[i], rows_mem_c, cols_mem_c, batch_count, stride_c);
   }
 }
 
@@ -309,11 +320,11 @@ void rocblas_gemm::free_mem() {
         hipFree(mat.ptr_dev_d[i]);
       }
     }
-    hipFree(mat.ptr_dev_a);
-    hipFree(mat.ptr_dev_b);
-    hipFree(mat.ptr_dev_c);
+    free(mat.ptr_dev_a);
+    free(mat.ptr_dev_b);
+    free(mat.ptr_dev_c);
     if (!inplace) {
-      hipFree(mat.ptr_dev_d);
+      free(mat.ptr_dev_d);
     }
     hipFree(mat.devWork);
     // if (batched && !strided) {

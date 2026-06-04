@@ -54,7 +54,9 @@ class mblas_data_type {
     virtual std::string to_string() const { return to_string("MBLAS"); }
     bool is_real() const;
     bool is_fp8() const;
+    bool is_fp6() const;
     bool is_fp4() const;
+    bool is_mx_possible() const;
     int get_packing_count() const;
     void set_scalar(std::string scalarstr, mblas_data_type precision, mblas_compute_type& compute);
 };

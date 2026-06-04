@@ -173,6 +173,9 @@ class cublaslt_gemm : public generic_gemm {
   void test_matmul(cublaslt_gemm_inst *mat, int ith_solution);
   std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc desc, mblas_cuda_data_type type, std::string matrix_id);
   //static std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc desc, mblas_cuda_data_type type, std::string matrix_id);
+  // Per-matrix scale-tensor byte count for either host or device alloc.
+  // `host == true` uses type_call_host<sizeofCUDT>, otherwise type_call_dev.
+  uint64_t scale_bytes(scale_size sz, mblas_cuda_data_type st, bool host) const;
 
  public:
   cublaslt_gemm(cxxopts::ParseResult result);
