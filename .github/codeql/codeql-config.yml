@@ -1,0 +1,7 @@
+name: "CodeQL Config"
+
+paths-ignore:
+  # Exclude yaml-cpp dependency from scanning
+  - 'build/_deps/yaml-cpp-*/**'
+  - '**/build/_deps/yaml-cpp-*/**'
+

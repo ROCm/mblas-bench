@@ -1,0 +1,90 @@
+#pragma once
+
+#include <map>
+
+enum mblas_data_type_enum {
+  MBLAS_R_32F   =  0,
+  MBLAS_R_64F   =  1,
+  MBLAS_R_16F   =  2,
+  MBLAS_R_8I    =  3,
+  MBLAS_C_32F   =  4,
+  MBLAS_C_64F   =  5,
+  MBLAS_C_16F   =  6,
+  MBLAS_C_8I    =  7,
+  MBLAS_R_8U    =  8,
+  MBLAS_C_8U    =  9,
+  MBLAS_R_32I   = 10,
+  MBLAS_C_32I   = 11,
+  MBLAS_R_32U   = 12,
+  MBLAS_C_32U   = 13,
+  MBLAS_R_16BF  = 14,
+  MBLAS_C_16BF  = 15,
+  MBLAS_R_4I    = 16,
+  MBLAS_C_4I    = 17,
+  MBLAS_R_4U    = 18,
+  MBLAS_C_4U    = 19,
+  MBLAS_R_16I   = 20,
+  MBLAS_C_16I   = 21,
+  MBLAS_R_16U   = 22,
+  MBLAS_C_16U   = 23,
+  MBLAS_R_64I   = 24,
+  MBLAS_C_64I   = 25,
+  MBLAS_R_64U   = 26,
+  MBLAS_C_64U   = 27,
+  MBLAS_R_8F_E4M3 = 28,
+  MBLAS_R_8F_E5M2 = 29,
+  MBLAS_R_8F_UE4M3 = MBLAS_R_8F_E4M3,
+  MBLAS_R_8F_UE8M0 = 30,
+  MBLAS_R_6F_E2M3  = 31,
+  MBLAS_R_6F_E3M2  = 32,
+  MBLAS_R_4F_E2M1  = 33,
+  MBLAS_ANY = 254,
+  MBLAS_NULL = 255
+};
+
+enum mblas_compute_type_enum {
+  MBLAS_COMPUTE_16F = 64,
+  MBLAS_COMPUTE_16F_PEDANTIC = 65,
+  MBLAS_COMPUTE_32F = 68,
+  MBLAS_COMPUTE_32F_PEDANTIC = 69,
+  MBLAS_COMPUTE_32F_FAST_16F = 74,
+  MBLAS_COMPUTE_32F_FAST_16BF = 75,
+  MBLAS_COMPUTE_32F_FAST_TF32 = 77,
+  MBLAS_COMPUTE_32F_EMULATED_16BFX9 = 78,
+  MBLAS_COMPUTE_64F = 70,
+  MBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT = 79,
+  MBLAS_COMPUTE_64F_PEDANTIC = 71,
+  MBLAS_COMPUTE_32I = 72,
+  MBLAS_COMPUTE_32I_PEDANTIC = 73,
+  MBLAS_COMPUTE_32F_8F_8F = 91,
+  MBLAS_COMPUTE_32F_8F_8BF = 92,
+  MBLAS_COMPUTE_32F_8BF_8F = 93,
+  MBLAS_COMPUTE_32F_8BF_8BF = 94,
+  MBLAS_COMPUTE_NULL = 90,
+};
+
+enum mblas_operation_enum {
+  MBLAS_OP_N = 0,
+  MBLAS_OP_T = 1,
+  MBLAS_OP_C = 2,
+  MBLAS_OP_CONJG = 3,
+  MBLAS_OP_NULL = 15,
+};
+
+// Used for establishing a link between precision and compute
+const std::map<mblas_data_type_enum, mblas_compute_type_enum> precToCompute = {
+    {MBLAS_R_64F, MBLAS_COMPUTE_64F},
+    {MBLAS_C_64F, MBLAS_COMPUTE_64F},
+    {MBLAS_R_32F, MBLAS_COMPUTE_32F},
+    {MBLAS_C_32F, MBLAS_COMPUTE_32F},
+    {MBLAS_R_16BF, MBLAS_COMPUTE_32F},
+    {MBLAS_C_16BF, MBLAS_COMPUTE_32F},
+    {MBLAS_R_16F, MBLAS_COMPUTE_16F},
+    {MBLAS_C_16F, MBLAS_COMPUTE_16F},
+    {MBLAS_R_32I, MBLAS_COMPUTE_32I},
+};
+
+enum mblas_fp6_interpretation_t {
+  MBLAS_F6_E3M2 = 0, /**< FP6 E3M2 Type*/
+  MBLAS_F6_E2M3 = 1, /**< FP6 E2M3 Type */
+};

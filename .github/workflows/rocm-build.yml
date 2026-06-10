@@ -1,0 +1,63 @@
+name: ROCm Build Test
+permissions:
+  contents: read
+on:
+  #push:
+  #  branches:
+  #    - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        rocm_version: [6.4.3, 7.0.2, 7.1]
+        include:
+          - rocm_version: 6.4.3
+            gpu_targets: "gfx1100,gfx1030,gfx942,gfx90a,gfx908"
+          - rocm_version: 7.0.2
+            gpu_targets: "gfx950,gfx1201,gfx1200,gfx1101,gfx1100,gfx1030,gfx942,gfx90a,gfx908"
+          - rocm_version: 7.1
+            gpu_targets: "gfx950,gfx1201,gfx1200,gfx1101,gfx1100,gfx1030,gfx942,gfx90a,gfx908"
+      fail-fast: false
+    runs-on: ubuntu-latest
+    container:
+      image: rocm/dev-ubuntu-22.04:${{ matrix.rocm_version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fix unfortunate rocm container bug
+        if: ${{ matrix.rocm_version == '7.0.2' }}
+        run: |
+          sed -i "s/7.0.2/30.10.2/" /etc/apt/sources.list.d/amdgpu.list 
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y wget build-essential git rocblas-dev hipblas-dev hipblaslt-dev
+
+      # Needed for hipblaslt 1.1.0
+      - name: Install CMake manually
+        run: |
+          mkdir -p /opt/cmake
+          wget --no-check-certificate --quiet -O - https://github.com/Kitware/CMake/releases/download/v3.31.9/cmake-3.31.9-linux-x86_64.tar.gz | tar --strip-components=1 -xz -C /opt/cmake
+
+      - name: Configure Project with CMake
+        run: |
+          /opt/cmake/bin/cmake -S src -B build \
+            -DWITH_ROCM=true \
+            -DWITH_CUDA=false \
+            -DGPU_TARGETS=${{ matrix.gpu_targets }}
+      
+      - name: Build mblas-bench
+        run: /opt/cmake/bin/cmake --build build -j
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "ROCm ${{ matrix.rocm_version }} build complete: ${{ job.status }}"
+
