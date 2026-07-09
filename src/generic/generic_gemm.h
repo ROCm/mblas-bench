@@ -9,7 +9,8 @@ enum class scaling_type {
   Block_32_UE8M0, Block_16_UE8M0,
   Block_32_UE4M3, Block_16_UE4M3,
   Block_32_UE5M3, Block_16_UE5M3,
-  Block_32_UE8M0_K4, Block_128_UE8M0_K4
+  Block_32_UE8M0_K4, Block_128_UE8M0_K4,
+  Block_32_UE8M0_Swizzle
 };
 std::string scaling_string(scaling_type input);
 // True for the generic Block mode and every explicit Block_* format.

@@ -222,6 +222,13 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
         "\nMatrix: " + matrix_id +
         "\nType: " + type.to_string();
     throw std::invalid_argument(errorString);
+  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0_Swizzle) {
+    string errorString =
+        "Scale mode " + scaling_string(desc.scale_mode) +
+        " is a gfx950/hipBLASLt-only feature and is not supported in cublaslt."
+        "\nMatrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    throw std::invalid_argument(errorString);
   } else if (is_block_scaling(desc.scale_mode)) {
     // cuBLASLt has no scale mode for Block_16_UE8M0, Block_32_UE4M3,
     // Block_32_UE5M3 or Block_16_UE5M3.

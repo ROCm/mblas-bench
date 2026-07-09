@@ -256,6 +256,8 @@ scaling_type generic_gemm::set_scale_mode(string value) {
       case 6: return scaling_type::Block_16_UE4M3;
       case 7: return scaling_type::Block_32_UE5M3;
       case 8: return scaling_type::Block_16_UE5M3;
+      // gfx950 pre-swizzled MX layout (BLK32_UE8M0_32_8_EXT).
+      case 1001: return scaling_type::Block_32_UE8M0_Swizzle;
     }
   } else {
     // The word "block" keeps the generic mode. Each backend then picks the
@@ -272,12 +274,15 @@ scaling_type generic_gemm::set_scale_mode(string value) {
     if (lower_val == "block_16_ue5m3" || lower_val == "b16_ue5m3") return scaling_type::Block_16_UE5M3;
     if (lower_val == "block_32_ue8m0_k4" || lower_val == "b32_ue8m0_k4") return scaling_type::Block_32_UE8M0_K4;
     if (lower_val == "block_128_ue8m0_k4" || lower_val == "b128_ue8m0_k4") return scaling_type::Block_128_UE8M0_K4;
+    if (lower_val == "block_32_ue8m0_swizzle" || lower_val == "b32_ue8m0_swizzle") {
+      return scaling_type::Block_32_UE8M0_Swizzle;
+    }
   }
 
   throw std::invalid_argument(
       "Unknown scale mode \"" + value + "\". "
-      "Use a number (0 none, 1 scalar, 2 vector, 3 to 8 block), the word block, "
-      "or a block name such as Block_32_UE8M0 or B16_UE4M3.");
+      "Use a number (0 none, 1 scalar, 2 vector, 3 to 8 block, 1001 gfx950 swizzled block), "
+      "the word block, or a block name such as Block_32_UE8M0 or B16_UE4M3.");
 }
 
 
@@ -325,6 +330,7 @@ std::string scaling_string(scaling_type input){
     case scaling_type::Block_16_UE5M3: return "Block_16_UE5M3";
     case scaling_type::Block_32_UE8M0_K4:  return "Block_32_UE8M0_K4";
     case scaling_type::Block_128_UE8M0_K4: return "Block_128_UE8M0_K4";
+    case scaling_type::Block_32_UE8M0_Swizzle: return "Block_32_UE8M0_Swizzle";
   }
   return "Unknown";
 }
@@ -340,6 +346,7 @@ bool is_block_scaling(scaling_type input) {
     case scaling_type::Block_16_UE5M3:
     case scaling_type::Block_32_UE8M0_K4:
     case scaling_type::Block_128_UE8M0_K4:
+    case scaling_type::Block_32_UE8M0_Swizzle:
       return true;
     default:
       return false;
