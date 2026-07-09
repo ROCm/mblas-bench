@@ -15,6 +15,7 @@
 #include "hip_create_allocate.h"
 #include "hip_datatype_utils.h"
 #include "hip_error.h"
+#include "hip_preswizzle.h"
 #include "cxxopts.hpp"
 #include "generic_setup.h"
 
@@ -164,6 +165,13 @@ hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, st
     scale_type = type.get_scale_type();  // Returns MBLAS_R_8F_UE8M0 for MX
     scale_mode = get_scale_mode(type);  // Returns VEC32_UE8M0 for MX
     scale_size_result = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (desc.scale_mode == scaling_type::BlockSwizzled) {
+    // gfx950 pre-swizzled MX block scales (--scaleA/--scaleB 1001).
+    scale_type = type.get_scale_type();  // MBLAS_R_8F_UE8M0
+    scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_BLK32_UE8M0_32_8_EXT;
+    // Free dim is m for A and n for B; K is the shared contraction dim.
+    long M = (matrix_id == "B") ? n : m;
+    scale_size_result = get_swizzled_scale_tensor_size(M, k);
   } else if (type.is_fp4() || type.is_fp6()) {
     string errorString =
         "Non-block scaled MX formats not supported in hipblaslt."
@@ -194,6 +202,20 @@ uint64_t hipblaslt_gemm::scale_bytes(scale_size sz, mblas_hip_data_type st, bool
   return ceil_division(
       (uint64_t)sz.get_size() * batch_count * element_size,
       uint64_t(st.get_packing_count()));
+}
+
+void hipblaslt_gemm::swizzle_scales_gfx950(void **scale_host, scale_size sz) const {
+  const size_t n_elem = sz.get_size();
+  const std::vector<size_t> dims = {(size_t)sz.rows, (size_t)sz.cols};
+  for (int i = 0; i < flush_batch_count; i++) {
+    float *buf = static_cast<float *>(scale_host[i]);
+    for (int b = 0; b < batch_count; b++) {
+      float *slice = buf + (size_t)b * n_elem;
+      std::vector<float> in(slice, slice + n_elem);
+      std::vector<float> out = mblas_preswizzle::preSwizzleScalesGFX950(in, dims);
+      std::copy(out.begin(), out.end(), slice);
+    }
+  }
 }
 #endif
 
@@ -503,12 +525,24 @@ void hipblaslt_gemm::fill_host() {
                              a_scale_size.rows, a_scale_size.cols, a_scale_size.rows,
                              batch_count, (long long)a_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_a, string(""));
+    if (a_props.scale_mode == scaling_type::BlockSwizzled) {
+      // Reorder A's UE8M0 block scales into the gfx950 pre-swizzled 32x8 layout.
+      // Host UE8M0 scales are stored as float (see type_call_host); a_scale_size
+      // is already the padded (rows, cols) so the permutation is size-preserving.
+      swizzle_scales_gfx950(scale_host_a, a_scale_size);
+    }
   }
   if (b_props.scale_mode != scaling_type::None) {
     type_call_host<initHost>(b_scale_type, scale_init, scale_host_b,
                              b_scale_size.rows, b_scale_size.cols, b_scale_size.rows,
                              batch_count, (long long)b_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_b, string(""));
+    if (b_props.scale_mode == scaling_type::BlockSwizzled) {
+      // Reorder B's UE8M0 block scales into the gfx950 pre-swizzled 32x8 layout.
+      // Host UE8M0 scales are stored as float (see type_call_host); b_scale_size
+      // is already the padded (rows, cols) so the permutation is size-preserving.
+      swizzle_scales_gfx950(scale_host_b, b_scale_size);
+    }
   }
   if (c_props.scale_mode != scaling_type::None) {
     type_call_host<initHost>(c_scale_type, scale_init, scale_host_c,
