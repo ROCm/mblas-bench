@@ -1,6 +1,6 @@
 #pragma once
 
-#include <hipblas/hipblas.h>
+#include <hipblas-common/hipblas-common.h>
 #include "mblas_compute_type.h"
 
 class mblas_hipblas_compute_type: public mblas_compute_type {

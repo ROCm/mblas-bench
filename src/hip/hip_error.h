@@ -1,6 +1,6 @@
 #pragma once
 #include <assert.h>
-#include <hipblas/hipblas.h>
+#include <hipblas-common/hipblas-common.h>
 #include <hip/hip_runtime.h>
 #include <stdlib.h>
 #include <unistd.h>

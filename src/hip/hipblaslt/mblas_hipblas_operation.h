@@ -1,6 +1,6 @@
 #pragma once
 
-#include <hipblas/hipblas.h>
+#include <hipblas-common/hipblas-common.h>
 #include "mblas_operation.h"
 
 class mblas_hipblas_operation: public mblas_operation {

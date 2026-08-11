@@ -19,7 +19,7 @@ set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
 
 # Find HIP/ROCm packages (conditionally based on enabled backends)
 find_package(hip REQUIRED)
-find_package(hipblas REQUIRED)
+find_package(hipblas-common REQUIRED)
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
 
@@ -85,7 +85,7 @@ endif()
 set(ROCM_LINK_LIBS
     hip::device
     hip::host
-    roc::hipblas
+    roc::hipblas-common
     Threads::Threads
     OpenMP::OpenMP_CXX
     -lpthread
