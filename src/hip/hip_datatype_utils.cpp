@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <map>
+#include <stdexcept>
 #include <string>
 using namespace std;
 
@@ -44,6 +45,22 @@ hipblasLtMatmulMatrixScale_t get_scale_mode(mblas_hip_data_type type) {
   return HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F;
 }
 #endif
+
+std::string get_arch_name(int device) {
+  hipDeviceProp_t props;
+  hipError_t err = hipGetDeviceProperties(&props, device);
+  if (err != hipSuccess) {
+    throw std::runtime_error("Failed to query properties for device " +
+                             std::to_string(device) + ": " +
+                             std::string(hipGetErrorString(err)));
+  }
+  std::string arch(props.gcnArchName);
+  return arch.substr(0, arch.find(':'));
+}
+
+bool arch_uses_fnuz_fp8(const std::string &arch) {
+  return (arch == "gfx940" || arch == "gfx941" || arch == "gfx942");
+}
 
 // bool isReal(rocblas_datatype type) {
 //   // You could also do this based on the string version with _R_ or _C_, but

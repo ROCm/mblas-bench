@@ -14,6 +14,7 @@ class mblas_data_type {
     static const mblas_data_type MBLAS_R_16F,     MBLAS_C_16F;
     static const mblas_data_type MBLAS_R_16BF,    MBLAS_C_16BF;
     static const mblas_data_type MBLAS_R_8F_E4M3, MBLAS_R_8F_E5M2;
+    static const mblas_data_type MBLAS_R_8F_E4M3_FNUZ, MBLAS_R_8F_E5M2_FNUZ;
     static const mblas_data_type MBLAS_R_8F_UE4M3, MBLAS_R_8F_UE8M0;
     static const mblas_data_type MBLAS_R_6F_E2M3, MBLAS_R_6F_E3M2;
     static const mblas_data_type MBLAS_R_4F_E2M1;
@@ -54,6 +55,11 @@ class mblas_data_type {
     virtual std::string to_string() const { return to_string("MBLAS"); }
     bool is_real() const;
     bool is_fp8() const;
+    bool is_fp8_fnuz() const;
+    // Translate between the OCP and FNUZ fp8 encodings. Any other type is
+    // returned unchanged.
+    mblas_data_type to_fnuz() const;
+    mblas_data_type to_ocp() const;
     bool is_fp6() const;
     bool is_fp4() const;
     bool is_mx_possible() const;
@@ -66,6 +72,7 @@ constexpr const mblas_data_type mblas_data_type::MBLAS_R_32F{mblas_data_type_enu
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_16F{mblas_data_type_enum::MBLAS_R_16F},         mblas_data_type::MBLAS_C_16F{mblas_data_type_enum::MBLAS_C_16F};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_16BF{mblas_data_type_enum::MBLAS_R_16BF},       mblas_data_type::MBLAS_C_16BF{mblas_data_type_enum::MBLAS_C_16BF};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_8F_E4M3{mblas_data_type_enum::MBLAS_R_8F_E4M3}, mblas_data_type::MBLAS_R_8F_E5M2{mblas_data_type_enum::MBLAS_R_8F_E5M2};
+constexpr const mblas_data_type mblas_data_type::MBLAS_R_8F_E4M3_FNUZ{mblas_data_type_enum::MBLAS_R_8F_E4M3_FNUZ}, mblas_data_type::MBLAS_R_8F_E5M2_FNUZ{mblas_data_type_enum::MBLAS_R_8F_E5M2_FNUZ};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_8F_UE4M3{mblas_data_type_enum::MBLAS_R_8F_UE4M3}, mblas_data_type::MBLAS_R_8F_UE8M0{mblas_data_type_enum::MBLAS_R_8F_UE8M0};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_6F_E2M3{mblas_data_type_enum::MBLAS_R_6F_E2M3}, mblas_data_type::MBLAS_R_6F_E3M2{mblas_data_type_enum::MBLAS_R_6F_E3M2};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_4F_E2M1{mblas_data_type_enum::MBLAS_R_4F_E2M1};

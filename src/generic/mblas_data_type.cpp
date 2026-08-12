@@ -12,6 +12,8 @@ const std::map<std::string, mblas_data_type_enum> mblas_data_type::precDType = {
     {"bf16_c", mblas_data_type_enum::MBLAS_C_16BF}, {"i8_r", mblas_data_type_enum::MBLAS_R_8I},   {"i8_c", mblas_data_type_enum::MBLAS_C_8I},
     {"i32_r", mblas_data_type_enum::MBLAS_R_32I},   {"i32_c", mblas_data_type_enum::MBLAS_C_32I},
     {"f8_r", mblas_data_type_enum::MBLAS_R_8F_E4M3},   {"bf8_r", mblas_data_type_enum::MBLAS_R_8F_E5M2},
+    {"f8_fnuz_r", mblas_data_type_enum::MBLAS_R_8F_E4M3_FNUZ},
+    {"bf8_fnuz_r", mblas_data_type_enum::MBLAS_R_8F_E5M2_FNUZ},
     {"f6_r", mblas_data_type_enum::MBLAS_R_6F_E3M2},
     {"f4_r", mblas_data_type_enum::MBLAS_R_4F_E2M1},
     // MBLAS
@@ -47,6 +49,8 @@ const std::map<std::string, mblas_data_type_enum> mblas_data_type::precDType = {
     {"MBLAS_C_64U",  mblas_data_type_enum::MBLAS_C_64U},
     {"MBLAS_R_8F_E4M3", mblas_data_type_enum::MBLAS_R_8F_E4M3},
     {"MBLAS_R_8F_E5M2", mblas_data_type_enum::MBLAS_R_8F_E5M2},
+    {"MBLAS_R_8F_E4M3_FNUZ", mblas_data_type_enum::MBLAS_R_8F_E4M3_FNUZ},
+    {"MBLAS_R_8F_E5M2_FNUZ", mblas_data_type_enum::MBLAS_R_8F_E5M2_FNUZ},
     {"MBLAS_R_8F_UE4M3", mblas_data_type_enum::MBLAS_R_8F_UE4M3},
     {"MBLAS_R_8F_UE8M0", mblas_data_type_enum::MBLAS_R_8F_UE8M0},
     {"MBLAS_R_6F_E2M3", mblas_data_type_enum::MBLAS_R_6F_E2M3},
@@ -119,8 +123,8 @@ const std::map<std::string, mblas_data_type_enum> mblas_data_type::precDType = {
     {"HIP_C_64U",  mblas_data_type_enum::MBLAS_C_64U},
     {"HIP_R_8F_E4M3", mblas_data_type_enum::MBLAS_R_8F_E4M3},
     {"HIP_R_8F_E5M2", mblas_data_type_enum::MBLAS_R_8F_E5M2},
-    {"HIP_R_8F_E4M3_FUNZ", mblas_data_type_enum::MBLAS_R_8F_E4M3},
-    {"HIP_R_8F_E5M2_FUNZ", mblas_data_type_enum::MBLAS_R_8F_E5M2},
+    {"HIP_R_8F_E4M3_FNUZ", mblas_data_type_enum::MBLAS_R_8F_E4M3_FNUZ},
+    {"HIP_R_8F_E5M2_FNUZ", mblas_data_type_enum::MBLAS_R_8F_E5M2_FNUZ},
 };
 
 // Manually defined
@@ -182,10 +186,32 @@ bool mblas_data_type::is_real() const {
 }
 
 bool mblas_data_type::is_fp8() const {
-  if (value == MBLAS_R_8F_E4M3 || value == MBLAS_R_8F_E5M2) {
+  if (value == MBLAS_R_8F_E4M3 || value == MBLAS_R_8F_E5M2 || is_fp8_fnuz()) {
     return true;
   }
   return false;
+}
+
+bool mblas_data_type::is_fp8_fnuz() const {
+  return (value == MBLAS_R_8F_E4M3_FNUZ || value == MBLAS_R_8F_E5M2_FNUZ);
+}
+
+mblas_data_type mblas_data_type::to_fnuz() const {
+  if (value == MBLAS_R_8F_E4M3) {
+    return MBLAS_R_8F_E4M3_FNUZ;
+  } else if (value == MBLAS_R_8F_E5M2) {
+    return MBLAS_R_8F_E5M2_FNUZ;
+  }
+  return *this;
+}
+
+mblas_data_type mblas_data_type::to_ocp() const {
+  if (value == MBLAS_R_8F_E4M3_FNUZ) {
+    return MBLAS_R_8F_E4M3;
+  } else if (value == MBLAS_R_8F_E5M2_FNUZ) {
+    return MBLAS_R_8F_E5M2;
+  }
+  return *this;
 }
 
 bool mblas_data_type::is_fp6() const {

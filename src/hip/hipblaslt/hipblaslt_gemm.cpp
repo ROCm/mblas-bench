@@ -43,6 +43,8 @@ std::vector<matmul_prec_type_f8> hipblaslt_gemm::matmulSupportedF8 = {
   {MBLAS_R_32F,  MBLAS_R_32F,     MBLAS_R_32F,      MBLAS_R_16BF},
   {MBLAS_R_32F,  MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3,  MBLAS_R_16F },
   {MBLAS_R_32F,  MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2,  MBLAS_R_16F },
+  {MBLAS_R_32F,  MBLAS_R_8F_E4M3_FNUZ, MBLAS_R_8F_E4M3_FNUZ, MBLAS_R_16F },
+  {MBLAS_R_32F,  MBLAS_R_8F_E5M2_FNUZ, MBLAS_R_8F_E5M2_FNUZ, MBLAS_R_16F },
   // FP32 bias variants
   // Scale Type  C Type           D Type            Bias Type
   {MBLAS_R_32F,  MBLAS_R_16F,     MBLAS_R_16F,      MBLAS_R_32F },
@@ -50,6 +52,8 @@ std::vector<matmul_prec_type_f8> hipblaslt_gemm::matmulSupportedF8 = {
   {MBLAS_R_32F,  MBLAS_R_32F,     MBLAS_R_32F,      MBLAS_R_32F },
   {MBLAS_R_32F,  MBLAS_R_8F_E4M3, MBLAS_R_8F_E4M3,  MBLAS_R_32F },
   {MBLAS_R_32F,  MBLAS_R_8F_E5M2, MBLAS_R_8F_E5M2,  MBLAS_R_32F },
+  {MBLAS_R_32F,  MBLAS_R_8F_E4M3_FNUZ, MBLAS_R_8F_E4M3_FNUZ, MBLAS_R_32F },
+  {MBLAS_R_32F,  MBLAS_R_8F_E5M2_FNUZ, MBLAS_R_8F_E5M2_FNUZ, MBLAS_R_32F },
 };
 
 #if HIP_VERSION >= 70000000
@@ -197,6 +201,40 @@ uint64_t hipblaslt_gemm::scale_bytes(scale_size sz, mblas_hip_data_type st, bool
 }
 #endif
 
+void hipblaslt_gemm::fixup_fp8_arch() {
+  mblas_hip_data_type *types[] = {&precision, &a_type, &b_type, &c_type, &d_type};
+  bool uses_fp8 = false;
+  for (auto *type : types) uses_fp8 |= type->is_fp8();
+  // Leave an out-of-range --device to be reported by prepare_array()
+  if (!uses_fp8) return;
+
+  string arch = get_arch_name(mat_ptrs.front().devIDX);
+  if (arch_uses_fnuz_fp8(arch)) {
+    bool substituted = false;
+    for (auto *type : types) {
+      mblas_hip_data_type fnuz(type->to_fnuz());
+      substituted |= (fnuz != *type);
+      *type = fnuz;
+    }
+    if (substituted) {
+      cerr << "Warning: " << arch << " only implements the FNUZ fp8 encoding, "
+           << "substituting f8_fnuz_r/bf8_fnuz_r for the requested OCP types"
+           << endl;
+    }
+    return;
+  }
+
+  for (auto *type : types) {
+    if (type->is_fp8_fnuz()) {
+      throw std::invalid_argument(
+          "FNUZ fp8 is only implemented on gfx940,gfx941,gfx942 (MI300X/MI325X). Use the OCP "
+          "fp8 types (f8_r/bf8_r) instead."
+          "\nDetected architecture: " + arch +
+          "\nRequested type: " + type->to_string());
+    }
+  }
+}
+
 void hipblaslt_gemm::validate_parameters() {
   // Validate that data types exist in table of supported configurations
   matmul_prec_type selType = {
@@ -268,7 +306,11 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
   std::string tB = result["transposeB"].as<std::string>();
   transA = mblas_hipblas_operation(result["transposeA"].as<std::string>());
   transB = mblas_hipblas_operation(result["transposeB"].as<std::string>());
-  
+
+  // Must run before scaling is configured and the types are validated, both of
+  // which depend on the final fp8 encoding.
+  fixup_fp8_arch();
+
 #if HIP_VERSION >= 70000000
   use_scaling = a_type.is_mx_possible() || b_type.is_mx_possible() || 
                 c_type.is_mx_possible() || d_type.is_mx_possible();
