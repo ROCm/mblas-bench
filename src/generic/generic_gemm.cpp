@@ -251,6 +251,11 @@ scaling_type generic_gemm::set_scale_mode(string value) {
       case 3:
         out = scaling_type::Block;
         break;
+      // 1001 matches hipblaslt-bench's --scaleA/--scaleB value for the gfx950
+      // pre-swizzled MX block scale layout (Block_32_UE8M0_32_8_EXT).
+      case 1001:
+        out = scaling_type::BlockSwizzled;
+        break;
     }
   } else {
     string lower_val = value;
@@ -265,6 +270,10 @@ scaling_type generic_gemm::set_scale_mode(string value) {
       out = scaling_type::Vector;
     } else if (lower_val == "block") {
       out = scaling_type::Block;
+    } else if (lower_val == "block_swizzled") {
+      // Note: the text alias must not contain digits, since set_scale_mode
+      // routes any value containing a digit through the numeric (stoi) path.
+      out = scaling_type::BlockSwizzled;
     }
   }
   return out;
@@ -273,7 +282,9 @@ scaling_type generic_gemm::set_scale_mode(string value) {
 
 std::string generic_gemm::set_init(matrix_desc desc, std::string init, std::string mx_init) {
   // Set init if datatype is using
-  if (mx_init == "" || desc.scale_mode != scaling_type::Block) {
+  if (mx_init == "" ||
+      (desc.scale_mode != scaling_type::Block &&
+       desc.scale_mode != scaling_type::BlockSwizzled)) {
     // Default to regular init if mx_init isn't specified or the scaling mode isn't block
     return init;
   }
@@ -310,5 +321,8 @@ std::string scaling_string(scaling_type input){
     return "Vector";
   } else if (input == scaling_type::Block) {
     return "Block";
+  } else if (input == scaling_type::BlockSwizzled) {
+    return "BlockSwizzled";
   }
+  return "None";
 }

@@ -168,6 +168,12 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
 
     // Calculate lengths
     scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (desc.scale_mode == scaling_type::BlockSwizzled) {
+    string errorString =
+        "Pre-swizzled block scaling (1001) is a gfx950/hipBLASLt-only feature "
+        "and is not supported in cublaslt.\nMatrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    throw std::invalid_argument(errorString);
   } else if (type.is_fp4()) {
     string errorString =
         "Non-block scaled fp4 is not supported in cublaslt"

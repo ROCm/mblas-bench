@@ -17,6 +17,15 @@
 std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, 
                                                   hipblasLtMatmulMatrixScale_t ScaleMode);
 hipblasLtMatmulMatrixScale_t get_scale_mode(mblas_hip_data_type type);
+
+// gfx950 pre-swizzled MX scale tensor size (Block_32_UE8M0_32_8_EXT).
+// M is the matrix's free dimension (m for A, n for B), K is the contraction
+// dimension. One UE8M0 scale per 32-element block along K. The gfx950 host
+// pre-swizzle pads the free dim to a multiple of 32 and the K/32 dim to a
+// multiple of 8 (matching hipblaslt-bench preSwizzleScalesGFX950 / library
+// setMXScaleA with padScaleTensorFreeDim). Returned as {rows, cols} = {M_pad,
+// (K/32)_pad}.
+std::pair<size_t, size_t> get_swizzled_scale_tensor_size(int M, int K);
 #endif
 
 
