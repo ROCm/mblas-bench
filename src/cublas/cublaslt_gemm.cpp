@@ -21,6 +21,7 @@
 #include "cuda_error.h"
 #include "cxxopts.hpp"
 #include "cuda_monitor.h"
+#include "compound_init.h"
 
 using std::cerr;
 using std::cout;
@@ -545,6 +546,48 @@ void cublaslt_gemm::fill_host() {
   type_call_host<initHost>(c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
                          batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
   // D is just output, don't need to init
+
+#if (ENABLE_CUDA_FP4)
+  auto fill_scale = [&](matrix_desc& props, mblas_cuda_data_type scale_type,
+                        void** scale_host, void** ptr_host, scale_size sz,
+                        int rows_mem, int cols_mem, float scale_factor) {
+    if (props.scale_mode == scaling_type::None) return;
+    const bool is_pow2_block_scale =
+        scale_type == mblas_data_type::MBLAS_R_8F_UE8M0 ||
+        scale_type == mblas_data_type::MBLAS_R_8F_UE4M3;
+    const bool compound = props.scale_mode == scaling_type::Block &&
+                          is_pow2_block_scale &&
+                          is_compound_init(scale_init);
+    // Default-fill the scale buffer with constant 1.0 in the compound case so
+    // padding entries are well-defined; otherwise honor user's --scale_init.
+    type_call_host<initHost>(scale_type, compound ? string("constant") : scale_init,
+                             scale_host, sz.rows, sz.cols, sz.rows,
+                             batch_count, (long long)sz.get_size(),
+                             flush_batch_count, false,
+                             compound ? 1.0f : scale_factor, string(""));
+    if (compound) {
+      const scale_policy policy = parse_scale_policy(scale_init);
+      // UE8M0 -> VEC32 (block 32); UE4M3 -> VEC16 (block 16).
+      const size_t block_size =
+          (scale_type == mblas_data_type::MBLAS_R_8F_UE8M0) ? 32 : 16;
+      for (int i = 0; i < flush_batch_count; i++) {
+        compound_init_block_pow2(
+            (float*)ptr_host[i], (float*)scale_host[i],
+            (size_t)rows_mem, (size_t)cols_mem, (size_t)batch_count,
+            (size_t)sz.rows, (size_t)sz.cols, block_size, policy);
+      }
+    }
+  };
+
+  fill_scale(a_props, a_scale_type, scale_host_a, ptr_host_a, a_scale_size,
+             rows_mem_a, cols_mem_a, scale_factor_a);
+  fill_scale(b_props, b_scale_type, scale_host_b, ptr_host_b, b_scale_size,
+             rows_mem_b, cols_mem_b, scale_factor_b);
+  fill_scale(c_props, c_scale_type, scale_host_c, ptr_host_c, c_scale_size,
+             rows_mem_c, cols_mem_c, scale_factor_c);
+  fill_scale(d_props, d_scale_type, scale_host_d, ptr_host_d, d_scale_size,
+             rows_mem_d, cols_mem_d, scale_factor_d);
+#else
   if (a_props.scale_mode != scaling_type::None) {
     type_call_host<initHost>(a_scale_type, scale_init, scale_host_a,
                              a_scale_size.rows, a_scale_size.cols, a_scale_size.rows,
@@ -569,6 +612,7 @@ void cublaslt_gemm::fill_host() {
                              batch_count, (long long)d_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_d, string(""));
   }
+#endif
 }
 
 void cublaslt_gemm::copy_host_to_dev(cublaslt_gemm_inst *mat) {
