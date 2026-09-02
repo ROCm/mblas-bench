@@ -7,6 +7,7 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <cmath>
 #include <omp.h>
 
 // Rand int gen
@@ -198,6 +199,49 @@ void fill_rand_host_trig_float(void **ptr_array, long rows_A, long cols_A, long 
   }
 }
 
+// uniform_trig data initialization.
+//
+// Fills each operand by:
+//   1. drawing a UNIFORM RANDOM value in [0, MxK) for A (or [0, NxK) for B)
+//      i.e. over the matrix's element count, the same span the element index
+//      would cover, but randomized rather than sequential;
+//   2. passing that value through sinf()/cosf() (single precision);
+//   3. storing the f32 result. The caller's f32 -> fp8/bf16/fp4 convert then
+//      snaps to the nearest representable value (round-to-nearest).
+// There is NO scaling factor. isSin selects sinf over cosf (A uses sin, B uses
+// cos by default via the 'control' flag, matching trig_float's A/B split).
+//
+// NOTE: this is DISTINCT from a trig init that feeds the *sequential* element
+// index to sin() (e.g. trig_float); uniform_trig feeds a *uniform random*
+// argument instead. Each rotating copy is filled with an independent random draw.
+template <typename T>
+void fill_rand_host_uniform_trig(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
+                                 long long int stride, int flush_batch_count,
+                                 bool isSin) {
+  std::random_device r;
+  int random_dev_seed = r();
+  const double span = (double)rows_A * (double)cols_A;   // MxK for A, NxK for B
+  #pragma omp parallel
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<float> dist(0.0f, (float)span);
+    #pragma omp for collapse(4)
+    for (int flush_idx = 0; flush_idx < flush_batch_count; flush_idx++) {
+      for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+        for (size_t j = 0; j < cols_A; ++j) {
+          for (size_t i = 0; i < rows_A; ++i) {
+            T *A = (T *)ptr_array[flush_idx];
+            float x = dist(gen);                           // uniform in [0, MxK)
+            float val = isSin ? sinf(x) : cosf(x);         // sinf/cosf
+            A[i + j * ld + i_batch * stride] = (T)val;
+          }
+        }
+      }
+    }
+  }
+}
+
 template <typename T>
 void fill_rand_host_csv(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
                          long long int stride, int flush_batch_count, std::string filename) {
@@ -269,6 +313,8 @@ void initHost<T>::operator()(std::string initialization, void **ptr_array, long 
     fill_rand_host_rand_int_alternating<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, r());
   } else if (initialization == "trig_float") {
     fill_rand_host_trig_float<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, constant);
+  } else if (initialization == "uniform_trig") {
+    fill_rand_host_uniform_trig<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control);
   } else if (parse_parameterized_init(initialization, 
             {"normal_float", "norm_float", "norm_dist"}, mean, std_dev)) {
     // Can be "normal_float", "norm_float", or "norm_dist"

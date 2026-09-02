@@ -129,6 +129,8 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
     control_b = true;
   } else if (initialization == "trig_float") {
     control_a = true;
+  } else if (initialization == "uniform_trig") {
+    control_a = true;
   }
 }
 
