@@ -38,6 +38,9 @@ enum mblas_data_type_enum {
   MBLAS_R_6F_E2M3  = 31,
   MBLAS_R_6F_E3M2  = 32,
   MBLAS_R_4F_E2M1  = 33,
+  // Legacy ROCm fp8, only available on gfx942
+  MBLAS_R_8F_E4M3_FNUZ = 34,
+  MBLAS_R_8F_E5M2_FNUZ = 35,
   MBLAS_ANY = 254,
   MBLAS_NULL = 255
 };

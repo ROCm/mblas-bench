@@ -157,6 +157,7 @@ class hipblaslt_gemm : public generic_gemm {
                   std::string aStr, std::string bStr, std::string cStr,
                   std::string dStr);
   void validate_parameters();
+  void fixup_fp8_arch();
   void parse_dev_iters(std::string);
   void alloc_host();
   void alloc_dev(hipblaslt_gemm_inst *);

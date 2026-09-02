@@ -19,6 +19,13 @@ std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols,
 hipblasLtMatmulMatrixScale_t get_scale_mode(mblas_hip_data_type type);
 #endif
 
+// Architecture of the given device, with any feature suffix stripped, so
+// "gfx942:sramecc+:xnack-" is reported as "gfx942".
+std::string get_arch_name(int device);
+// True on the architectures whose only fp8 encoding is the legacy ROCm FNUZ
+// one. Everything newer implements the OCP encoding instead.
+bool arch_uses_fnuz_fp8(const std::string &arch);
+
 
 // data
 
