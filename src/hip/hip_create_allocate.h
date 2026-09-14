@@ -210,6 +210,8 @@ auto type_call_host(mblas_data_type type, Args... args)
 #if HIP_VERSION >= 70000000
     case mblas_data_type::MBLAS_R_8F_UE8M0:
       return tFunc<float>()(args...);
+    case mblas_data_type::MBLAS_R_8F_UE5M3:
+      return tFunc<float>()(args...);
     case mblas_data_type::MBLAS_R_6F_E2M3:
       return tFunc<float>()(args...);
     case mblas_data_type::MBLAS_R_6F_E3M2:
@@ -296,6 +298,8 @@ auto type_call_dev(mblas_data_type type, Args... args)
 #if HIP_VERSION >= 70000000
     // These are all typedef __hip_fp8_storage_t anyway
     case mblas_data_type::MBLAS_R_8F_UE8M0:
+      return tFunc<__hip_fp8_storage_t>()(args...);
+    case mblas_data_type::MBLAS_R_8F_UE5M3:
       return tFunc<__hip_fp8_storage_t>()(args...);
     case mblas_data_type::MBLAS_R_6F_E2M3:
       return tFunc<__hip_fp8_storage_t>()(args...);
