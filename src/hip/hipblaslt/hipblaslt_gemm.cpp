@@ -164,9 +164,42 @@ hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, st
   hipblasLtMatmulMatrixScale_t scale_mode;
   scale_size scale_size_result;
   
-  if (desc.scale_mode == scaling_type::Block) {
-    scale_type = type.get_scale_type();  // Returns MBLAS_R_8F_UE8M0 for MX
-    scale_mode = get_scale_mode(type);  // Returns VEC32_UE8M0 for MX
+  if (is_block_scaling(desc.scale_mode)) {
+    if (desc.scale_mode == scaling_type::Block) {
+      // Generic block: pick the scale mode and scale type from the data type.
+      scale_type = type.get_scale_type();  // MBLAS_R_8F_UE8M0 for MX
+      scale_mode = get_scale_mode(type);   // VEC32_UE8M0 for MX
+    } else {
+      // Explicit block format: use a fixed scale mode and scale type.
+      switch (desc.scale_mode) {
+        case scaling_type::Block_32_UE8M0:
+          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
+          scale_type = MBLAS_R_8F_UE8M0;
+          break;
+        case scaling_type::Block_16_UE8M0:
+          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT;
+          scale_type = MBLAS_R_8F_UE8M0;
+          break;
+        case scaling_type::Block_32_UE4M3:
+          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT;
+          scale_type = MBLAS_R_8F_UE4M3;
+          break;
+        case scaling_type::Block_16_UE4M3:
+          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+          scale_type = MBLAS_R_8F_UE4M3;
+          break;
+        case scaling_type::Block_32_UE5M3:
+          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT;
+          scale_type = MBLAS_R_8F_UE5M3;
+          break;
+        case scaling_type::Block_16_UE5M3:
+          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT;
+          scale_type = MBLAS_R_8F_UE5M3;
+          break;
+        default:
+          break;  // Unreachable: generic Block is handled above.
+      }
+    }
     scale_size_result = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
   } else if (type.is_fp4() || type.is_fp6()) {
     string errorString =

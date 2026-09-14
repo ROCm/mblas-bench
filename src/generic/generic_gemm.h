@@ -4,8 +4,15 @@
 #include <utility>
 
 #include "cxxopts.hpp"
-enum class scaling_type {None, Scalar, Vector, Block};
+enum class scaling_type {
+  None, Scalar, Vector, Block,
+  Block_32_UE8M0, Block_16_UE8M0,
+  Block_32_UE4M3, Block_16_UE4M3,
+  Block_32_UE5M3, Block_16_UE5M3
+};
 std::string scaling_string(scaling_type input);
+// True for the generic Block mode and every explicit Block_* format.
+bool is_block_scaling(scaling_type input);
 class generic_gemm {
  protected:
   struct matrix_desc {

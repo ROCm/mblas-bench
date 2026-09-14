@@ -168,6 +168,26 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
 
     // Calculate lengths
     scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0) {
+    // Explicit block format that cublaslt supports.
+    scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
+    scale_type = MBLAS_R_8F_UE8M0;
+    scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (desc.scale_mode == scaling_type::Block_16_UE4M3) {
+    // Explicit block format that cublaslt supports.
+    scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+    scale_type = MBLAS_R_8F_UE4M3;
+    scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (is_block_scaling(desc.scale_mode)) {
+    // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3 and Block_16_UE5M3 run
+    // only on the hipblaslt backend.
+    string errorString =
+        "Scale mode " + scaling_string(desc.scale_mode) +
+        " is only supported by the hipblaslt backend. "
+        "Use Block_32_UE8M0, Block_16_UE4M3, or the word block."
+        "\nMatrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    throw std::invalid_argument(errorString);
   } else if (type.is_fp4()) {
     string errorString =
         "Non-block scaled fp4 is not supported in cublaslt"

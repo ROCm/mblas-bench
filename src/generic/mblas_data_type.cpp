@@ -53,6 +53,7 @@ const std::map<std::string, mblas_data_type_enum> mblas_data_type::precDType = {
     {"MBLAS_R_8F_E5M2_FNUZ", mblas_data_type_enum::MBLAS_R_8F_E5M2_FNUZ},
     {"MBLAS_R_8F_UE4M3", mblas_data_type_enum::MBLAS_R_8F_UE4M3},
     {"MBLAS_R_8F_UE8M0", mblas_data_type_enum::MBLAS_R_8F_UE8M0},
+    {"MBLAS_R_8F_UE5M3", mblas_data_type_enum::MBLAS_R_8F_UE5M3},
     {"MBLAS_R_6F_E2M3", mblas_data_type_enum::MBLAS_R_6F_E2M3},
     {"MBLAS_R_6F_E3M2", mblas_data_type_enum::MBLAS_R_6F_E3M2},
     {"MBLAS_R_4F_E2M1", mblas_data_type_enum::MBLAS_R_4F_E2M1},
@@ -125,6 +126,7 @@ const std::map<std::string, mblas_data_type_enum> mblas_data_type::precDType = {
     {"HIP_R_8F_E5M2", mblas_data_type_enum::MBLAS_R_8F_E5M2},
     {"HIP_R_8F_E4M3_FNUZ", mblas_data_type_enum::MBLAS_R_8F_E4M3_FNUZ},
     {"HIP_R_8F_E5M2_FNUZ", mblas_data_type_enum::MBLAS_R_8F_E5M2_FNUZ},
+    {"HIP_R_8F_E5M3_EXT", mblas_data_type_enum::MBLAS_R_8F_UE5M3},
 };
 
 // Manually defined

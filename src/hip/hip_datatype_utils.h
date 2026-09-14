@@ -17,6 +17,9 @@
 std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, 
                                                   hipblasLtMatmulMatrixScale_t ScaleMode);
 hipblasLtMatmulMatrixScale_t get_scale_mode(mblas_hip_data_type type);
+// Elements per scale block for a given scale mode: 32 for the VEC32 modes,
+// 16 for the VEC16 modes, 1 otherwise.
+size_t scale_block_size(hipblasLtMatmulMatrixScale_t ScaleMode);
 #endif
 
 // Architecture of the given device, with any feature suffix stripped, so

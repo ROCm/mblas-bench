@@ -41,6 +41,8 @@ enum mblas_data_type_enum {
   // Legacy ROCm fp8, only available on gfx942
   MBLAS_R_8F_E4M3_FNUZ = 34,
   MBLAS_R_8F_E5M2_FNUZ = 35,
+  // Block scale factor type, 8-bit with a 5-bit exponent and 3-bit mantissa
+  MBLAS_R_8F_UE5M3 = 36,
   MBLAS_ANY = 254,
   MBLAS_NULL = 255
 };

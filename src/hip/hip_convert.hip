@@ -8,6 +8,7 @@
 #if HIP_VERSION >= 70000000
 //#include <hip/hip_fp4.h>
 #include <hip/hip_fp6.h>
+#include <hipblaslt/hipblaslt_e5m3.h>
 #endif
 #include "hip_create_allocate.h"
 #include "hip_error.h"
@@ -77,6 +78,17 @@ __global__ void float_to_ue8m0(float *input, size_t num_elements,
   }
 
   output[idx] = (__hip_fp8_storage_t)result;
+}
+
+// Convert float to UE5M3 (8-bit, 5-bit exponent, 3-bit mantissa). This scale
+// factor type has no hipDataType, so the conversion uses the hipBLASLt
+// reference struct from hipblaslt_e5m3.h.
+__global__ void float_to_ue5m3(float *input, size_t num_elements,
+                                __hip_fp8_storage_t *output)
+{
+  long idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= num_elements) return;
+  output[idx] = (__hip_fp8_storage_t)hipblaslt_e5m3(input[idx]).data;
 }
 #endif
 
@@ -213,6 +225,20 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_ue8m0<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA);
+    check_hip(hipGetLastError());
+    hipFree(tmpA);
+  }
+  else if (precision == mblas_data_type::MBLAS_R_8F_UE5M3)
+  {
+    // Allocate memory in the device for host precision (float)
+    void *tmpA;
+    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
+                         hipMemcpyHostToDevice));
+    long long num_elements = total_elements;
+    long long block_size = 256;
+    long long num_blocks = (num_elements + block_size - 1) / block_size;
+    float_to_ue5m3<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA);
     check_hip(hipGetLastError());
     hipFree(tmpA);
   }
