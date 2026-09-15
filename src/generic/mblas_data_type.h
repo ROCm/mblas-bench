@@ -15,7 +15,7 @@ class mblas_data_type {
     static const mblas_data_type MBLAS_R_16BF,    MBLAS_C_16BF;
     static const mblas_data_type MBLAS_R_8F_E4M3, MBLAS_R_8F_E5M2;
     static const mblas_data_type MBLAS_R_8F_E4M3_FNUZ, MBLAS_R_8F_E5M2_FNUZ;
-    static const mblas_data_type MBLAS_R_8F_UE4M3, MBLAS_R_8F_UE8M0;
+    static const mblas_data_type MBLAS_R_8F_UE4M3, MBLAS_R_8F_UE8M0, MBLAS_R_8F_UE5M3;
     static const mblas_data_type MBLAS_R_6F_E2M3, MBLAS_R_6F_E3M2;
     static const mblas_data_type MBLAS_R_4F_E2M1;
     static const mblas_data_type MBLAS_R_64I,     MBLAS_C_64I;
@@ -74,6 +74,7 @@ constexpr const mblas_data_type mblas_data_type::MBLAS_R_16BF{mblas_data_type_en
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_8F_E4M3{mblas_data_type_enum::MBLAS_R_8F_E4M3}, mblas_data_type::MBLAS_R_8F_E5M2{mblas_data_type_enum::MBLAS_R_8F_E5M2};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_8F_E4M3_FNUZ{mblas_data_type_enum::MBLAS_R_8F_E4M3_FNUZ}, mblas_data_type::MBLAS_R_8F_E5M2_FNUZ{mblas_data_type_enum::MBLAS_R_8F_E5M2_FNUZ};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_8F_UE4M3{mblas_data_type_enum::MBLAS_R_8F_UE4M3}, mblas_data_type::MBLAS_R_8F_UE8M0{mblas_data_type_enum::MBLAS_R_8F_UE8M0};
+constexpr const mblas_data_type mblas_data_type::MBLAS_R_8F_UE5M3{mblas_data_type_enum::MBLAS_R_8F_UE5M3};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_6F_E2M3{mblas_data_type_enum::MBLAS_R_6F_E2M3}, mblas_data_type::MBLAS_R_6F_E3M2{mblas_data_type_enum::MBLAS_R_6F_E3M2};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_4F_E2M1{mblas_data_type_enum::MBLAS_R_4F_E2M1};
 constexpr const mblas_data_type mblas_data_type::MBLAS_R_64I{mblas_data_type_enum::MBLAS_R_64I},         mblas_data_type::MBLAS_C_64I{mblas_data_type_enum::MBLAS_C_64I};

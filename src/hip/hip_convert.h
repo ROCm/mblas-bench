@@ -18,6 +18,11 @@ __global__ void float_to_fp8(float *input, size_t num_elements,
 void float_to_fp6_helper(float *input, size_t num_elements, __hip_fp8_storage_t *output, mblas_fp6_interpretation_t minterp, size_t num_blocks, size_t block_size);
 void float_to_fp4_helper(float2 *input, size_t num_elements, __hip_fp8_storage_t *output, size_t num_blocks, size_t block_size);
 __global__ void float_to_ue8m0(float *input, size_t num_elements, __hip_fp8_storage_t *output);
+#if MBLAS_WITH_HIPBLASLT
+// UE5M3 conversion needs the hipBLASLt reference header, so a rocBLAS-only
+// build leaves it out.
+__global__ void float_to_ue5m3(float *input, size_t num_elements, __hip_fp8_storage_t *output);
+#endif
 #endif
 
 void copy_and_convert(mblas_data_type precision, void *host_a, void *devA, long x,

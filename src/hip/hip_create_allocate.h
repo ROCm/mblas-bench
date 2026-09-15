@@ -13,6 +13,7 @@
 #include <type_traits>
 
 #include "generic_init.h"
+#include "hip_error.h"
 #include "mblas_data_type.h"
 
 // DEPRECATED: These functions are disabled due to cross-library malloc/free issues.
@@ -156,7 +157,7 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
   // check_cuda(cudaMalloc(&dptr, batch_count * sizeof(T *)));
   // hptr = reinterpret_cast<void **>(host);
   // check_cuda(
-  hipMemcpy(dptr, hptr, batch_count * sizeof(T *), hipMemcpyHostToDevice);
+  check_hip(hipMemcpy(dptr, hptr, batch_count * sizeof(T *), hipMemcpyHostToDevice));
 }
 
 // template <typename T>
@@ -209,6 +210,8 @@ auto type_call_host(mblas_data_type type, Args... args)
       return tFunc<float>()(args...);
 #if HIP_VERSION >= 70000000
     case mblas_data_type::MBLAS_R_8F_UE8M0:
+      return tFunc<float>()(args...);
+    case mblas_data_type::MBLAS_R_8F_UE5M3:
       return tFunc<float>()(args...);
     case mblas_data_type::MBLAS_R_6F_E2M3:
       return tFunc<float>()(args...);
@@ -296,6 +299,8 @@ auto type_call_dev(mblas_data_type type, Args... args)
 #if HIP_VERSION >= 70000000
     // These are all typedef __hip_fp8_storage_t anyway
     case mblas_data_type::MBLAS_R_8F_UE8M0:
+      return tFunc<__hip_fp8_storage_t>()(args...);
+    case mblas_data_type::MBLAS_R_8F_UE5M3:
       return tFunc<__hip_fp8_storage_t>()(args...);
     case mblas_data_type::MBLAS_R_6F_E2M3:
       return tFunc<__hip_fp8_storage_t>()(args...);

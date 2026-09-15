@@ -8,6 +8,10 @@
 #if HIP_VERSION >= 70000000
 //#include <hip/hip_fp4.h>
 #include <hip/hip_fp6.h>
+#if MBLAS_WITH_HIPBLASLT
+// This header ships with hipBLASLt only. A rocBLAS-only build does not have it.
+#include <hipblaslt/hipblaslt_e5m3.h>
+#endif
 #endif
 #include "hip_create_allocate.h"
 #include "hip_error.h"
@@ -78,6 +82,19 @@ __global__ void float_to_ue8m0(float *input, size_t num_elements,
 
   output[idx] = (__hip_fp8_storage_t)result;
 }
+
+#if MBLAS_WITH_HIPBLASLT
+// Convert float to UE5M3 (8-bit, 5-bit exponent, 3-bit mantissa). This scale
+// factor type has no hipDataType, so the conversion uses the hipBLASLt
+// reference struct from hipblaslt_e5m3.h.
+__global__ void float_to_ue5m3(float *input, size_t num_elements,
+                                __hip_fp8_storage_t *output)
+{
+  long idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= num_elements) return;
+  output[idx] = (__hip_fp8_storage_t)hipblaslt_e5m3(input[idx]).data;
+}
+#endif
 #endif
 
 // __global__ void intToInt8(__int32_t *input, size_t num_elements,
@@ -112,7 +129,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_fp16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__half *)devA);
     check_hip(hipGetLastError());
-    hipFree(tmpA);
+    check_hip(hipFree(tmpA));
   }
   else if (precision == mblas_data_type(MBLAS_C_16BF) || precision == mblas_data_type(MBLAS_R_16BF))
   {
@@ -125,7 +142,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_bf16<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (hip_bfloat16 *)devA);
     check_hip(hipGetLastError());
-    hipFree(tmpA);
+    check_hip(hipFree(tmpA));
   }
   else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 ||
            precision == mblas_data_type::MBLAS_R_8F_E5M2 ||
@@ -158,7 +175,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     }
     float_to_fp8<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA, interp);
     check_hip(hipGetLastError());
-    hipFree(tmpA);
+    check_hip(hipFree(tmpA));
   }
 #if HIP_VERSION >= 70000000
   else if (precision == mblas_data_type::MBLAS_R_4F_E2M1)
@@ -175,7 +192,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     //float_to_fp4<<<num_blocks, block_size>>>((float2 *)tmpA, num_elements, 
     //                                           (__hip_fp8_storage_t *)devA);
     check_hip(hipGetLastError());
-    hipFree(tmpA);
+    check_hip(hipFree(tmpA));
   }
   else if (precision == mblas_data_type::MBLAS_R_6F_E2M3 || precision == mblas_data_type::MBLAS_R_6F_E3M2)
   {
@@ -200,7 +217,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     // float_to_fp6<<<num_blocks, block_size>>>((float *)tmpA, num_elements,
     //                                            (__hip_fp8_storage_t *)devA, interp);
     check_hip(hipGetLastError());
-    hipFree(tmpA);
+    check_hip(hipFree(tmpA));
   }
   else if (precision == mblas_data_type::MBLAS_R_8F_UE8M0)
   {
@@ -214,8 +231,24 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     long long num_blocks = (num_elements + block_size - 1) / block_size;
     float_to_ue8m0<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA);
     check_hip(hipGetLastError());
-    hipFree(tmpA);
+    check_hip(hipFree(tmpA));
   }
+#if MBLAS_WITH_HIPBLASLT
+  else if (precision == mblas_data_type::MBLAS_R_8F_UE5M3)
+  {
+    // Allocate memory in the device for host precision (float)
+    void *tmpA;
+    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
+                         hipMemcpyHostToDevice));
+    long long num_elements = total_elements;
+    long long block_size = 256;
+    long long num_blocks = (num_elements + block_size - 1) / block_size;
+    float_to_ue5m3<<<num_blocks, block_size>>>((float *)tmpA, num_elements, (__hip_fp8_storage_t *)devA);
+    check_hip(hipGetLastError());
+    check_hip(hipFree(tmpA));
+  }
+#endif
 #endif
   else 
   {

@@ -22,14 +22,13 @@ const char *hipblas_get_error_string(hipblasStatus_t status);
 
 // Convenience function for checking CUDA runtime API results
 // can be wrapped around any runtime API call. No-op in release builds.
-static inline hipError_t check_hip(hipError_t result) {
+static inline void check_hip(hipError_t result) {
   if (result != hipSuccess) {
     std::cerr << "HIP Runtime Error: " << hipGetErrorString(result)
               << std::endl;
     // fprintf(stderr, "HIP Runtime Error: %s\n", hipGetErrorString(result));
     assert(result == hipSuccess);
   }
-  return result;
 }
 
 #if MBLAS_WITH_ROCBLAS

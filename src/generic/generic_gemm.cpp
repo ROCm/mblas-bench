@@ -233,47 +233,53 @@ void generic_gemm::set_flush_batch_count(
 
 
 scaling_type generic_gemm::set_scale_mode(string value) {
-  // Is this a digit or a word?
-  bool is_number = std::find_if(value.begin(), value.end(), ::isdigit) != value.end();
-  scaling_type out = scaling_type::None;
+  // Lowercase the value first, so the check is case insensitive.
+  string lower_val = value;
+  std::transform(lower_val.begin(), lower_val.end(), lower_val.begin(), ::tolower);
+
+  // The value is a number only when every character is a digit. A block name
+  // such as "b32_ue8m0" has digits but is not a number.
+  bool is_number = !lower_val.empty() &&
+                   std::all_of(lower_val.begin(), lower_val.end(), ::isdigit);
+
   if (is_number) {
-    switch (std::stoi(value)) {
-      //0 = none, 1 = scalar, 2 = vector, 3 = block,
-      case 0:
-        out = scaling_type::None;
-        break;
-      case 1: 
-        out = scaling_type::Scalar;
-        break;
-      case 2:
-        out = scaling_type::Vector;
-        break;
-      case 3:
-        out = scaling_type::Block;
-        break;
+    // Numbers use the hipblaslt-bench client map.
+    switch (std::stoi(lower_val)) {
+      case 0: return scaling_type::None;
+      case 1: return scaling_type::Scalar;
+      case 2: return scaling_type::Vector;
+      case 3: return scaling_type::Block_32_UE8M0;
+      case 4: return scaling_type::Block_16_UE8M0;
+      case 5: return scaling_type::Block_32_UE4M3;
+      case 6: return scaling_type::Block_16_UE4M3;
+      case 7: return scaling_type::Block_32_UE5M3;
+      case 8: return scaling_type::Block_16_UE5M3;
     }
   } else {
-    string lower_val = value;
-    //std::transform(value.begin(), value.end(), lower_val.begin(),
-    //[](unsigned char c){ return std::tolower(c); });
-    std::transform(lower_val.begin(), lower_val.end(), lower_val.begin(), ::tolower);
-    if (lower_val == "none") {
-      out = scaling_type::None;
-    } else if (lower_val == "scalar") {
-      out = scaling_type::Scalar;
-    } else if (lower_val == "vector") {
-      out = scaling_type::Vector;
-    } else if (lower_val == "block") {
-      out = scaling_type::Block;
-    }
+    // The word "block" keeps the generic mode. Each backend then picks the
+    // scale mode. An explicit name locks the format with no auto selection.
+    if (lower_val == "none")   return scaling_type::None;
+    if (lower_val == "scalar") return scaling_type::Scalar;
+    if (lower_val == "vector") return scaling_type::Vector;
+    if (lower_val == "block")  return scaling_type::Block;
+    if (lower_val == "block_32_ue8m0" || lower_val == "b32_ue8m0") return scaling_type::Block_32_UE8M0;
+    if (lower_val == "block_16_ue8m0" || lower_val == "b16_ue8m0") return scaling_type::Block_16_UE8M0;
+    if (lower_val == "block_32_ue4m3" || lower_val == "b32_ue4m3") return scaling_type::Block_32_UE4M3;
+    if (lower_val == "block_16_ue4m3" || lower_val == "b16_ue4m3") return scaling_type::Block_16_UE4M3;
+    if (lower_val == "block_32_ue5m3" || lower_val == "b32_ue5m3") return scaling_type::Block_32_UE5M3;
+    if (lower_val == "block_16_ue5m3" || lower_val == "b16_ue5m3") return scaling_type::Block_16_UE5M3;
   }
-  return out;
+
+  throw std::invalid_argument(
+      "Unknown scale mode \"" + value + "\". "
+      "Use a number (0 none, 1 scalar, 2 vector, 3 to 8 block), the word block, "
+      "or a block name such as Block_32_UE8M0 or B16_UE4M3.");
 }
 
 
 std::string generic_gemm::set_init(matrix_desc desc, std::string init, std::string mx_init) {
   // Set init if datatype is using
-  if (mx_init == "" || desc.scale_mode != scaling_type::Block) {
+  if (mx_init == "" || !is_block_scaling(desc.scale_mode)) {
     // Default to regular init if mx_init isn't specified or the scaling mode isn't block
     return init;
   }
@@ -302,13 +308,32 @@ void generic_gemm::run_solutions() {
 }
 
 std::string scaling_string(scaling_type input){
-  if (input == scaling_type::None) {
-    return "None";
-  } else if (input == scaling_type::Scalar) {
-    return "Scalar";
-  } else if (input == scaling_type::Vector) {
-    return "Vector";
-  } else if (input == scaling_type::Block) {
-    return "Block";
+  switch (input) {
+    case scaling_type::None:           return "None";
+    case scaling_type::Scalar:         return "Scalar";
+    case scaling_type::Vector:         return "Vector";
+    case scaling_type::Block:          return "Block";
+    case scaling_type::Block_32_UE8M0: return "Block_32_UE8M0";
+    case scaling_type::Block_16_UE8M0: return "Block_16_UE8M0";
+    case scaling_type::Block_32_UE4M3: return "Block_32_UE4M3";
+    case scaling_type::Block_16_UE4M3: return "Block_16_UE4M3";
+    case scaling_type::Block_32_UE5M3: return "Block_32_UE5M3";
+    case scaling_type::Block_16_UE5M3: return "Block_16_UE5M3";
+  }
+  return "Unknown";
+}
+
+bool is_block_scaling(scaling_type input) {
+  switch (input) {
+    case scaling_type::Block:
+    case scaling_type::Block_32_UE8M0:
+    case scaling_type::Block_16_UE8M0:
+    case scaling_type::Block_32_UE4M3:
+    case scaling_type::Block_16_UE4M3:
+    case scaling_type::Block_32_UE5M3:
+    case scaling_type::Block_16_UE5M3:
+      return true;
+    default:
+      return false;
   }
 }
