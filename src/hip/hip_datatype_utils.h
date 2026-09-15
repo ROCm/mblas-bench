@@ -10,7 +10,9 @@
 #include <rocblas/rocblas.h>
 #endif 
 
-#if HIP_VERSION >= 70000000
+// These scale helpers return hipBLASLt types and use its headers, so a
+// rocBLAS-only build (no hipBLASLt) leaves them out.
+#if (HIP_VERSION >= 70000000) && MBLAS_WITH_HIPBLASLT
 #include <hipblaslt/hipblaslt.h>
 #include "mblas_hip_data_type.h"
 
