@@ -8,7 +8,7 @@
 #include <string>
 using namespace std;
 
-#if HIP_VERSION >= 70000000
+#if (HIP_VERSION >= 70000000) && MBLAS_WITH_HIPBLASLT
 static size_t roundoff(size_t x, size_t granul) {
   return granul * ((x + (granul - 1)) / granul);
 }

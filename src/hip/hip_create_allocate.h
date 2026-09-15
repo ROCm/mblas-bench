@@ -13,6 +13,7 @@
 #include <type_traits>
 
 #include "generic_init.h"
+#include "hip_error.h"
 #include "mblas_data_type.h"
 
 // DEPRECATED: These functions are disabled due to cross-library malloc/free issues.
@@ -156,7 +157,7 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
   // check_cuda(cudaMalloc(&dptr, batch_count * sizeof(T *)));
   // hptr = reinterpret_cast<void **>(host);
   // check_cuda(
-  hipMemcpy(dptr, hptr, batch_count * sizeof(T *), hipMemcpyHostToDevice);
+  check_hip(hipMemcpy(dptr, hptr, batch_count * sizeof(T *), hipMemcpyHostToDevice));
 }
 
 // template <typename T>

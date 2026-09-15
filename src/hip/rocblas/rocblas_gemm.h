@@ -144,9 +144,9 @@ class rocblas_gemm : public generic_gemm {
 
  public:
   rocblas_gemm(cxxopts::ParseResult result);
-  std::string prepare_array();
+  std::string prepare_array() override;
   double test(const int &ith_solution) override;
-  std::string get_result_string();
-  virtual void free_mem();
+  std::string get_result_string() override;
+  void free_mem() override;
 
 };
