@@ -19,6 +19,7 @@ class generic_gemm {
     float scale_factor;
     scaling_type scale_mode = scaling_type::None;
     std::string init;
+    bool skip_convert{false};
   };
 
   matrix_desc a_props;

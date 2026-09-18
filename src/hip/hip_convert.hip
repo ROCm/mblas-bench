@@ -92,10 +92,17 @@ __global__ void float_to_ue8m0(float *input, size_t num_elements,
 // }
 
 void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x, long y,
-                      int batchsz, long long stride)
+                      int batchsz, long long stride, bool skip_convert)
 {
   if (batchsz * x * y == 0)
   {
+    return;
+  }
+  if (skip_convert)
+  {
+    check_hip(hipMemcpy(devA, hostA,
+                        get_malloc_size(precision, x, y, batchsz, stride, true),
+                        hipMemcpyHostToDevice));
     return;
   }
   long long base = x * y;

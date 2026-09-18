@@ -83,11 +83,18 @@ __global__ void float_to_fp4(float2 *input, size_t num_elements,
 #endif
 
 void copy_and_convert(mblas_cuda_data_type precision, void *host_a, void *devA, long x,
-                      long y, int batchsz, long long stride)
+                      long y, int batchsz, long long stride, bool skip_convert)
 {
   if (batchsz * x * y == 0)
   {
     // Matrix not used, don't copy
+    return;
+  }
+  if (skip_convert)
+  {
+    check_cuda(cudaMemcpy(devA, host_a,
+                          static_cast<size_t>(get_malloc_size(precision, x, y, batchsz, stride, true)),
+                          cudaMemcpyHostToDevice));
     return;
   }
   long hostsz = type_call_host<sizeofCUDT>(precision);
