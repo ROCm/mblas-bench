@@ -227,7 +227,8 @@ int main(int argc, char **argv) {
   opp_adder("initialization",
             "Initialize with random integers, trig functions sin and cos, or "
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
-            "uniform_dist, pow2_binomial, hpl, blasgemm, constant",
+            "uniform_dist, uniform_splitmix64, uniform_splitmix64_bits (fp4 data only), "
+            "pow2_binomial, hpl, blasgemm, constant",
             cxxopts::value<string>()->default_value("rand_int"));
   opp_adder("mx_init",
             "Initialize any MX datatypes with this initialization strategy."
@@ -236,7 +237,7 @@ int main(int argc, char **argv) {
             cxxopts::value<string>()->default_value(""));
   opp_adder("scale_init",
             "Initialize the block scaling factors with a particular distribution "
-            "Options: constant, normal_float, pow2_binomial[_n[_center]] "
+            "Options: constant, normal_float, uniform_splitmix64, pow2_binomial[_n[_center]] "
             "(pow2_binomial defaults: n=10, center=0; e.g. pow2_binomial_2_-1)",
             cxxopts::value<string>()->default_value("constant"));
   opp_adder("filename_a",

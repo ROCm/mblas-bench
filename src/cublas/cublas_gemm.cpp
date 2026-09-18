@@ -261,9 +261,9 @@ void cublas_gemm::alloc_host() {
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(c_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = malloc(get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a), false);
-    ptr_host_b[i] = malloc(get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b), false);
-    ptr_host_c[i] = malloc(get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c), false);
+    ptr_host_a[i] = malloc(get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, a_props.skip_convert));
+    ptr_host_b[i] = malloc(get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, b_props.skip_convert));
+    ptr_host_c[i] = malloc(get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, c_props.skip_convert));
   }
 }
 
@@ -278,9 +278,9 @@ void cublas_gemm::alloc_dev(cublasgemmInst *mat) {
       (void **)malloc(batch_count * flush_batch_count * type_call_dev<sizeofCUDTP>(c_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    cudaMalloc(&mat->ptr_dev_a[i], get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a), true);
-    cudaMalloc(&mat->ptr_dev_b[i], get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b), true);
-    cudaMalloc(&mat->ptr_dev_c[i], get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c), true);
+    cudaMalloc(&mat->ptr_dev_a[i], get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, true));
+    cudaMalloc(&mat->ptr_dev_b[i], get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, true));
+    cudaMalloc(&mat->ptr_dev_c[i], get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, true));
   }
 
   mat->wSZ = workspace_size;
@@ -288,11 +288,11 @@ void cublas_gemm::alloc_dev(cublasgemmInst *mat) {
 }
 
 void cublas_gemm::fill_host() {
-  type_call_host<initHost>(a_type, a_props.init, ptr_host_a, rows_a, cols_a, lda,
+  type_call_host<initHost>(a_type, a_type, a_props.init, ptr_host_a, rows_a, cols_a, lda,
                          batch_count, stride_a, flush_batch_count, control_a, constant_a, filename_a);
-  type_call_host<initHost>(b_type, b_props.init, ptr_host_b, rows_b, cols_b, ldb,
+  type_call_host<initHost>(b_type, b_type, b_props.init, ptr_host_b, rows_b, cols_b, ldb,
                          batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
-  type_call_host<initHost>(c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
+  type_call_host<initHost>(c_type, c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
                          batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
   // D is just output, don't need to init
 }

@@ -460,10 +460,10 @@ void cublaslt_gemm::alloc_host() {
       (void **)malloc(flush_batch_count * type_call_host<sizeofCUDTP>(d_type));
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = malloc(get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a), false);
-    ptr_host_b[i] = malloc(get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b), false);
-    ptr_host_c[i] = malloc(get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c), false);
-    ptr_host_d[i] = malloc(get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d), false);
+    ptr_host_a[i] = malloc(get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, a_props.skip_convert));
+    ptr_host_b[i] = malloc(get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, b_props.skip_convert));
+    ptr_host_c[i] = malloc(get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, c_props.skip_convert));
+    ptr_host_d[i] = malloc(get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d, d_props.skip_convert));
   }
 
   if (a_props.scale_mode != scaling_type::None) {
@@ -505,11 +505,11 @@ void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
   }
 
   for (int i = 0; i < flush_batch_count; i++) {
-    cudaMalloc(&mat->ptr_dev_a[i], get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a), true);
-    cudaMalloc(&mat->ptr_dev_b[i], get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b), true);
-    cudaMalloc(&mat->ptr_dev_c[i], get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c), true);
+    cudaMalloc(&mat->ptr_dev_a[i], get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, true));
+    cudaMalloc(&mat->ptr_dev_b[i], get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, true));
+    cudaMalloc(&mat->ptr_dev_c[i], get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, true));
     if (!inplace) {
-      cudaMalloc(&mat->ptr_dev_d[i], get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d), true);
+      cudaMalloc(&mat->ptr_dev_d[i], get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d, true));
     }
   }
 
@@ -538,33 +538,33 @@ void cublaslt_gemm::alloc_dev(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::fill_host() {
-  type_call_host<initHost>(a_type, a_props.init, ptr_host_a, rows_a, cols_a, lda,
+  type_call_host<initHost>(a_type, a_type, a_props.init, ptr_host_a, rows_a, cols_a, lda,
                          batch_count, stride_a, flush_batch_count, control_a, constant_a, filename_a);
-  type_call_host<initHost>(b_type, b_props.init, ptr_host_b, rows_b, cols_b, ldb,
+  type_call_host<initHost>(b_type, b_type, b_props.init, ptr_host_b, rows_b, cols_b, ldb,
                          batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
-  type_call_host<initHost>(c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
+  type_call_host<initHost>(c_type, c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
                          batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
   // D is just output, don't need to init
   if (a_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(a_scale_type, scale_init, scale_host_a,
+    type_call_host<initHost>(a_scale_type, a_scale_type, scale_init, scale_host_a,
                              a_scale_size.rows, a_scale_size.cols, a_scale_size.rows,
                              batch_count, (long long)a_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_a, string(""));
   }
   if (b_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(b_scale_type, scale_init, scale_host_b,
+    type_call_host<initHost>(b_scale_type, b_scale_type, scale_init, scale_host_b,
                              b_scale_size.rows, b_scale_size.cols, b_scale_size.rows,
                              batch_count, (long long)b_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_b, string(""));
   }
   if (c_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(c_scale_type, scale_init, scale_host_c,
+    type_call_host<initHost>(c_scale_type, c_scale_type, scale_init, scale_host_c,
                              c_scale_size.rows, c_scale_size.cols, c_scale_size.rows,
                              batch_count, (long long)c_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_c, string(""));
   }
   if (d_props.scale_mode != scaling_type::None) {
-    type_call_host<initHost>(d_scale_type, scale_init, scale_host_d,
+    type_call_host<initHost>(d_scale_type, d_scale_type, scale_init, scale_host_d,
                              d_scale_size.rows, d_scale_size.cols, d_scale_size.rows,
                              batch_count, (long long)d_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_d, string(""));

@@ -8,6 +8,15 @@
 #include <vector>
 #include <string>
 #include <omp.h>
+#include <cstdint>
+#include <stdexcept>
+
+#include "mblas_data_type.h"
+
+// Defined per-backend in {cublas,hip}_create_allocate.cpp. Declared here so the
+// raw-bits init can size its contiguous fill to the packed device allocation.
+long long get_malloc_size(mblas_data_type type, long x, long y, int batch,
+                          long long stride, bool use_dev_type);
 
 // Rand int gen
 template <typename T>
@@ -145,6 +154,54 @@ void fill_rand_host_uniform(void **ptr_array, long rows_A, long cols_A, long ld,
   }
 }
 
+// Type 2: uniform float fill. Values are produced as floats and left for the
+// existing float->target conversion (copy_and_convert) to quantize.
+template <typename T>
+void fill_rand_host_uniform_splitmix64(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
+                                       long long int stride, int flush_batch_count,
+                                       float min_val, float max_val, uint64_t seed) {
+  #pragma omp parallel for collapse(4)
+  for (int flush_idx = 0; flush_idx < flush_batch_count; flush_idx++) {
+    for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+      for (size_t j = 0; j < cols_A; ++j) {
+        for (size_t i = 0; i < rows_A; ++i) {
+          T *A = (T *)ptr_array[flush_idx];
+          uint64_t element_offset = (uint64_t)i + (uint64_t)j * (uint64_t)ld
+                                  + (uint64_t)i_batch * (uint64_t)stride;
+          uint64_t buffer_elements = (uint64_t)stride * (uint64_t)(batch - 1)
+                                   + (uint64_t)ld * (uint64_t)cols_A;
+          uint64_t x = seed
+                     + (uint64_t)flush_idx * buffer_elements * sizeof(T)
+                     + element_offset * sizeof(T);
+          x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+          x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+          x = x ^ (x >> 31);
+          float u = (float)(x >> 40) * (1.0f / 16777216.0f);
+          A[i + j * ld + i_batch * stride] = (T)(u * (max_val - min_val) + min_val);
+        }
+      }
+    }
+  }
+}
+
+// Type 1: raw random bits filling the packed device-sized host buffer contiguously.
+// nbytes must equal the packed device allocation size (get_malloc_size(..., true)).
+// dtype-agnostic: copy_and_convert copies these bytes verbatim (honored for fp4).
+inline void fill_rand_host_uniform_splitmix64_bits(void **ptr_array, long long nbytes,
+                                                   int flush_batch_count, uint64_t seed) {
+  #pragma omp parallel for collapse(2)
+  for (int flush_idx = 0; flush_idx < flush_batch_count; flush_idx++) {
+    for (long long byte = 0; byte < nbytes; byte++) {
+      uint64_t x = seed + (uint64_t)flush_idx * (uint64_t)nbytes
+                 + (uint64_t)byte;
+      x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+      x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+      x = x ^ (x >> 31);
+      ((uint8_t *)ptr_array[flush_idx])[byte] = (uint8_t)(x >> 56);
+    }
+  }
+}
+
 template <typename T>
 void fill_rand_host_pow2_binomial(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
                                    long long int stride, int flush_batch_count, int n = 10, int center = 0) {
@@ -236,7 +293,7 @@ void fill_rand_host_csv(void **ptr_array, long rows_A, long cols_A, long ld, int
 
 template <typename T>
 struct initHost {
-  void operator()(std::string initialization, void **ptr_array, long rows_A, long cols_A,
+  void operator()(mblas_data_type type, std::string initialization, void **ptr_array, long rows_A, long cols_A,
                   long ld, int batch, long long int stride, int flush_batch_count,
                   bool control = false, float constant = 0.f, std::string filename = "");
 };
@@ -248,7 +305,7 @@ bool parse_parameterized_init(const std::string& initialization,
                            Args&... default_and_output_params);
 
 template <typename T>
-void initHost<T>::operator()(std::string initialization, void **ptr_array, long rows_A,
+void initHost<T>::operator()(mblas_data_type type, std::string initialization, void **ptr_array, long rows_A,
                              long cols_A, long ld, int batch,
                              long long int stride, int flush_batch_count, bool control,
                              float constant, std::string filename) {
@@ -277,6 +334,26 @@ void initHost<T>::operator()(std::string initialization, void **ptr_array, long 
       fill_rand_host_normal_float<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, mean, std_dev);
     } else {
       std::string error_string = "Error: normal distribution not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  } else if (initialization == "uniform_splitmix64_bits") {
+    if (!type.is_fp4()) {
+      throw std::invalid_argument(
+          "uniform_splitmix64_bits is only supported for fp4.");
+    }
+    // Type 1: raw random bits sized to the packed device buffer. copy_and_convert
+    // copies them verbatim (honored for fp4 only). Fixed seed 2024; the fill
+    // applies the per-rotating-buffer offset internally. Checked before the
+    // "uniform_splitmix64" prefix branch below so it is not swallowed by it.
+    long long nbytes = get_malloc_size(type, ld, cols_A, batch, stride, /*use_dev_type=*/true);
+    fill_rand_host_uniform_splitmix64_bits(ptr_array, nbytes, flush_batch_count, 2024);
+  } else if (parse_parameterized_init(initialization, {"uniform_splitmix64"}, min_val, max_val)) {
+    // Type 2: uniform float via splitmix64 (deterministic). Checked before the
+    // "uniform" branch below because "uniform" is a prefix of this name.
+    if constexpr (std::is_floating_point_v<T>) {
+      fill_rand_host_uniform_splitmix64<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, min_val, max_val, 2024);
+    } else {
+      std::string error_string = "Error: uniform_splitmix64 distribution not supported for non-floating-point types";
       throw std::invalid_argument(error_string);
     }
   } else if (parse_parameterized_init(initialization, 
