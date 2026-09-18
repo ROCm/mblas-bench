@@ -533,11 +533,11 @@ void hipblaslt_gemm::alloc_host() {
 
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = malloc(get_malloc_size_host(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
-    ptr_host_b[i] = malloc(get_malloc_size_host(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
-    ptr_host_c[i] = malloc(get_malloc_size_host(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
+    ptr_host_a[i] = malloc(get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, false));
+    ptr_host_b[i] = malloc(get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, false));
+    ptr_host_c[i] = malloc(get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, false));
     if (!inplace) {
-      ptr_host_d[i] = malloc(get_malloc_size_host(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+      ptr_host_d[i] = malloc(get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d, false));
     }
   }
   
@@ -582,11 +582,11 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
   }
 
   for (int i = 0; i < flush_batch_count; i++) {
-    check_hip(hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a)));
-    check_hip(hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b)));
-    check_hip(hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c)));
+    check_hip(hipMalloc(&mat->ptr_dev_a[i], get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, true)));
+    check_hip(hipMalloc(&mat->ptr_dev_b[i], get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, true)));
+    check_hip(hipMalloc(&mat->ptr_dev_c[i], get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, true)));
     if (!inplace) {
-      check_hip(hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d)));
+      check_hip(hipMalloc(&mat->ptr_dev_d[i], get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d, true)));
     }
   }
   mat->wSZ = workspace_size;
