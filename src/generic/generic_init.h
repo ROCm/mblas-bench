@@ -199,21 +199,9 @@ void fill_rand_host_trig_float(void **ptr_array, long rows_A, long cols_A, long 
   }
 }
 
-// uniform_trig data initialization.
-//
-// Fills each operand by:
-//   1. drawing a UNIFORM RANDOM value in [0, MxK) for A (or [0, NxK) for B)
-//      i.e. over the matrix's element count, the same span the element index
-//      would cover, but randomized rather than sequential;
-//   2. passing that value through sinf()/cosf() (single precision);
-//   3. storing the f32 result. The caller's f32 -> fp8/bf16/fp4 convert then
-//      snaps to the nearest representable value (round-to-nearest).
-// There is NO scaling factor. isSin selects sinf over cosf (A uses sin, B uses
-// cos by default via the 'control' flag, matching trig_float's A/B split).
-//
-// NOTE: this is DISTINCT from a trig init that feeds the *sequential* element
-// index to sin() (e.g. trig_float); uniform_trig feeds a *uniform random*
-// argument instead. Each rotating copy is filled with an independent random draw.
+// Draw a uniform value in [0, rows*cols) and store sin or cos of it.
+// isSin selects sin for A and cos for B, the same split as trig_float.
+// Each rotating copy uses an independent draw.
 template <typename T>
 void fill_rand_host_uniform_trig(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
                                  long long int stride, int flush_batch_count,
