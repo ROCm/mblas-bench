@@ -7,6 +7,7 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <cmath>
 #include <omp.h>
 
 // Rand int gen
@@ -198,6 +199,37 @@ void fill_rand_host_trig_float(void **ptr_array, long rows_A, long cols_A, long 
   }
 }
 
+// Draw a uniform value in [0, rows*cols) and store sin or cos of it.
+// isSin selects sin for A and cos for B, the same split as trig_float.
+// Each rotating copy uses an independent draw.
+template <typename T>
+void fill_rand_host_uniform_trig(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
+                                 long long int stride, int flush_batch_count,
+                                 bool isSin) {
+  std::random_device r;
+  int random_dev_seed = r();
+  const long long span = static_cast<long long>(rows_A) * static_cast<long long>(cols_A);
+  #pragma omp parallel
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<float> dist(0.0f, static_cast<float>(span));
+    #pragma omp for collapse(4)
+    for (int flush_idx = 0; flush_idx < flush_batch_count; flush_idx++) {
+      for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+        for (size_t j = 0; j < cols_A; ++j) {
+          for (size_t i = 0; i < rows_A; ++i) {
+            T *A = (T *)ptr_array[flush_idx];
+            T x = T(dist(gen));
+            T val = isSin ? std::sin(x) : std::cos(x);
+            A[i + j * ld + i_batch * stride] = val;
+          }
+        }
+      }
+    }
+  }
+}
+
 template <typename T>
 void fill_rand_host_csv(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
                          long long int stride, int flush_batch_count, std::string filename) {
@@ -268,7 +300,19 @@ void initHost<T>::operator()(std::string initialization, void **ptr_array, long 
     std::random_device r;
     fill_rand_host_rand_int_alternating<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, r());
   } else if (initialization == "trig_float") {
-    fill_rand_host_trig_float<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, constant);
+    if constexpr (std::is_floating_point_v<T>) {
+      fill_rand_host_trig_float<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, constant);
+    } else {
+      std::string error_string = "Error: trig_float not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
+  } else if (initialization == "uniform_trig") {
+    if constexpr (std::is_floating_point_v<T>) {
+      fill_rand_host_uniform_trig<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control);
+    } else {
+      std::string error_string = "Error: uniform_trig not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
   } else if (parse_parameterized_init(initialization, 
             {"normal_float", "norm_float", "norm_dist"}, mean, std_dev)) {
     // Can be "normal_float", "norm_float", or "norm_dist"
