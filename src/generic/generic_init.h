@@ -300,9 +300,19 @@ void initHost<T>::operator()(std::string initialization, void **ptr_array, long 
     std::random_device r;
     fill_rand_host_rand_int_alternating<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, r());
   } else if (initialization == "trig_float") {
-    fill_rand_host_trig_float<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, constant);
+    if constexpr (std::is_floating_point_v<T>) {
+      fill_rand_host_trig_float<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control, constant);
+    } else {
+      std::string error_string = "Error: trig_float not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
   } else if (initialization == "uniform_trig") {
-    fill_rand_host_uniform_trig<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control);
+    if constexpr (std::is_floating_point_v<T>) {
+      fill_rand_host_uniform_trig<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, control);
+    } else {
+      std::string error_string = "Error: uniform_trig not supported for non-floating-point types";
+      throw std::invalid_argument(error_string);
+    }
   } else if (parse_parameterized_init(initialization, 
             {"normal_float", "norm_float", "norm_dist"}, mean, std_dev)) {
     // Can be "normal_float", "norm_float", or "norm_dist"
