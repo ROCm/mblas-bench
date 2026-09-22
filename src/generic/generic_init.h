@@ -208,21 +208,21 @@ void fill_rand_host_uniform_trig(void **ptr_array, long rows_A, long cols_A, lon
                                  bool isSin) {
   std::random_device r;
   int random_dev_seed = r();
-  const double span = (double)rows_A * (double)cols_A;   // MxK for A, NxK for B
+  const long long span = static_cast<long long>(rows_A) * static_cast<long long>(cols_A);
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
     std::mt19937 gen(seed);
-    std::uniform_real_distribution<float> dist(0.0f, (float)span);
+    std::uniform_real_distribution<float> dist(0.0f, static_cast<float>(span));
     #pragma omp for collapse(4)
     for (int flush_idx = 0; flush_idx < flush_batch_count; flush_idx++) {
       for (size_t i_batch = 0; i_batch < batch; i_batch++) {
         for (size_t j = 0; j < cols_A; ++j) {
           for (size_t i = 0; i < rows_A; ++i) {
             T *A = (T *)ptr_array[flush_idx];
-            float x = dist(gen);                           // uniform in [0, MxK)
-            float val = isSin ? sinf(x) : cosf(x);         // sinf/cosf
-            A[i + j * ld + i_batch * stride] = (T)val;
+            T x = T(dist(gen));
+            T val = isSin ? std::sin(x) : std::cos(x);
+            A[i + j * ld + i_batch * stride] = val;
           }
         }
       }
