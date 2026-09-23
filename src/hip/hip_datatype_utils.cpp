@@ -16,12 +16,16 @@ static size_t roundoff(size_t x, size_t granul) {
 size_t scale_block_size(hipblasLtMatmulMatrixScale_t ScaleMode) {
   switch (ScaleMode) {
     case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0:
+#if HIP_VERSION >= 71300000
     case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT:
     case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT:
+#endif
       return 32;
     case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3:
+#if HIP_VERSION >= 71300000
     case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT:
     case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT:
+#endif
       return 16;
     default:
       return 1;

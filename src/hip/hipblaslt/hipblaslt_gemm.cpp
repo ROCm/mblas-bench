@@ -176,16 +176,17 @@ hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, st
           scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
           scale_type = MBLAS_R_8F_UE8M0;
           break;
+        case scaling_type::Block_16_UE4M3:
+          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+          scale_type = MBLAS_R_8F_UE4M3;
+          break;
+#if HIP_VERSION >= 71300000
         case scaling_type::Block_16_UE8M0:
           scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT;
           scale_type = MBLAS_R_8F_UE8M0;
           break;
         case scaling_type::Block_32_UE4M3:
           scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT;
-          scale_type = MBLAS_R_8F_UE4M3;
-          break;
-        case scaling_type::Block_16_UE4M3:
-          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
           scale_type = MBLAS_R_8F_UE4M3;
           break;
         case scaling_type::Block_32_UE5M3:
@@ -196,8 +197,17 @@ hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, st
           scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT;
           scale_type = MBLAS_R_8F_UE5M3;
           break;
-        default:
-          break;  // Unreachable: generic Block is handled above.
+#endif
+        default: {
+          // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3 and Block_16_UE5M3
+          // need hipBLASLt from ROCm 7.13 or newer.
+          string errorString =
+              "Scale mode not supported by the hipBLASLt in this ROCm version."
+              "\nMatrix: " + matrix_id +
+              "\nRequested scale mode: " + scaling_string(desc.scale_mode) +
+              "\nUse Block_32_UE8M0, Block_16_UE4M3, or the word block, or build with ROCm 7.13 or newer.";
+          throw std::invalid_argument(errorString);
+        }
       }
     }
     scale_size_result = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);

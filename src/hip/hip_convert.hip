@@ -8,8 +8,9 @@
 #if HIP_VERSION >= 70000000
 //#include <hip/hip_fp4.h>
 #include <hip/hip_fp6.h>
-#if MBLAS_WITH_HIPBLASLT
-// This header ships with hipBLASLt only. A rocBLAS-only build does not have it.
+#if MBLAS_WITH_HIPBLASLT && (HIP_VERSION >= 71300000)
+// This header ships with hipBLASLt only, starting in ROCm 7.13. A rocBLAS-only
+// build does not have it.
 #include <hipblaslt/hipblaslt_e5m3.h>
 #endif
 #endif
@@ -83,7 +84,7 @@ __global__ void float_to_ue8m0(float *input, size_t num_elements,
   output[idx] = (__hip_fp8_storage_t)result;
 }
 
-#if MBLAS_WITH_HIPBLASLT
+#if MBLAS_WITH_HIPBLASLT && (HIP_VERSION >= 71300000)
 // Convert float to UE5M3 (8-bit, 5-bit exponent, 3-bit mantissa). This scale
 // factor type has no hipDataType, so the conversion uses the hipBLASLt
 // reference struct from hipblaslt_e5m3.h.
@@ -233,7 +234,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     check_hip(hipGetLastError());
     check_hip(hipFree(tmpA));
   }
-#if MBLAS_WITH_HIPBLASLT
+#if MBLAS_WITH_HIPBLASLT && (HIP_VERSION >= 71300000)
   else if (precision == mblas_data_type::MBLAS_R_8F_UE5M3)
   {
     // Allocate memory in the device for host precision (float)
