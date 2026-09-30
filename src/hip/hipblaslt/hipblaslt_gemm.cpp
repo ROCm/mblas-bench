@@ -25,6 +25,26 @@ using std::string;
 using std::thread;
 using std::vector;
 
+#if HIP_VERSION >= 70000000
+namespace {
+scaling_type resolved_scaling_type(scaling_type requested, hipblasLtMatmulMatrixScale_t mode) {
+  if (requested == scaling_type::None)
+    return requested;
+  switch (mode) {
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0: return scaling_type::Block_32_UE8M0;
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3: return scaling_type::Block_16_UE4M3;
+#if HIP_VERSION >= 71300000
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT: return scaling_type::Block_16_UE8M0;
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT: return scaling_type::Block_32_UE4M3;
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT: return scaling_type::Block_32_UE5M3;
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT: return scaling_type::Block_16_UE5M3;
+#endif
+    default: return requested;
+  }
+}
+}  // namespace
+#endif
+
 // clang-format off
 std::vector<matmul_prec_type> hipblaslt_gemm::matmul_supported = {
   // Compute type                 Scale Type    A Type        B Type        C Type        D Type        Bias Type
@@ -362,6 +382,10 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
     std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
     std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
     std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
+    scale_mode_a = resolved_scaling_type(scale_mode_a, a_scale_mode);
+    scale_mode_b = resolved_scaling_type(scale_mode_b, b_scale_mode);
+    scale_mode_c = resolved_scaling_type(scale_mode_c, c_scale_mode);
+    scale_mode_d = resolved_scaling_type(scale_mode_d, d_scale_mode);
   }
 #endif
   
@@ -460,6 +484,8 @@ string hipblaslt_gemm::prepare_array() {
   if (batched) {
     ossHeader << "batch_count,";
   }
+  //ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,";
+  ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "solution_index,";
   ossHeader << "hipBLASLt-Gflops,hipBLASLt-GB/s,hipBLASLt-us," << endl;
   return ossHeader.str();
@@ -849,6 +875,17 @@ std::string hipblaslt_gemm::get_result_string() {
   if (batched) {
     ossValues << batch_count << ',';
   }
+  //auto scale_type_string = [&](scaling_type mode, const mblas_hip_data_type &type) {
+  //  return (use_scaling && mode != scaling_type::None) ? type.to_string() : string("None");
+  //};
+  //ossValues << scale_type_string(scale_mode_a, a_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_b, b_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_c, c_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_d, d_scale_type) << ',';
+  ossValues << scaling_string(scale_mode_a) << ',';
+  ossValues << scaling_string(scale_mode_b) << ',';
+  ossValues << scaling_string(scale_mode_c) << ',';
+  ossValues << scaling_string(scale_mode_d) << ',';
   ossValues << current_solution_index << ',';
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';

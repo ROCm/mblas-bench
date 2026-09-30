@@ -57,6 +57,18 @@ bool any_selected_device_requires_fp8_tn(const std::vector<cublaslt_gemm_inst>& 
   return false;
 }
 
+#if (ENABLE_CUDA_FP4)
+scaling_type resolved_scaling_type(scaling_type requested, cublasLtMatmulMatrixScale_t mode) {
+  if (requested == scaling_type::None)
+    return requested;
+  switch (mode) {
+    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0: return scaling_type::Block_32_UE8M0;
+    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3: return scaling_type::Block_16_UE4M3;
+    default: return requested;
+  }
+}
+#endif
+
 }  // namespace
 
 // clang-format off
@@ -274,6 +286,10 @@ void cublaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
   std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
   std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
   std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
+  scale_mode_a = resolved_scaling_type(scale_mode_a, a_scale_mode);
+  scale_mode_b = resolved_scaling_type(scale_mode_b, b_scale_mode);
+  scale_mode_c = resolved_scaling_type(scale_mode_c, c_scale_mode);
+  scale_mode_d = resolved_scaling_type(scale_mode_d, d_scale_mode);
 #endif
 }
 
@@ -443,7 +459,8 @@ string cublaslt_gemm::prepare_array() {
   // }
   ossHeader << "alpha,beta,";
   ossHeader << "a_type,b_type,c_type,d_type,compute_type,scalar_type,";
-  ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
+  //ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,";
+  ossHeader << "bias_type,";
   ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
   ossHeader << "solution_index,";
@@ -897,10 +914,13 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << d_type.to_string() << ',';
   ossValues << compute.to_string() << ',';
   ossValues << scalar.to_string() << ',';
-  ossValues << a_scale_type.to_string() << ',';
-  ossValues << b_scale_type.to_string() << ',';
-  ossValues << c_scale_type.to_string() << ',';
-  ossValues << d_scale_type.to_string() << ',';
+  //auto scale_type_string = [&](scaling_type mode, const mblas_cuda_data_type &type) {
+  //  return (use_scaling && mode != scaling_type::None) ? type.to_string() : string("None");
+  //};
+  //ossValues << scale_type_string(scale_mode_a, a_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_b, b_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_c, c_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_d, d_scale_type) << ',';
   ossValues << bias_type.to_string() << ',';
   ossValues << scaling_string(scale_mode_a) << ',';
   ossValues << scaling_string(scale_mode_b) << ',';
