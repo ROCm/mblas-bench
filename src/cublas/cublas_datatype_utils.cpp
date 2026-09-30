@@ -34,13 +34,13 @@ std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, cublasLtMatm
     return std::pair<size_t, size_t>(1, 1);
 
   if (ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0 || ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3) {
-    static const size_t S_VSCALE = ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0 ? 32 : 16;
-    static const size_t S_BLOCK_COLS = 32;
-    static const size_t S_BLOCK_ROWS = 4;
-    static const size_t S_BLOCK_INNER = 4;
+    const size_t S_VSCALE = ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0 ? 32 : 16;
+    const size_t S_BLOCK_COLS = 32;
+    const size_t S_BLOCK_ROWS = 4;
+    const size_t S_BLOCK_INNER = 4;
 
-    static const size_t BLOCK_ROWS = S_BLOCK_INNER * S_VSCALE;
-    static const size_t BLOCK_COLS = S_BLOCK_COLS * S_BLOCK_ROWS;
+    const size_t BLOCK_ROWS = S_BLOCK_INNER * S_VSCALE;
+    const size_t BLOCK_COLS = S_BLOCK_COLS * S_BLOCK_ROWS;
 
     size_t s_rows = roundoff(size_t(rows), BLOCK_ROWS) / S_VSCALE;
     size_t s_cols = roundoff(size_t(cols), BLOCK_COLS);
