@@ -270,6 +270,8 @@ scaling_type generic_gemm::set_scale_mode(string value) {
     if (lower_val == "block_16_ue4m3" || lower_val == "b16_ue4m3") return scaling_type::Block_16_UE4M3;
     if (lower_val == "block_32_ue5m3" || lower_val == "b32_ue5m3") return scaling_type::Block_32_UE5M3;
     if (lower_val == "block_16_ue5m3" || lower_val == "b16_ue5m3") return scaling_type::Block_16_UE5M3;
+    if (lower_val == "block_32_ue8m0_k4" || lower_val == "b32_ue8m0_k4") return scaling_type::Block_32_UE8M0_K4;
+    if (lower_val == "block_128_ue8m0_k4" || lower_val == "b128_ue8m0_k4") return scaling_type::Block_128_UE8M0_K4;
   }
 
   throw std::invalid_argument(
@@ -321,6 +323,8 @@ std::string scaling_string(scaling_type input){
     case scaling_type::Block_16_UE4M3: return "Block_16_UE4M3";
     case scaling_type::Block_32_UE5M3: return "Block_32_UE5M3";
     case scaling_type::Block_16_UE5M3: return "Block_16_UE5M3";
+    case scaling_type::Block_32_UE8M0_K4:  return "Block_32_UE8M0_K4";
+    case scaling_type::Block_128_UE8M0_K4: return "Block_128_UE8M0_K4";
   }
   return "Unknown";
 }
@@ -334,6 +338,8 @@ bool is_block_scaling(scaling_type input) {
     case scaling_type::Block_16_UE4M3:
     case scaling_type::Block_32_UE5M3:
     case scaling_type::Block_16_UE5M3:
+    case scaling_type::Block_32_UE8M0_K4:
+    case scaling_type::Block_128_UE8M0_K4:
       return true;
     default:
       return false;

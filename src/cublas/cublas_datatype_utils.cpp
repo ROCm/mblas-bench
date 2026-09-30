@@ -48,6 +48,22 @@ std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, cublasLtMatm
     return std::pair<size_t, size_t>(s_rows, s_cols);
   }
 
+#if defined(HAS_CUBLASLT_SCALE_MN_K4)
+  // MN x K4 layout: rows is the K (inner) dimension, cols is M or N (outer).
+  // https://docs.nvidia.com/cuda/cublas/index.html#d-block-scaling-factors-mn-x-k4-layout-experimental
+  if (ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_MN_K4_UE8M0 || ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_VEC128_MN_K4_UE8M0) {
+    const size_t S_VSCALE = ScaleMode == CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_MN_K4_UE8M0 ? 32 : 128;
+    const size_t K_PACK = 4;
+    const size_t MN_PAD = 4;
+
+    size_t sf_k = roundoff(size_t(rows), S_VSCALE) / S_VSCALE;
+    size_t s_rows = roundoff(sf_k, K_PACK);
+    size_t s_cols = roundoff(size_t(cols), MN_PAD);
+
+    return std::pair<size_t, size_t>(s_rows, s_cols);
+  }
+#endif
+
   return std::pair<size_t, size_t>(0, 0);
 }
 #endif

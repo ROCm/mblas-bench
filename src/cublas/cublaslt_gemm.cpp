@@ -64,6 +64,10 @@ scaling_type resolved_scaling_type(scaling_type requested, cublasLtMatmulMatrixS
   switch (mode) {
     case CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0: return scaling_type::Block_32_UE8M0;
     case CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3: return scaling_type::Block_16_UE4M3;
+#if defined(HAS_CUBLASLT_SCALE_MN_K4)
+    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_MN_K4_UE8M0:  return scaling_type::Block_32_UE8M0_K4;
+    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC128_MN_K4_UE8M0: return scaling_type::Block_128_UE8M0_K4;
+#endif
     default: return requested;
   }
 }
@@ -190,13 +194,41 @@ std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublas
     scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
     scale_type = MBLAS_R_8F_UE4M3;
     scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
-  } else if (is_block_scaling(desc.scale_mode)) {
-    // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3 and Block_16_UE5M3 run
-    // only on the hipblaslt backend.
+#if defined(HAS_CUBLASLT_SCALE_MN_K4)
+  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0_K4 ||
+             desc.scale_mode == scaling_type::Block_128_UE8M0_K4) {
+    scale_mode = (desc.scale_mode == scaling_type::Block_32_UE8M0_K4)
+                     ? CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_MN_K4_UE8M0
+                     : CUBLASLT_MATMUL_MATRIX_SCALE_VEC128_MN_K4_UE8M0;
+    scale_type = MBLAS_R_8F_UE8M0;
+    // cuBLASLt decides what it supports; only warn about documented limits.
+    if (matrix_id == "A" || matrix_id == "B") {
+      scale_size = get_scale_tensor_size(k, (matrix_id == "A") ? m : n, scale_mode);
+    } else {
+      std::cerr << "Warning: cuBLASLt documents K4 scale modes for A and B only. Matrix: "
+                << matrix_id << std::endl;
+      scale_size = get_scale_tensor_size(m, n, scale_mode);
+    }
+    if (!type.is_fp8()) {
+      std::cerr << "Warning: cuBLASLt documents K4 scale modes for FP8 only. Matrix: "
+                << matrix_id << ", type: " << type.to_string() << std::endl;
+    }
+#endif
+  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0_K4 ||
+             desc.scale_mode == scaling_type::Block_128_UE8M0_K4) {
     string errorString =
         "Scale mode " + scaling_string(desc.scale_mode) +
-        " is only supported by the hipblaslt backend. "
-        "Use Block_32_UE8M0, Block_16_UE4M3, or the word block."
+        " needs cuBLAS 13.4 or newer. This build does not have it."
+        "\nMatrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    throw std::invalid_argument(errorString);
+  } else if (is_block_scaling(desc.scale_mode)) {
+    // cuBLASLt has no scale mode for Block_16_UE8M0, Block_32_UE4M3,
+    // Block_32_UE5M3 or Block_16_UE5M3.
+    string errorString =
+        "Scale mode " + scaling_string(desc.scale_mode) +
+        " is not supported by the cublaslt backend. "
+        "Use Block_32_UE8M0, Block_16_UE4M3, Block_32_UE8M0_K4, Block_128_UE8M0_K4, or the word block."
         "\nMatrix: " + matrix_id +
         "\nType: " + type.to_string();
     throw std::invalid_argument(errorString);

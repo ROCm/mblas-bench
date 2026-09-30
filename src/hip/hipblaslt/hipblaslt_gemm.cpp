@@ -218,6 +218,14 @@ hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, st
           scale_type = MBLAS_R_8F_UE5M3;
           break;
 #endif
+        case scaling_type::Block_32_UE8M0_K4:
+        case scaling_type::Block_128_UE8M0_K4: {
+          string errorString =
+              "Scale mode " + scaling_string(desc.scale_mode) +
+              " is only supported by the cublaslt backend."
+              "\nMatrix: " + matrix_id;
+          throw std::invalid_argument(errorString);
+        }
         default: {
           // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3 and Block_16_UE5M3
           // need hipBLASLt from ROCm 7.13 or newer.
