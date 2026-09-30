@@ -33,7 +33,6 @@ enum mblas_data_type_enum {
   MBLAS_C_64U   = 27,
   MBLAS_R_8F_E4M3 = 28,
   MBLAS_R_8F_E5M2 = 29,
-  MBLAS_R_8F_UE4M3 = MBLAS_R_8F_E4M3,
   MBLAS_R_8F_UE8M0 = 30,
   MBLAS_R_6F_E2M3  = 31,
   MBLAS_R_6F_E3M2  = 32,
@@ -43,6 +42,8 @@ enum mblas_data_type_enum {
   MBLAS_R_8F_E5M2_FNUZ = 35,
   // Block scale factor type, 8-bit with a 5-bit exponent and 3-bit mantissa
   MBLAS_R_8F_UE5M3 = 36,
+  // Block scale factor type, unsigned E4M3 (the NVFP4 scale type)
+  MBLAS_R_8F_UE4M3 = 37,
   MBLAS_ANY = 254,
   MBLAS_NULL = 255
 };

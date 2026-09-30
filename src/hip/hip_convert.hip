@@ -148,7 +148,8 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   else if (precision == mblas_data_type::MBLAS_R_8F_E4M3 ||
            precision == mblas_data_type::MBLAS_R_8F_E5M2 ||
            precision == mblas_data_type::MBLAS_R_8F_E4M3_FNUZ ||
-           precision == mblas_data_type::MBLAS_R_8F_E5M2_FNUZ)
+           precision == mblas_data_type::MBLAS_R_8F_E5M2_FNUZ ||
+           precision == mblas_data_type::MBLAS_R_8F_UE4M3)
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
@@ -158,7 +159,8 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
     long long block_size = 256;
     long long num_blocks = (num_elements + block_size - 1) / block_size;
     __hip_fp8_interpretation_t interp;
-    if (precision == mblas_data_type::MBLAS_R_8F_E4M3)
+    if (precision == mblas_data_type::MBLAS_R_8F_E4M3 ||
+        precision == mblas_data_type::MBLAS_R_8F_UE4M3)
     {
       interp = __HIP_E4M3;
     }

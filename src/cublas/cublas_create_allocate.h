@@ -212,8 +212,8 @@ auto type_call_host(mblas_data_type type, Args... args)
       return tFunc<std::complex<float>>()(args...);
     case mblas_data_type::MBLAS_R_8F_E4M3:
       return tFunc<float>()(args...);
-    //case mblas_data_type::MBLAS_R_8F_UE4M3:
-    //  return tFunc<float>()(args...);
+    case mblas_data_type::MBLAS_R_8F_UE4M3:
+      return tFunc<float>()(args...);
     case mblas_data_type::MBLAS_R_8F_E5M2:
       return tFunc<float>()(args...);
     case mblas_data_type::MBLAS_R_4F_E2M1:
@@ -258,8 +258,8 @@ auto type_call_dev(mblas_data_type type, Args... args)
       return tFunc<std::complex<__half>>()(args...);
     case mblas_data_type::MBLAS_R_8F_E4M3:
       return tFunc<__nv_fp8_e4m3>()(args...);
-    //case mblas_data_type::MBLAS_R_8F_UE4M3:
-    //  return tFunc<__nv_fp8_e4m3>()(args...);
+    case mblas_data_type::MBLAS_R_8F_UE4M3:
+      return tFunc<__nv_fp8_e4m3>()(args...);
     case mblas_data_type::MBLAS_R_8F_E5M2:
       return tFunc<__nv_fp8_e5m2>()(args...);
 #if (ENABLE_CUDA_FP4)
