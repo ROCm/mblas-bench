@@ -268,7 +268,8 @@ void cublaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
   }
 
 #if (ENABLE_CUDA_FP4)
-  use_scaling = a_type.is_fp4() || b_type.is_fp4() || c_type.is_fp4() || d_type.is_fp4();
+  use_scaling = scale_mode_a != scaling_type::None || scale_mode_b != scaling_type::None ||
+                scale_mode_c != scaling_type::None || scale_mode_d != scaling_type::None;
   std::tie(a_scale_type, a_scale_mode, a_scale_size) = configure_scaling(a_props, a_type, "A");
   std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
   std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
