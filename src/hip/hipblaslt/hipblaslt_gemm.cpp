@@ -26,27 +26,6 @@ using std::string;
 using std::thread;
 using std::vector;
 
-#if HIP_VERSION >= 70000000
-namespace {
-scaling_type resolved_scaling_type(scaling_type requested, hipblasLtMatmulMatrixScale_t mode) {
-  if (requested == scaling_type::None)
-    return requested;
-  switch (mode) {
-    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0: return scaling_type::Block_32_UE8M0;
-    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3: return scaling_type::Block_16_UE4M3;
-    case HIPBLASLT_MATMUL_MATRIX_SCALE_BLK32_UE8M0_32_8_EXT: return scaling_type::Block_32_UE8M0_Swizzle;
-#if HIP_VERSION >= 71300000
-    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT: return scaling_type::Block_16_UE8M0;
-    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT: return scaling_type::Block_32_UE4M3;
-    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT: return scaling_type::Block_32_UE5M3;
-    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT: return scaling_type::Block_16_UE5M3;
-#endif
-    default: return requested;
-  }
-}
-}  // namespace
-#endif
-
 // clang-format off
 std::vector<matmul_prec_type> hipblaslt_gemm::matmul_supported = {
   // Compute type                 Scale Type    A Type        B Type        C Type        D Type        Bias Type
@@ -181,11 +160,24 @@ void hipblaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
 
 #if HIP_VERSION >= 70000000
 std::tuple<mblas_hip_data_type, hipblasLtMatmulMatrixScale_t, scale_size> 
-hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, string matrix_id) {
+hipblaslt_gemm::configure_scaling(matrix_desc &desc, mblas_hip_data_type type, string matrix_id) {
   mblas_hip_data_type scale_type;
   hipblasLtMatmulMatrixScale_t scale_mode;
   scale_size scale_size_result;
-  
+
+  // The word block picks the format from the data type. Store the explicit
+  // format in desc, so the output reports what ran.
+  if (desc.scale_mode == scaling_type::Block) {
+    if (!type.is_mx_possible()) {
+      string errorString =
+          "Block scaling needs an MX data type (OCP fp8, fp6 or fp4) in hipblaslt."
+          "\nMatrix: " + matrix_id +
+          "\nType: " + type.to_string();
+      throw std::invalid_argument(errorString);
+    }
+    desc.scale_mode = scaling_type::Block_32_UE8M0;
+  }
+
   if (desc.scale_mode == scaling_type::Block_32_UE8M0_Swizzle) {
     // gfx950 pre-swizzled MX block scales (Block_32_UE8M0_Swizzle).
     scale_type = type.get_scale_type();  // MBLAS_R_8F_UE8M0
@@ -194,57 +186,51 @@ hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, st
     long M = (matrix_id == "B") ? n : m;
     scale_size_result = get_swizzled_scale_tensor_size(M, k);
   } else if (is_block_scaling(desc.scale_mode)) {
-    if (desc.scale_mode == scaling_type::Block) {
-      // Generic block: pick the scale mode and scale type from the data type.
-      scale_type = type.get_scale_type();  // MBLAS_R_8F_UE8M0 for MX
-      scale_mode = get_scale_mode(type);   // VEC32_UE8M0 for MX
-    } else {
-      // Explicit block format: use a fixed scale mode and scale type.
-      switch (desc.scale_mode) {
-        case scaling_type::Block_32_UE8M0:
-          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
-          scale_type = MBLAS_R_8F_UE8M0;
-          break;
-        case scaling_type::Block_16_UE4M3:
-          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
-          scale_type = MBLAS_R_8F_UE4M3;
-          break;
+    // Explicit block format: use a fixed scale mode and scale type.
+    switch (desc.scale_mode) {
+      case scaling_type::Block_32_UE8M0:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
+        scale_type = MBLAS_R_8F_UE8M0;
+        break;
+      case scaling_type::Block_16_UE4M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+        scale_type = MBLAS_R_8F_UE4M3;
+        break;
 #if HIP_VERSION >= 71300000
-        case scaling_type::Block_16_UE8M0:
-          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT;
-          scale_type = MBLAS_R_8F_UE8M0;
-          break;
-        case scaling_type::Block_32_UE4M3:
-          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT;
-          scale_type = MBLAS_R_8F_UE4M3;
-          break;
-        case scaling_type::Block_32_UE5M3:
-          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT;
-          scale_type = MBLAS_R_8F_UE5M3;
-          break;
-        case scaling_type::Block_16_UE5M3:
-          scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT;
-          scale_type = MBLAS_R_8F_UE5M3;
-          break;
+      case scaling_type::Block_16_UE8M0:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT;
+        scale_type = MBLAS_R_8F_UE8M0;
+        break;
+      case scaling_type::Block_32_UE4M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT;
+        scale_type = MBLAS_R_8F_UE4M3;
+        break;
+      case scaling_type::Block_32_UE5M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT;
+        scale_type = MBLAS_R_8F_UE5M3;
+        break;
+      case scaling_type::Block_16_UE5M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT;
+        scale_type = MBLAS_R_8F_UE5M3;
+        break;
 #endif
-        case scaling_type::Block_32_UE8M0_K4:
-        case scaling_type::Block_128_UE8M0_K4: {
-          string errorString =
-              "Scale mode " + scaling_string(desc.scale_mode) +
-              " is only supported by the cublaslt backend."
-              "\nMatrix: " + matrix_id;
-          throw std::invalid_argument(errorString);
-        }
-        default: {
-          // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3 and Block_16_UE5M3
-          // need hipBLASLt from ROCm 7.13 or newer.
-          string errorString =
-              "Scale mode not supported by the hipBLASLt in this ROCm version."
-              "\nMatrix: " + matrix_id +
-              "\nRequested scale mode: " + scaling_string(desc.scale_mode) +
-              "\nUse Block_32_UE8M0, Block_16_UE4M3, or the word block, or build with ROCm 7.13 or newer.";
-          throw std::invalid_argument(errorString);
-        }
+      case scaling_type::Block_32_UE8M0_K4:
+      case scaling_type::Block_128_UE8M0_K4: {
+        string errorString =
+            "Scale mode " + scaling_string(desc.scale_mode) +
+            " is only supported by the cublaslt backend."
+            "\nMatrix: " + matrix_id;
+        throw std::invalid_argument(errorString);
+      }
+      default: {
+        // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3 and Block_16_UE5M3
+        // need hipBLASLt from ROCm 7.13 or newer.
+        string errorString =
+            "Scale mode not supported by the hipBLASLt in this ROCm version."
+            "\nMatrix: " + matrix_id +
+            "\nRequested scale mode: " + scaling_string(desc.scale_mode) +
+            "\nUse Block_32_UE8M0, Block_16_UE4M3, or the word block, or build with ROCm 7.13 or newer.";
+        throw std::invalid_argument(errorString);
       }
     }
     scale_size_result = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
@@ -413,10 +399,6 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
     std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
     std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
     std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
-    scale_mode_a = resolved_scaling_type(scale_mode_a, a_scale_mode);
-    scale_mode_b = resolved_scaling_type(scale_mode_b, b_scale_mode);
-    scale_mode_c = resolved_scaling_type(scale_mode_c, c_scale_mode);
-    scale_mode_d = resolved_scaling_type(scale_mode_d, d_scale_mode);
   }
 #endif
   

@@ -57,22 +57,6 @@ bool any_selected_device_requires_fp8_tn(const std::vector<cublaslt_gemm_inst>& 
   return false;
 }
 
-#if (ENABLE_CUDA_FP4)
-scaling_type resolved_scaling_type(scaling_type requested, cublasLtMatmulMatrixScale_t mode) {
-  if (requested == scaling_type::None)
-    return requested;
-  switch (mode) {
-    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0: return scaling_type::Block_32_UE8M0;
-    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3: return scaling_type::Block_16_UE4M3;
-#if defined(HAS_CUBLASLT_SCALE_MN_K4)
-    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_MN_K4_UE8M0:  return scaling_type::Block_32_UE8M0_K4;
-    case CUBLASLT_MATMUL_MATRIX_SCALE_VEC128_MN_K4_UE8M0: return scaling_type::Block_128_UE8M0_K4;
-#endif
-    default: return requested;
-  }
-}
-#endif
-
 }  // namespace
 
 // clang-format off
@@ -171,20 +155,27 @@ void cublaslt_gemm::parse_dev_iters(std::string deviceStr) {
   }
 }
 
-std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublaslt_gemm::configure_scaling(matrix_desc desc, mblas_cuda_data_type type, string matrix_id) {
+std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublaslt_gemm::configure_scaling(matrix_desc &desc, mblas_cuda_data_type type, string matrix_id) {
   mblas_cuda_data_type scale_type;
   cublasLtMatmulMatrixScale_t scale_mode;
   scale_size scale_size;
-  if (desc.scale_mode == scaling_type::Block){
-    // Determine scale types (calculated from a,b,c,d type)
-    scale_type = type.get_scale_type();
+  // The word block picks the format from the data type. Store the explicit
+  // format in desc, so the output reports what ran.
+  if (desc.scale_mode == scaling_type::Block) {
+    if (type.is_fp8()) {
+      desc.scale_mode = scaling_type::Block_32_UE8M0;
+    } else if (type.is_fp4()) {
+      desc.scale_mode = scaling_type::Block_16_UE4M3;
+    } else {
+      string errorString =
+          "Block scaling needs an fp8 or fp4 data type in cublaslt."
+          "\nMatrix: " + matrix_id +
+          "\nType: " + type.to_string();
+      throw std::invalid_argument(errorString);
+    }
+  }
 
-    // Scale modes
-    scale_mode = type.get_scale_mode();
-
-    // Calculate lengths
-    scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
-  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0) {
+  if (desc.scale_mode == scaling_type::Block_32_UE8M0) {
     // Explicit block format that cublaslt supports.
     scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
     scale_type = MBLAS_R_8F_UE8M0;
@@ -325,10 +316,6 @@ void cublaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
   std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
   std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
   std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
-  scale_mode_a = resolved_scaling_type(scale_mode_a, a_scale_mode);
-  scale_mode_b = resolved_scaling_type(scale_mode_b, b_scale_mode);
-  scale_mode_c = resolved_scaling_type(scale_mode_c, c_scale_mode);
-  scale_mode_d = resolved_scaling_type(scale_mode_d, d_scale_mode);
 #endif
 }
 
