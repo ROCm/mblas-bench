@@ -171,16 +171,19 @@ class hipblaslt_gemm : public generic_gemm {
   void test_matmul(hipblaslt_gemm_inst *mat, int ith_solution);
 #if HIP_VERSION >= 70000000
   std::tuple<mblas_hip_data_type, hipblasLtMatmulMatrixScale_t, scale_size> 
-    configure_scaling(matrix_desc desc, mblas_hip_data_type type, std::string matrix_id);
+    configure_scaling(matrix_desc &desc, mblas_hip_data_type type, std::string matrix_id);
   // Per-matrix scale-tensor byte count for either host or device alloc.
   // `host == true` uses type_call_host<sizeofCUDT>, otherwise type_call_dev.
   uint64_t scale_bytes(scale_size sz, mblas_hip_data_type st, bool host) const;
+  // Reorder a host UE8M0 scale buffer in place into the gfx950 pre-swizzled
+  // 32x8 layout (Block_32_UE8M0_32_8_EXT). `sz` is the padded {rows, cols}.
+  void swizzle_scales_gfx950(void **scale_host, scale_size sz) const;
 #endif
 
  public:
   hipblaslt_gemm(cxxopts::ParseResult result);
-  std::string prepare_array();
+  std::string prepare_array() override;
   double test(const int &ith_solution) override;
-  std::string get_result_string();
-  virtual void free_mem();
+  std::string get_result_string() override;
+  void free_mem() override;
 };
