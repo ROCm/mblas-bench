@@ -178,6 +178,7 @@ hipblaslt_gemm::configure_scaling(matrix_desc &desc, mblas_hip_data_type type, s
     desc.scale_mode = scaling_type::Block_32_UE8M0;
   }
 
+#if HIP_VERSION >= 71300000
   if (desc.scale_mode == scaling_type::Block_32_UE8M0_Swizzle) {
     // gfx950 pre-swizzled MX block scales (Block_32_UE8M0_Swizzle).
     scale_type = type.get_scale_type();  // MBLAS_R_8F_UE8M0
@@ -185,7 +186,9 @@ hipblaslt_gemm::configure_scaling(matrix_desc &desc, mblas_hip_data_type type, s
     // Free dim is m for A and n for B; K is the shared contraction dim.
     long M = (matrix_id == "B") ? n : m;
     scale_size_result = get_swizzled_scale_tensor_size(M, k);
-  } else if (is_block_scaling(desc.scale_mode)) {
+  } else
+#endif
+  if (is_block_scaling(desc.scale_mode)) {
     // Explicit block format: use a fixed scale mode and scale type.
     switch (desc.scale_mode) {
       case scaling_type::Block_32_UE8M0:
@@ -223,8 +226,8 @@ hipblaslt_gemm::configure_scaling(matrix_desc &desc, mblas_hip_data_type type, s
         throw std::invalid_argument(errorString);
       }
       default: {
-        // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3 and Block_16_UE5M3
-        // need hipBLASLt from ROCm 7.13 or newer.
+        // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3, Block_16_UE5M3 and
+        // Block_32_UE8M0_Swizzle need hipBLASLt from ROCm 7.13 or newer.
         string errorString =
             "Scale mode not supported by the hipBLASLt in this ROCm version."
             "\nMatrix: " + matrix_id +
