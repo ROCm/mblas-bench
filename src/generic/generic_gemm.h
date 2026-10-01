@@ -4,7 +4,7 @@
 #include <utility>
 
 #include "cxxopts.hpp"
-enum class scaling_type {None, Scalar, Vector, Block};
+enum class scaling_type {None, Scalar, Vector, Block, BlockSwizzled};
 std::string scaling_string(scaling_type input);
 class generic_gemm {
  protected:
