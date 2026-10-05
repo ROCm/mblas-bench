@@ -276,11 +276,11 @@ void rocblas_gemm::alloc_dev(rocblas_gemm_inst *mat) {
 }
 
 void rocblas_gemm::fill_host() {
-  type_call_host<initHost>(a_type, initialization, ptr_host_a, rows_a, cols_a, lda,
+  type_call_host<initHost>(a_type, a_props.init, ptr_host_a, rows_a, cols_a, lda,
                          batch_count, stride_a, flush_batch_count, control_a, constant_a, filename_a);
-  type_call_host<initHost>(b_type, initialization, ptr_host_b, rows_b, cols_b, ldb,
+  type_call_host<initHost>(b_type, b_props.init, ptr_host_b, rows_b, cols_b, ldb,
                          batch_count, stride_b, flush_batch_count, control_b, constant_b, filename_b);
-  type_call_host<initHost>(c_type, initialization, ptr_host_c, rows_c, cols_c, ldc,
+  type_call_host<initHost>(c_type, c_props.init, ptr_host_c, rows_c, cols_c, ldc,
                          batch_count, stride_c, flush_batch_count, control_c, constant_c, filename_c);
   // D is just output, don't need to init
 }
