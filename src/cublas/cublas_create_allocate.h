@@ -68,8 +68,7 @@ struct set_scalar {
 };
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args)
-    -> std::invoke_result_t<tFunc<double>, Args...>;
+auto type_call_host(mblas_data_type type, Args... args);
 
 template <template <typename> class tFunc, class... Args>
 auto type_call_dev(mblas_data_type type, Args... args)
@@ -189,48 +188,56 @@ void batched_pointer_magic_generic(void **hptr, void *dAr, int batch_count, long
 //}
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args)
-    -> std::invoke_result_t<tFunc<double>, Args...> {
+auto type_call_host(mblas_data_type type, Args... args) {
+  // The pointer argument only carries the element type; it is always null.
+  auto call = [&](auto *tag) {
+    using F = tFunc<std::remove_pointer_t<decltype(tag)>>;
+    if constexpr (std::is_invocable_v<F, mblas_data_type, Args...>) {
+      return F()(type, args...);
+    } else {
+      return F()(args...);
+    }
+  };
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case mblas_data_type::MBLAS_R_64F:
-      return tFunc<double>()(args...);
+      return call(static_cast<double *>(nullptr));
     case mblas_data_type::MBLAS_C_64F:
-      return tFunc<std::complex<double>>()(args...);
+      return call(static_cast<std::complex<double> *>(nullptr));
     case mblas_data_type::MBLAS_R_32F:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_C_32F:
-      return tFunc<std::complex<float>>()(args...);
+      return call(static_cast<std::complex<float> *>(nullptr));
     case mblas_data_type::MBLAS_R_16BF:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_C_16BF:
-      return tFunc<std::complex<float>>()(args...);
+      return call(static_cast<std::complex<float> *>(nullptr));
     case mblas_data_type::MBLAS_R_16F:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_C_16F:
-      return tFunc<std::complex<float>>()(args...);
+      return call(static_cast<std::complex<float> *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_E4M3:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_UE4M3:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_E5M2:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_4F_E2M1:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8I:
-      return tFunc<__int8_t>()(args...);
+      return call(static_cast<__int8_t *>(nullptr));
     case mblas_data_type::MBLAS_C_8I:
-      return tFunc<std::complex<__int8_t>>()(args...);
+      return call(static_cast<std::complex<__int8_t> *>(nullptr));
     case mblas_data_type::MBLAS_R_8U:
-      return tFunc<__uint8_t>()(args...);
+      return call(static_cast<__uint8_t *>(nullptr));
     case mblas_data_type::MBLAS_C_8U:
-      return tFunc<std::complex<__uint8_t>>()(args...);
+      return call(static_cast<std::complex<__uint8_t> *>(nullptr));
     case mblas_data_type::MBLAS_R_32I:
-      return tFunc<__int32_t>()(args...);
+      return call(static_cast<__int32_t *>(nullptr));
     case mblas_data_type::MBLAS_C_32I:
-      return tFunc<std::complex<__int32_t>>()(args...);
+      return call(static_cast<std::complex<__int32_t> *>(nullptr));
     default:
-      return tFunc<double>()(args...);
+      return call(static_cast<double *>(nullptr));
   }
 }
 
