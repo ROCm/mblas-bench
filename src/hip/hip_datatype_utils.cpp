@@ -39,18 +39,11 @@ std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols,
 
   size_t block = scale_block_size(ScaleMode);
   if (block == 16 || block == 32) {
-    // One scale value per block along the row dimension. Pad the buffer to the
-    // swizzled tile, so it is large enough for the kernel.
-    const size_t S_VSCALE = block;
-    const size_t S_BLOCK_COLS = 32;
-    const size_t S_BLOCK_ROWS = 4;
-    const size_t S_BLOCK_INNER = 4;
-
-    const size_t BLOCK_ROWS = S_BLOCK_INNER * S_VSCALE;
-    const size_t BLOCK_COLS = S_BLOCK_COLS * S_BLOCK_ROWS;  // 128
-
-    size_t s_rows = roundoff(size_t(rows), BLOCK_ROWS) / S_VSCALE;
-    size_t s_cols = roundoff(size_t(cols), BLOCK_COLS);
+    // One scale value per block along the row dimension. Matches the hipBLASLt
+    // client sizing (scaleBufferSize): K blocks padded to 8, M/N padded to 32.
+    // This also covers the gfx1250 Tensile padding of K blocks to 128/block.
+    size_t s_rows = roundoff((size_t(rows) + block - 1) / block, 8);
+    size_t s_cols = roundoff(size_t(cols), 32);
 
     return std::pair<size_t, size_t>(s_rows, s_cols);
   }
