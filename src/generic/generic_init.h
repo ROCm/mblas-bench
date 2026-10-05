@@ -10,6 +10,14 @@
 #include <cmath>
 #include <omp.h>
 
+#include "mblas_data_type.h"
+
+// Fills each buffer with packed device-format codes of an OCP E4M3, E5M2, E3M2,
+// E2M3, or E2M1 type, every finite encoding equally likely. The buffers must be
+// copied to the device without conversion. Throws for any other type.
+void fill_host_uniform_native(const mblas_data_type &type, void **ptr_array, long x, long y, int batch,
+                              long long stride, int flush_batch_count);
+
 // Rand int gen
 template <typename T>
 inline T rand_int_gen(std::uniform_int_distribution<int> &idist,
@@ -268,7 +276,7 @@ void fill_rand_host_csv(void **ptr_array, long rows_A, long cols_A, long ld, int
 
 template <typename T>
 struct initHost {
-  void operator()(std::string initialization, void **ptr_array, long rows_A, long cols_A,
+  void operator()(mblas_data_type type, std::string initialization, void **ptr_array, long rows_A, long cols_A,
                   long ld, int batch, long long int stride, int flush_batch_count,
                   bool control = false, float constant = 0.f, std::string filename = "");
 };
@@ -280,7 +288,7 @@ bool parse_parameterized_init(const std::string& initialization,
                            Args&... default_and_output_params);
 
 template <typename T>
-void initHost<T>::operator()(std::string initialization, void **ptr_array, long rows_A,
+void initHost<T>::operator()(mblas_data_type type, std::string initialization, void **ptr_array, long rows_A,
                              long cols_A, long ld, int batch,
                              long long int stride, int flush_batch_count, bool control,
                              float constant, std::string filename) {
@@ -294,7 +302,9 @@ void initHost<T>::operator()(std::string initialization, void **ptr_array, long 
   int pow2_n = 10;
   int pow2_center = 0;
   
-  if (!filename.empty()) {
+  if (initialization == "uniform_native") {
+    fill_host_uniform_native(type, ptr_array, ld, cols_A, batch, stride, flush_batch_count);
+  } else if (!filename.empty()) {
     fill_rand_host_csv<T>(ptr_array, rows_A, cols_A, ld, batch, stride, flush_batch_count, filename);
   } else if (initialization == "rand_int") {
     std::random_device r;
