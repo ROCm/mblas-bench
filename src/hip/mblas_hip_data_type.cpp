@@ -87,5 +87,6 @@ const std::map<mblas_data_type, hipDataType> mblas_hip_data_type::prec_mappings 
     {MBLAS_R_6F_E3M2, HIP_R_6F_E3M2},
     {MBLAS_R_4F_E2M1, HIP_R_4F_E2M1},
     {MBLAS_R_8F_UE8M0, HIP_R_8F_UE8M0},
+    {MBLAS_R_8F_UE4M3, HIP_R_8F_E4M3},
 #endif
 };

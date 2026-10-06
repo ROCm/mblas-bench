@@ -171,7 +171,7 @@ class cublaslt_gemm : public generic_gemm {
   void run_threaded(void (cublaslt_gemm::*func)(cublaslt_gemm_inst *));
   std::tuple<double, double, double> calculate_figure_of_merit(double total_time_ms);
   void test_matmul(cublaslt_gemm_inst *mat, int ith_solution);
-  std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc desc, mblas_cuda_data_type type, std::string matrix_id);
+  std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc &desc, mblas_cuda_data_type type, std::string matrix_id);
   //static std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc desc, mblas_cuda_data_type type, std::string matrix_id);
   // Per-matrix scale-tensor byte count for either host or device alloc.
   // `host == true` uses type_call_host<sizeofCUDT>, otherwise type_call_dev.

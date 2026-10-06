@@ -8,32 +8,46 @@
 #include <string>
 using namespace std;
 
-#if HIP_VERSION >= 70000000
+#if (HIP_VERSION >= 70000000) && MBLAS_WITH_HIPBLASLT
 static size_t roundoff(size_t x, size_t granul) {
   return granul * ((x + (granul - 1)) / granul);
+}
+
+size_t scale_block_size(hipblasLtMatmulMatrixScale_t ScaleMode) {
+  switch (ScaleMode) {
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0:
+#if HIP_VERSION >= 71300000
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT:
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT:
+#endif
+      return 32;
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3:
+#if HIP_VERSION >= 71300000
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT:
+    case HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT:
+#endif
+      return 16;
+    default:
+      return 1;
+  }
 }
 
 std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols,
                                                   hipblasLtMatmulMatrixScale_t ScaleMode) {
   if (ScaleMode == HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F)
     return std::pair<size_t, size_t>(1, 1);
-  
-  if (ScaleMode == HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0) {
-    // Block size is always 32 for all MX formats in hipBLASLt
-    static const size_t S_VSCALE = 32;
-    static const size_t S_BLOCK_COLS = 32;
-    static const size_t S_BLOCK_ROWS = 4;
-    static const size_t S_BLOCK_INNER = 4;
-    
-    static const size_t BLOCK_ROWS = S_BLOCK_INNER * S_VSCALE;  // 128
-    static const size_t BLOCK_COLS = S_BLOCK_COLS * S_BLOCK_ROWS;  // 128
-    
-    size_t s_rows = roundoff(size_t(rows), BLOCK_ROWS) / S_VSCALE;
-    size_t s_cols = roundoff(size_t(cols), BLOCK_COLS);
-    
+
+  size_t block = scale_block_size(ScaleMode);
+  if (block == 16 || block == 32) {
+    // One scale value per block along the row dimension. Matches the hipBLASLt
+    // client sizing (scaleBufferSize): K blocks padded to 8, M/N padded to 32.
+    // This also covers the gfx1250 Tensile padding of K blocks to 128/block.
+    size_t s_rows = roundoff((size_t(rows) + block - 1) / block, 8);
+    size_t s_cols = roundoff(size_t(cols), 32);
+
     return std::pair<size_t, size_t>(s_rows, s_cols);
   }
-  
+
   return std::pair<size_t, size_t>(0, 0);
 }
 
@@ -43,6 +57,16 @@ hipblasLtMatmulMatrixScale_t get_scale_mode(mblas_hip_data_type type) {
     return HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
   }
   return HIPBLASLT_MATMUL_MATRIX_SCALE_SCALAR_32F;
+}
+
+std::pair<size_t, size_t> get_swizzled_scale_tensor_size(int M, int K) {
+  // Block size is always 32 for all MX formats in hipBLASLt.
+  static const size_t MX_BLOCK = 32;
+  size_t k_blocks = (size_t(K) + MX_BLOCK - 1) / MX_BLOCK;  // ceil(K / 32)
+  // gfx950 pre-swizzle padding: free dim (M) -> multiple of 32, K/32 -> mult of 8.
+  size_t s_rows = roundoff(size_t(M), 32);
+  size_t s_cols = roundoff(k_blocks, 8);
+  return std::pair<size_t, size_t>(s_rows, s_cols);
 }
 #endif
 

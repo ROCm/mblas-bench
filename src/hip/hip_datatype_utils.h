@@ -10,13 +10,27 @@
 #include <rocblas/rocblas.h>
 #endif 
 
-#if HIP_VERSION >= 70000000
+// These scale helpers return hipBLASLt types and use its headers, so a
+// rocBLAS-only build (no hipBLASLt) leaves them out.
+#if (HIP_VERSION >= 70000000) && MBLAS_WITH_HIPBLASLT
 #include <hipblaslt/hipblaslt.h>
 #include "mblas_hip_data_type.h"
 
 std::pair<size_t, size_t> get_scale_tensor_size(int rows, int cols, 
                                                   hipblasLtMatmulMatrixScale_t ScaleMode);
 hipblasLtMatmulMatrixScale_t get_scale_mode(mblas_hip_data_type type);
+// Elements per scale block for a given scale mode: 32 for the VEC32 modes,
+// 16 for the VEC16 modes, 1 otherwise.
+size_t scale_block_size(hipblasLtMatmulMatrixScale_t ScaleMode);
+
+// gfx950 pre-swizzled MX scale tensor size (Block_32_UE8M0_32_8_EXT).
+// M is the matrix's free dimension (m for A, n for B), K is the contraction
+// dimension. One UE8M0 scale per 32-element block along K. The gfx950 host
+// pre-swizzle pads the free dim to a multiple of 32 and the K/32 dim to a
+// multiple of 8 (matching hipblaslt-bench preSwizzleScalesGFX950 / library
+// setMXScaleA with padScaleTensorFreeDim). Returned as {rows, cols} = {M_pad,
+// (K/32)_pad}.
+std::pair<size_t, size_t> get_swizzled_scale_tensor_size(int M, int K);
 #endif
 
 // Architecture of the given device, with any feature suffix stripped, so

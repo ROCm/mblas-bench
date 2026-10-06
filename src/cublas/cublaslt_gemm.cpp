@@ -155,19 +155,81 @@ void cublaslt_gemm::parse_dev_iters(std::string deviceStr) {
   }
 }
 
-std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublaslt_gemm::configure_scaling(matrix_desc desc, mblas_cuda_data_type type, string matrix_id) {
+std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> cublaslt_gemm::configure_scaling(matrix_desc &desc, mblas_cuda_data_type type, string matrix_id) {
   mblas_cuda_data_type scale_type;
   cublasLtMatmulMatrixScale_t scale_mode;
   scale_size scale_size;
-  if (desc.scale_mode == scaling_type::Block){
-    // Determine scale types (calculated from a,b,c,d type)
-    scale_type = type.get_scale_type();
+  // The word block picks the format from the data type. Store the explicit
+  // format in desc, so the output reports what ran.
+  if (desc.scale_mode == scaling_type::Block) {
+    if (type.is_fp8()) {
+      desc.scale_mode = scaling_type::Block_32_UE8M0;
+    } else if (type.is_fp4()) {
+      desc.scale_mode = scaling_type::Block_16_UE4M3;
+    } else {
+      string errorString =
+          "Block scaling needs an fp8 or fp4 data type in cublaslt."
+          "\nMatrix: " + matrix_id +
+          "\nType: " + type.to_string();
+      throw std::invalid_argument(errorString);
+    }
+  }
 
-    // Scale modes
-    scale_mode = type.get_scale_mode();
-
-    // Calculate lengths
+  if (desc.scale_mode == scaling_type::Block_32_UE8M0) {
+    // Explicit block format that cublaslt supports.
+    scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
+    scale_type = MBLAS_R_8F_UE8M0;
     scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+  } else if (desc.scale_mode == scaling_type::Block_16_UE4M3) {
+    // Explicit block format that cublaslt supports.
+    scale_mode = CUBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+    scale_type = MBLAS_R_8F_UE4M3;
+    scale_size = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
+#if defined(HAS_CUBLASLT_SCALE_MN_K4)
+  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0_K4 ||
+             desc.scale_mode == scaling_type::Block_128_UE8M0_K4) {
+    scale_mode = (desc.scale_mode == scaling_type::Block_32_UE8M0_K4)
+                     ? CUBLASLT_MATMUL_MATRIX_SCALE_VEC32_MN_K4_UE8M0
+                     : CUBLASLT_MATMUL_MATRIX_SCALE_VEC128_MN_K4_UE8M0;
+    scale_type = MBLAS_R_8F_UE8M0;
+    // cuBLASLt decides what it supports; only warn about documented limits.
+    if (matrix_id == "A" || matrix_id == "B") {
+      scale_size = get_scale_tensor_size(k, (matrix_id == "A") ? m : n, scale_mode);
+    } else {
+      std::cerr << "Warning: cuBLASLt documents K4 scale modes for A and B only. Matrix: "
+                << matrix_id << std::endl;
+      scale_size = get_scale_tensor_size(m, n, scale_mode);
+    }
+    if (!type.is_fp8()) {
+      std::cerr << "Warning: cuBLASLt documents K4 scale modes for FP8 only. Matrix: "
+                << matrix_id << ", type: " << type.to_string() << std::endl;
+    }
+#endif
+  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0_K4 ||
+             desc.scale_mode == scaling_type::Block_128_UE8M0_K4) {
+    string errorString =
+        "Scale mode " + scaling_string(desc.scale_mode) +
+        " needs cuBLAS 13.4 or newer. This build does not have it."
+        "\nMatrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    throw std::invalid_argument(errorString);
+  } else if (desc.scale_mode == scaling_type::Block_32_UE8M0_Swizzle) {
+    string errorString =
+        "Scale mode " + scaling_string(desc.scale_mode) +
+        " is a gfx950/hipBLASLt-only feature and is not supported in cublaslt."
+        "\nMatrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    throw std::invalid_argument(errorString);
+  } else if (is_block_scaling(desc.scale_mode)) {
+    // cuBLASLt has no scale mode for Block_16_UE8M0, Block_32_UE4M3,
+    // Block_32_UE5M3 or Block_16_UE5M3.
+    string errorString =
+        "Scale mode " + scaling_string(desc.scale_mode) +
+        " is not supported by the cublaslt backend. "
+        "Use Block_32_UE8M0, Block_16_UE4M3, Block_32_UE8M0_K4, Block_128_UE8M0_K4, or the word block."
+        "\nMatrix: " + matrix_id +
+        "\nType: " + type.to_string();
+    throw std::invalid_argument(errorString);
   } else if (type.is_fp4()) {
     string errorString =
         "Non-block scaled fp4 is not supported in cublaslt"
@@ -248,7 +310,8 @@ void cublaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
   }
 
 #if (ENABLE_CUDA_FP4)
-  use_scaling = a_type.is_fp4() || b_type.is_fp4() || c_type.is_fp4() || d_type.is_fp4();
+  use_scaling = scale_mode_a != scaling_type::None || scale_mode_b != scaling_type::None ||
+                scale_mode_c != scaling_type::None || scale_mode_d != scaling_type::None;
   std::tie(a_scale_type, a_scale_mode, a_scale_size) = configure_scaling(a_props, a_type, "A");
   std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
   std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
@@ -422,7 +485,8 @@ string cublaslt_gemm::prepare_array() {
   // }
   ossHeader << "alpha,beta,";
   ossHeader << "a_type,b_type,c_type,d_type,compute_type,scalar_type,";
-  ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,bias_type,";
+  //ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,";
+  ossHeader << "bias_type,";
   ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
   ossHeader << "solution_index,";
@@ -876,10 +940,13 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << d_type.to_string() << ',';
   ossValues << compute.to_string() << ',';
   ossValues << scalar.to_string() << ',';
-  ossValues << a_scale_type.to_string() << ',';
-  ossValues << b_scale_type.to_string() << ',';
-  ossValues << c_scale_type.to_string() << ',';
-  ossValues << d_scale_type.to_string() << ',';
+  //auto scale_type_string = [&](scaling_type mode, const mblas_cuda_data_type &type) {
+  //  return (use_scaling && mode != scaling_type::None) ? type.to_string() : string("None");
+  //};
+  //ossValues << scale_type_string(scale_mode_a, a_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_b, b_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_c, c_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_d, d_scale_type) << ',';
   ossValues << bias_type.to_string() << ',';
   ossValues << scaling_string(scale_mode_a) << ',';
   ossValues << scaling_string(scale_mode_b) << ',';

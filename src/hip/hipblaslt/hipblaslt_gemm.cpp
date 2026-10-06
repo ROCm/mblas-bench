@@ -15,6 +15,7 @@
 #include "hip_create_allocate.h"
 #include "hip_datatype_utils.h"
 #include "hip_error.h"
+#include "hip_preswizzle.h"
 #include "cxxopts.hpp"
 #include "generic_setup.h"
 
@@ -159,14 +160,82 @@ void hipblaslt_gemm::parse_problem_type(string computeTStr, string scalarTStr,
 
 #if HIP_VERSION >= 70000000
 std::tuple<mblas_hip_data_type, hipblasLtMatmulMatrixScale_t, scale_size> 
-hipblaslt_gemm::configure_scaling(matrix_desc desc, mblas_hip_data_type type, string matrix_id) {
+hipblaslt_gemm::configure_scaling(matrix_desc &desc, mblas_hip_data_type type, string matrix_id) {
   mblas_hip_data_type scale_type;
   hipblasLtMatmulMatrixScale_t scale_mode;
   scale_size scale_size_result;
-  
+
+  // The word block picks the format from the data type. Store the explicit
+  // format in desc, so the output reports what ran.
   if (desc.scale_mode == scaling_type::Block) {
-    scale_type = type.get_scale_type();  // Returns MBLAS_R_8F_UE8M0 for MX
-    scale_mode = get_scale_mode(type);  // Returns VEC32_UE8M0 for MX
+    if (!type.is_mx_possible()) {
+      string errorString =
+          "Block scaling needs an MX data type (OCP fp8, fp6 or fp4) in hipblaslt."
+          "\nMatrix: " + matrix_id +
+          "\nType: " + type.to_string();
+      throw std::invalid_argument(errorString);
+    }
+    desc.scale_mode = scaling_type::Block_32_UE8M0;
+  }
+
+#if HIP_VERSION >= 71300000
+  if (desc.scale_mode == scaling_type::Block_32_UE8M0_Swizzle) {
+    // gfx950 pre-swizzled MX block scales (Block_32_UE8M0_Swizzle).
+    scale_type = type.get_scale_type();  // MBLAS_R_8F_UE8M0
+    scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_BLK32_UE8M0_32_8_EXT;
+    // Free dim is m for A and n for B; K is the shared contraction dim.
+    long M = (matrix_id == "B") ? n : m;
+    scale_size_result = get_swizzled_scale_tensor_size(M, k);
+  } else
+#endif
+  if (is_block_scaling(desc.scale_mode)) {
+    // Explicit block format: use a fixed scale mode and scale type.
+    switch (desc.scale_mode) {
+      case scaling_type::Block_32_UE8M0:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE8M0;
+        scale_type = MBLAS_R_8F_UE8M0;
+        break;
+      case scaling_type::Block_16_UE4M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3;
+        scale_type = MBLAS_R_8F_UE4M3;
+        break;
+#if HIP_VERSION >= 71300000
+      case scaling_type::Block_16_UE8M0:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE8M0_EXT;
+        scale_type = MBLAS_R_8F_UE8M0;
+        break;
+      case scaling_type::Block_32_UE4M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE4M3_EXT;
+        scale_type = MBLAS_R_8F_UE4M3;
+        break;
+      case scaling_type::Block_32_UE5M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC32_UE5M3_EXT;
+        scale_type = MBLAS_R_8F_UE5M3;
+        break;
+      case scaling_type::Block_16_UE5M3:
+        scale_mode = HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE5M3_EXT;
+        scale_type = MBLAS_R_8F_UE5M3;
+        break;
+#endif
+      case scaling_type::Block_32_UE8M0_K4:
+      case scaling_type::Block_128_UE8M0_K4: {
+        string errorString =
+            "Scale mode " + scaling_string(desc.scale_mode) +
+            " is only supported by the cublaslt backend."
+            "\nMatrix: " + matrix_id;
+        throw std::invalid_argument(errorString);
+      }
+      default: {
+        // Block_16_UE8M0, Block_32_UE4M3, Block_32_UE5M3, Block_16_UE5M3 and
+        // Block_32_UE8M0_Swizzle need hipBLASLt from ROCm 7.13 or newer.
+        string errorString =
+            "Scale mode not supported by the hipBLASLt in this ROCm version."
+            "\nMatrix: " + matrix_id +
+            "\nRequested scale mode: " + scaling_string(desc.scale_mode) +
+            "\nUse Block_32_UE8M0, Block_16_UE4M3, or the word block, or build with ROCm 7.13 or newer.";
+        throw std::invalid_argument(errorString);
+      }
+    }
     scale_size_result = get_scale_tensor_size(desc.rows_mem, desc.cols_mem, scale_mode);
   } else if (type.is_fp4() || type.is_fp6()) {
     string errorString =
@@ -198,6 +267,20 @@ uint64_t hipblaslt_gemm::scale_bytes(scale_size sz, mblas_hip_data_type st, bool
   return ceil_division(
       (uint64_t)sz.get_size() * batch_count * element_size,
       uint64_t(st.get_packing_count()));
+}
+
+void hipblaslt_gemm::swizzle_scales_gfx950(void **scale_host, scale_size sz) const {
+  const size_t n_elem = sz.get_size();
+  const std::vector<size_t> dims = {(size_t)sz.rows, (size_t)sz.cols};
+  for (int i = 0; i < flush_batch_count; i++) {
+    float *buf = static_cast<float *>(scale_host[i]);
+    for (int b = 0; b < batch_count; b++) {
+      float *slice = buf + (size_t)b * n_elem;
+      std::vector<float> in(slice, slice + n_elem);
+      std::vector<float> out = mblas_preswizzle::preSwizzleScalesGFX950(in, dims);
+      std::copy(out.begin(), out.end(), slice);
+    }
+  }
 }
 #endif
 
@@ -374,7 +457,7 @@ string hipblaslt_gemm::prepare_array() {
   this->fill_host();
 
   int num_devices;
-  hipGetDeviceCount(&num_devices);
+  check_hip(hipGetDeviceCount(&num_devices));
   // Check range of devices here
   // This implementation may not work if
   // CUDA_VISIBLE_DEVICES is set to something weird
@@ -417,6 +500,8 @@ string hipblaslt_gemm::prepare_array() {
   if (batched) {
     ossHeader << "batch_count,";
   }
+  //ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,";
+  ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "solution_index,";
   ossHeader << "hipBLASLt-Gflops,hipBLASLt-GB/s,hipBLASLt-us," << endl;
   return ossHeader.str();
@@ -481,7 +566,7 @@ void hipblaslt_gemm::alloc_host() {
 }
 
 void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
-  hipSetDevice(mat->devIDX);
+  check_hip(hipSetDevice(mat->devIDX));
 
   mat->ptr_dev_a =
       (void **)malloc(batch_count * flush_batch_count * type_call_dev<sizeofCUDTP>(a_type));
@@ -497,36 +582,36 @@ void hipblaslt_gemm::alloc_dev(hipblaslt_gemm_inst *mat) {
   }
 
   for (int i = 0; i < flush_batch_count; i++) {
-    hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a));
-    hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b));
-    hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c));
+    check_hip(hipMalloc(&mat->ptr_dev_a[i], get_malloc_size_dev(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a)));
+    check_hip(hipMalloc(&mat->ptr_dev_b[i], get_malloc_size_dev(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b)));
+    check_hip(hipMalloc(&mat->ptr_dev_c[i], get_malloc_size_dev(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c)));
     if (!inplace) {
-      hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d));
+      check_hip(hipMalloc(&mat->ptr_dev_d[i], get_malloc_size_dev(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d)));
     }
   }
   mat->wSZ = workspace_size;
-  hipMalloc(&mat->devWork, mat->wSZ);
+  check_hip(hipMalloc(&mat->devWork, mat->wSZ));
   
 #if HIP_VERSION >= 70000000
   if (a_props.scale_mode != scaling_type::None) {
     mat->scale_dev_a = (void**)malloc(flush_batch_count * sizeof(void*));
     for (int i = 0; i < flush_batch_count; i++)
-      hipMalloc(&mat->scale_dev_a[i], scale_bytes(a_scale_size, a_scale_type, /*host=*/false));
+      check_hip(hipMalloc(&mat->scale_dev_a[i], scale_bytes(a_scale_size, a_scale_type, /*host=*/false)));
   }
   if (b_props.scale_mode != scaling_type::None) {
     mat->scale_dev_b = (void**)malloc(flush_batch_count * sizeof(void*));
     for (int i = 0; i < flush_batch_count; i++)
-      hipMalloc(&mat->scale_dev_b[i], scale_bytes(b_scale_size, b_scale_type, /*host=*/false));
+      check_hip(hipMalloc(&mat->scale_dev_b[i], scale_bytes(b_scale_size, b_scale_type, /*host=*/false)));
   }
   if (c_props.scale_mode != scaling_type::None) {
     mat->scale_dev_c = (void**)malloc(flush_batch_count * sizeof(void*));
     for (int i = 0; i < flush_batch_count; i++)
-      hipMalloc(&mat->scale_dev_c[i], scale_bytes(c_scale_size, c_scale_type, /*host=*/false));
+      check_hip(hipMalloc(&mat->scale_dev_c[i], scale_bytes(c_scale_size, c_scale_type, /*host=*/false)));
   }
   if (d_props.scale_mode != scaling_type::None) {
     mat->scale_dev_d = (void**)malloc(flush_batch_count * sizeof(void*));
     for (int i = 0; i < flush_batch_count; i++)
-      hipMalloc(&mat->scale_dev_d[i], scale_bytes(d_scale_size, d_scale_type, /*host=*/false));
+      check_hip(hipMalloc(&mat->scale_dev_d[i], scale_bytes(d_scale_size, d_scale_type, /*host=*/false)));
   }
 #endif
 }
@@ -545,12 +630,24 @@ void hipblaslt_gemm::fill_host() {
                              a_scale_size.rows, a_scale_size.cols, a_scale_size.rows,
                              batch_count, (long long)a_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_a, string(""));
+    if (a_props.scale_mode == scaling_type::Block_32_UE8M0_Swizzle) {
+      // Reorder A's UE8M0 block scales into the gfx950 pre-swizzled 32x8 layout.
+      // Host UE8M0 scales are stored as float (see type_call_host); a_scale_size
+      // is already the padded (rows, cols) so the permutation is size-preserving.
+      swizzle_scales_gfx950(scale_host_a, a_scale_size);
+    }
   }
   if (b_props.scale_mode != scaling_type::None) {
     type_call_host<initHost>(b_scale_type, scale_init, scale_host_b,
                              b_scale_size.rows, b_scale_size.cols, b_scale_size.rows,
                              batch_count, (long long)b_scale_size.get_size(),
                              flush_batch_count, false, scale_factor_b, string(""));
+    if (b_props.scale_mode == scaling_type::Block_32_UE8M0_Swizzle) {
+      // Reorder B's UE8M0 block scales into the gfx950 pre-swizzled 32x8 layout.
+      // Host UE8M0 scales are stored as float (see type_call_host); b_scale_size
+      // is already the padded (rows, cols) so the permutation is size-preserving.
+      swizzle_scales_gfx950(scale_host_b, b_scale_size);
+    }
   }
   if (c_props.scale_mode != scaling_type::None) {
     type_call_host<initHost>(c_scale_type, scale_init, scale_host_c,
@@ -568,7 +665,7 @@ void hipblaslt_gemm::fill_host() {
 }
 
 void hipblaslt_gemm::copy_host_to_dev(hipblaslt_gemm_inst *mat) {
-  hipSetDevice(mat->devIDX);
+  check_hip(hipSetDevice(mat->devIDX));
   for (int i = 0; i < flush_batch_count; i++) {
     copy_and_convert(a_type, ptr_host_a[i], mat->ptr_dev_a[i], rows_mem_a, cols_mem_a, batch_count, stride_a);
     copy_and_convert(b_type, ptr_host_b[i], mat->ptr_dev_b[i], rows_mem_b, cols_mem_b, batch_count, stride_b);
@@ -721,13 +818,13 @@ void hipblaslt_gemm::free_mem() {
 #endif
   
   for (auto mat : mat_ptrs) {
-    hipSetDevice(mat.devIDX);
+    check_hip(hipSetDevice(mat.devIDX));
     for (int i = 0; i < flush_batch_count; i++) {
-      hipFree(mat.ptr_dev_a[i]);
-      hipFree(mat.ptr_dev_b[i]);
-      hipFree(mat.ptr_dev_c[i]);
+      check_hip(hipFree(mat.ptr_dev_a[i]));
+      check_hip(hipFree(mat.ptr_dev_b[i]));
+      check_hip(hipFree(mat.ptr_dev_c[i]));
       if (!inplace) {
-        hipFree(mat.ptr_dev_d[i]);
+        check_hip(hipFree(mat.ptr_dev_d[i]));
       }
     }
     free(mat.ptr_dev_a);
@@ -736,23 +833,23 @@ void hipblaslt_gemm::free_mem() {
     if (!inplace) {
       free(mat.ptr_dev_d);
     }
-    hipFree(mat.devWork);
+    check_hip(hipFree(mat.devWork));
 
 #if HIP_VERSION >= 70000000
     if (mat.scale_dev_a) {
-      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_a[i]);
+      for (int i = 0; i < flush_batch_count; i++) check_hip(hipFree(mat.scale_dev_a[i]));
       free(mat.scale_dev_a);
     }
     if (mat.scale_dev_b) {
-      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_b[i]);
+      for (int i = 0; i < flush_batch_count; i++) check_hip(hipFree(mat.scale_dev_b[i]));
       free(mat.scale_dev_b);
     }
     if (mat.scale_dev_c) {
-      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_c[i]);
+      for (int i = 0; i < flush_batch_count; i++) check_hip(hipFree(mat.scale_dev_c[i]));
       free(mat.scale_dev_c);
     }
     if (mat.scale_dev_d) {
-      for (int i = 0; i < flush_batch_count; i++) hipFree(mat.scale_dev_d[i]);
+      for (int i = 0; i < flush_batch_count; i++) check_hip(hipFree(mat.scale_dev_d[i]));
       free(mat.scale_dev_d);
     }
 #endif
@@ -806,6 +903,17 @@ std::string hipblaslt_gemm::get_result_string() {
   if (batched) {
     ossValues << batch_count << ',';
   }
+  //auto scale_type_string = [&](scaling_type mode, const mblas_hip_data_type &type) {
+  //  return (use_scaling && mode != scaling_type::None) ? type.to_string() : string("None");
+  //};
+  //ossValues << scale_type_string(scale_mode_a, a_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_b, b_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_c, c_scale_type) << ',';
+  //ossValues << scale_type_string(scale_mode_d, d_scale_type) << ',';
+  ossValues << scaling_string(scale_mode_a) << ',';
+  ossValues << scaling_string(scale_mode_b) << ',';
+  ossValues << scaling_string(scale_mode_c) << ',';
+  ossValues << scaling_string(scale_mode_d) << ',';
   ossValues << current_solution_index << ',';
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
@@ -871,7 +979,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
     check_hipblas(stat);
     check_hip(hipGetLastError());
   }
-  hipStreamSynchronize(stream);
+  check_hip(hipStreamSynchronize(stream));
 
   hipEvent_t start, stop;
   check_hip(hipEventCreate(&start));
@@ -880,7 +988,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
   /*
     Run and time the performance test
   */
-  hipEventRecord(start, stream);
+  check_hip(hipEventRecord(start, stream));
   for (int rep = 0; rep < iters; rep++) {
     int flush_index = rep % flush_batch_count;
     stat = hipblasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
@@ -891,8 +999,8 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
                           &mat->algos[ith_solution].algo,
                           mat->devWork, mat->wSZ, stream);
   }
-  hipEventRecord(stop, stream);
-  hipEventSynchronize(stop);
+  check_hip(hipEventRecord(stop, stream));
+  check_hip(hipEventSynchronize(stop));
 
   // Check for errors during the performance test
   check_hipblas(stat);
@@ -900,7 +1008,7 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
 
   // Calculate and report GFlops
   float elapsedTime_ms;
-  hipEventElapsedTime(&elapsedTime_ms, start, stop);
+  check_hip(hipEventElapsedTime(&elapsedTime_ms, start, stop));
   std::tie(mat->gflops, mat->gbytes, mat->time_us) =
       calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
   
