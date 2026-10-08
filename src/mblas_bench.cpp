@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cctype>
+#include <exception>
 #include <iostream>
 #include <fstream>
 
@@ -97,7 +98,7 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
 }
 
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv) try {
   // print device info
   // int num_devices;
   // cudaGetDeviceCount(&num_devices);
@@ -223,6 +224,13 @@ int main(int argc, char **argv) {
   opp_adder("device", "GPU device(s) to run on",
             cxxopts::value<string>()->default_value("0"));
   opp_adder("instances", "Number of instances to run on each GPU",
+            cxxopts::value<int>()->default_value("1"));
+  opp_adder("cotenant_workgroups",
+            "Persistent cotenant workgroups launched alongside cuBLASLt; "
+            "0 disables contention. Must be less than each selected device's SM count",
+            cxxopts::value<int>()->default_value("0"));
+  opp_adder("cotenant_max_occupancy",
+            "Shared-memory-based maximum cotenant blocks per SM (1-64)",
             cxxopts::value<int>()->default_value("1"));
   opp_adder("initialization",
             "Initialize with random integers, trig functions sin and cos, or "
@@ -360,8 +368,27 @@ int main(int argc, char **argv) {
     // Select backend implementation
     string driver = s_to_lower(result["driver"].as<string>());
     string function = s_to_lower(result["function"].as<string>());
+    const int cotenant_workgroups = result["cotenant_workgroups"].as<int>();
+    const int cotenant_max_occupancy =
+        result["cotenant_max_occupancy"].as<int>();
+    if (cotenant_workgroups < 0) {
+      cerr << "cotenant_workgroups must be >= 0" << endl;
+      return 1;
+    }
+    if (cotenant_max_occupancy < 1 || cotenant_max_occupancy > 64) {
+      cerr << "cotenant_max_occupancy must be in [1, 64]" << endl;
+      return 1;
+    }
 
-    if (driver == "cublaslt" || (driver == "cublas" && function == "matmul")) {
+    const bool uses_cublaslt =
+        driver == "cublaslt" || (driver == "cublas" && function == "matmul");
+    if (cotenant_workgroups > 0 && !uses_cublaslt) {
+      cerr << "cotenant_workgroups is supported only by the cuBLASLt backend"
+           << endl;
+      return 1;
+    }
+
+    if (uses_cublaslt) {
       // Since regular cublas has no matmul, we can safely assume the user means
       // cublaslt
       gemm = new cublaslt_gemm_factory();
@@ -387,4 +414,8 @@ int main(int argc, char **argv) {
 
 
   return 0;
+}
+catch (const std::exception& error) {
+  cerr << error.what() << endl;
+  return 1;
 }

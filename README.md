@@ -76,6 +76,49 @@ When multiple solutions are requested, a `solution_index` column is added to the
 
 > **Note:** cuBLAS and rocBLAS backends do not support multiple solutions. If `--requested_solution_num` is not equal to 1 with these backends, a warning is printed and the single available solution is benchmarked.
 
+#### Benchmarking cuBLASLt under cotenant contention
+
+The cuBLASLt backend can run each candidate solution alongside a persistent
+cotenant kernel on a separate CUDA stream. The cotenant reserves dynamic shared
+memory while doing very little compute, which makes it useful for comparing
+solution performance under controlled SM residency pressure.
+
+```bash
+# Uncontended baseline (the default)
+build/mblas-bench -m 4096 -n 4096 -k 4096 \
+  --a_type f16_r --b_type f16_r --c_type f16_r --d_type f16_r \
+  --compute_type f32_r --function matmul --driver cublaslt \
+  --cotenant_workgroups 0
+
+# 32 persistent workgroups, each reserving about half an SM's shared memory
+build/mblas-bench -m 4096 -n 4096 -k 4096 \
+  --a_type f16_r --b_type f16_r --c_type f16_r --d_type f16_r \
+  --compute_type f32_r --function matmul --driver cublaslt \
+  --cotenant_workgroups 32 --cotenant_max_occupancy 2
+```
+
+`--cotenant_workgroups` defaults to 0, which disables the feature. When enabled,
+it must be less than every selected device's SM count. `--cotenant_max_occupancy`
+defaults to 1 and accepts values from 1 through 64. It controls the dynamic
+shared-memory reservation per cotenant block: a value of 2 reserves about half
+the shared memory per SM, while 4 reserves about one quarter. CUDA's occupancy
+API verifies the actual maximum resident blocks per SM, and the selected byte
+count and actual occupancy are logged.
+
+The workgroup count is not guaranteed to equal the number of distinct occupied
+SMs when max occupancy is greater than 1. These options model shared-memory
+residency contention; they do not reproduce a complete tenant's compute, cache,
+memory-bandwidth, or power behavior.
+
+For every requested cuBLASLt solution, the cotenant starts after setup, waits up
+to 30 seconds for all workgroups to report residency, remains active for cold
+and timed iterations, and stops after the timed CUDA event completes. Startup
+and shutdown are outside the reported GEMM time. When cotenant mode is enabled,
+one untimed priming matmul completes any lazy cuBLASLt algorithm setup before the
+persistent kernel starts. With multiple unique devices, the same requested
+configuration is applied independently to each device. Duplicate device IDs are
+rejected while cotenant mode is enabled.
+
 #### Running gemms from a YAML file
 Instead of specifying all parameters on the command line, you can use the `--yaml` argument to provide a configuration file that defines one or more GEMM operations. This is especially useful for running benchmarks across multiple matrix sizes, data types, or configurations.
 

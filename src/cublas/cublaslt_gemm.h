@@ -140,6 +140,9 @@ class cublaslt_gemm : public generic_gemm {
 
   uint64_t workspace_size = 64 * 1024 * 1024;
 
+  int cotenant_workgroups = 0;
+  int cotenant_max_occupancy = 1;
+
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
     // Emulated FP64 configuration
     bool use_f64_emulation = false;

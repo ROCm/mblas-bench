@@ -58,6 +58,7 @@ add_library(mblascuda SHARED
     cublas_convert.cu
     cublas_create_allocate.cpp
     cublas_datatype_utils.cpp
+    cuda_cotenant.cu
     cuda_error.cpp
     mblas_cuda_data_type.cpp
     mblas_cuda_compute_type.cpp

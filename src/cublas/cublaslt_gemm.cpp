@@ -4,13 +4,16 @@
 #include <cuda_runtime.h>
 
 #include <algorithm>
+#include <chrono>
 #include <climits>
 #include <cstring>
+#include <exception>
 #include <future>
 #include <iomanip>
 #include <limits>
 #include <numeric>
 #include <regex>
+#include <set>
 #include <string>
 #include <thread>
 
@@ -18,6 +21,7 @@
 #include "cublas_convert.h"
 #include "cublas_create_allocate.h"
 #include "cublas_datatype_utils.h"
+#include "cuda_cotenant.h"
 #include "cuda_error.h"
 #include "cxxopts.hpp"
 #include "cuda_monitor.h"
@@ -363,7 +367,23 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
   string dT = result["d_type"].as<string>();
   parse_problem_type(computeT, scalarT, aT, bT, cT, dT);
 
+  cotenant_workgroups = result["cotenant_workgroups"].as<int>();
+  cotenant_max_occupancy = result["cotenant_max_occupancy"].as<int>();
+  if (cotenant_workgroups < 0)
+    throw std::invalid_argument("cotenant_workgroups must be >= 0");
+  if (cotenant_max_occupancy < 1 || cotenant_max_occupancy > 64)
+    throw std::invalid_argument("cotenant_max_occupancy must be in [1, 64]");
+
   parse_dev_iters(result["device"].as<string>());
+  if (cotenant_workgroups > 0) {
+    std::set<int> selected_devices;
+    for (const auto& instance : mat_ptrs) {
+      if (!selected_devices.insert(instance.devIDX).second) {
+        throw std::invalid_argument(
+            "cotenant mode does not support duplicate device IDs");
+      }
+    }
+  }
   std::string tA = result["transposeA"].as<std::string>();
   std::string tB = result["transposeB"].as<std::string>();
   transA = mblas_cuda_operation(result["transposeA"].as<std::string>());
@@ -441,7 +461,7 @@ string cublaslt_gemm::prepare_array() {
   this->fill_host();
 
   int num_devices;
-  cudaGetDeviceCount(&num_devices);
+  check_cuda(cudaGetDeviceCount(&num_devices));
   // Check range of devices here
   // This implementation may not work if
   // CUDA_VISIBLE_DEVICES is set to something weird
@@ -453,6 +473,19 @@ string cublaslt_gemm::prepare_array() {
           std::to_string(num_devices) +
           "\nDevice selection:           " + std::to_string(instance.devIDX);
       throw std::invalid_argument(errorString);
+    }
+    if (instance.devIDX < 0)
+      throw std::invalid_argument("Invalid device id: " +
+                                  std::to_string(instance.devIDX));
+    if (cotenant_workgroups > 0) {
+      cudaDeviceProp properties{};
+      check_cuda(cudaGetDeviceProperties(&properties, instance.devIDX));
+      if (cotenant_workgroups >= properties.multiProcessorCount) {
+        throw std::invalid_argument(
+            "cotenant_workgroups must be less than device " +
+            std::to_string(instance.devIDX) + " SM count (" +
+            std::to_string(properties.multiProcessorCount) + ")");
+      }
     }
   }
   // for (auto &instance : mat_ptrs) {
@@ -489,6 +522,7 @@ string cublaslt_gemm::prepare_array() {
   ossHeader << "bias_type,";
   ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
+  ossHeader << "cotenant_workgroups,cotenant_max_occupancy,";
   ossHeader << "solution_index,";
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
@@ -896,13 +930,23 @@ void cublaslt_gemm::free_mem() {
 
 double cublaslt_gemm::test(const int &ith_solution) {
   vector<thread> threads;
-  double gflops = 0.0;
-  for (auto &mat : mat_ptrs) {
-    threads.push_back(thread(&cublaslt_gemm::test_matmul, this, &mat, ith_solution));
+  std::vector<std::exception_ptr> errors(mat_ptrs.size());
+  for (std::size_t i = 0; i < mat_ptrs.size(); ++i) {
+    threads.emplace_back([this, &mat = mat_ptrs[i], ith_solution, &error = errors[i]] {
+      try {
+        test_matmul(&mat, ith_solution);
+      } catch (...) {
+        error = std::current_exception();
+      }
+    });
   }
   // Wait on running jobs
   for (auto &thread : threads) {
     thread.join();
+  }
+  for (const auto& error : errors) {
+    if (error)
+      std::rethrow_exception(error);
   }
 
   // Sum all gflops
@@ -953,6 +997,8 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << scaling_string(scale_mode_c) << ',';
   ossValues << scaling_string(scale_mode_d) << ',';
   ossValues << flush_memory_size << ','; // rotating buffer size
+  ossValues << cotenant_workgroups << ',';
+  ossValues << cotenant_max_occupancy << ',';
   ossValues << current_solution_index << ',';
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
@@ -1015,67 +1061,109 @@ std::tuple<double, double, double> cublaslt_gemm::calculate_figure_of_merit(
 }
 
 void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat, int ith_solution) {
-  cublasStatus_t stat;
-  cublasLtHandle_t handle;
-  cudaStream_t stream;
-  check_cuda(cudaSetDevice(mat->devIDX));
-  check_cublas(cublasLtCreate(&handle));
-  check_cuda(cudaStreamCreate(&stream));
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = cublasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
-                          mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
-                          mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algos[ith_solution].algo, mat->devWork, mat->wSZ, stream);
-    // Check for errors during the gemm run
-    check_cublas(stat);
-    check_cuda(cudaGetLastError());
+  cublasStatus_t stat = CUBLAS_STATUS_SUCCESS;
+  cublasLtHandle_t handle = nullptr;
+  cudaStream_t stream = nullptr;
+  cudaEvent_t start = nullptr;
+  cudaEvent_t stop = nullptr;
+
+  const auto cleanup = [&] {
+    if (stop != nullptr)
+      (void)cudaEventDestroy(stop);
+    if (start != nullptr)
+      (void)cudaEventDestroy(start);
+    if (handle != nullptr)
+      (void)cublasLtDestroy(handle);
+    if (stream != nullptr)
+      (void)cudaStreamDestroy(stream);
+  };
+
+  try {
+    check_cuda(cudaSetDevice(mat->devIDX));
+    check_cublas(cublasLtCreate(&handle));
+    check_cuda(cudaStreamCreate(&stream));
+    check_cuda(cudaEventCreate(&start));
+    check_cuda(cudaEventCreate(&stop));
+
+    float elapsedTime_ms = 0.0F;
+    if (cotenant_workgroups > 0) {
+      // cuBLASLt may lazily load or initialize the selected algorithm on its
+      // first launch. Complete that setup before starting a persistent kernel,
+      // then run the normal cold and timed iterations under contention.
+      stat = cublasLtMatmul(handle, mat->desc_ops[0], alpha,
+                           mat->ptr_dev_a[0], mat->desc_a,
+                           mat->ptr_dev_b[0], mat->desc_b, beta,
+                           mat->ptr_dev_c[0], mat->desc_c,
+                           mat->ptr_dev_d[0], mat->desc_d,
+                           &mat->algos[ith_solution].algo, mat->devWork,
+                           mat->wSZ, stream);
+      check_cublas(stat);
+      check_cuda(cudaGetLastError());
+      check_cuda(cudaStreamSynchronize(stream));
+    }
+    {
+      const cuda_cotenant_config cotenant_config{
+          cotenant_workgroups, cotenant_max_occupancy,
+          std::chrono::milliseconds(30000)};
+      scoped_cuda_cotenant cotenant(cotenant_config, stream);
+
+      // Cold iters
+      for (int rep = 0; rep < cold_iters; rep++) {
+        int flush_index = rep % flush_batch_count;
+        stat = cublasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
+                             mat->ptr_dev_a[flush_index], mat->desc_a,
+                             mat->ptr_dev_b[flush_index], mat->desc_b, beta,
+                             mat->ptr_dev_c[flush_index], mat->desc_c,
+                             mat->ptr_dev_d[flush_index], mat->desc_d,
+                             &mat->algos[ith_solution].algo, mat->devWork,
+                             mat->wSZ, stream);
+        // Check for errors during the gemm run
+        check_cublas(stat);
+        check_cuda(cudaGetLastError());
+      }
+      check_cuda(cudaStreamSynchronize(stream));
+
+      /*
+        Run and time the performance test
+      */
+      auto freq_monitor = cuda_monitor::monitor();
+      freq_monitor.set_device_id(mat->devIDX);
+
+      freq_monitor.start();
+      check_cuda(cudaEventRecord(start, stream));
+      for (int rep = 0; rep < iters; rep++) {
+        int flush_index = rep % flush_batch_count;
+        stat = cublasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
+                             mat->ptr_dev_a[flush_index], mat->desc_a,
+                             mat->ptr_dev_b[flush_index], mat->desc_b, beta,
+                             mat->ptr_dev_c[flush_index], mat->desc_c,
+                             mat->ptr_dev_d[flush_index], mat->desc_d,
+                             &mat->algos[ith_solution].algo, mat->devWork,
+                             mat->wSZ, stream);
+      }
+      check_cuda(cudaEventRecord(stop, stream));
+      check_cuda(cudaEventSynchronize(stop));
+      freq_monitor.stop();
+
+      // Check for errors during the performance test
+      check_cublas(stat);
+      check_cuda(cudaGetLastError());
+      check_cuda(cudaEventElapsedTime(&elapsedTime_ms, start, stop));
+
+      if (cuda_monitor::monitor::enabled()) {
+        avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
+        med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
+        avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
+        med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
+      }
+    }
+
+    // Calculate and report GFlops after cotenant shutdown, outside event timing.
+    std::tie(mat->gflops, mat->gbytes, mat->time_us) =
+        calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+  } catch (...) {
+    cleanup();
+    throw;
   }
-  check_cuda(cudaStreamSynchronize(stream));
-
-  cudaEvent_t start, stop;
-  check_cuda(cudaEventCreate(&start));
-  check_cuda(cudaEventCreate(&stop));
-
-  /*
-    Run and time the performance test
-  */
-  auto freq_monitor = cuda_monitor::monitor();
-  freq_monitor.set_device_id(mat->devIDX);
-
-  freq_monitor.start();
-  cudaEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = cublasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
-                          mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
-                          mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algos[ith_solution].algo, mat->devWork, mat->wSZ, stream);
-  }
-  cudaEventRecord(stop, stream);
-  cudaEventSynchronize(stop);
-  freq_monitor.stop();
-
-  // Check for errors during the performance test
-  check_cublas(stat);
-  check_cuda(cudaGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  cudaEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
-
-  if (cuda_monitor::monitor::enabled()) {
-    avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
-    med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
-    avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
-    med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
-  }
-
+  cleanup();
 }
