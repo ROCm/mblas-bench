@@ -533,11 +533,11 @@ void hipblaslt_gemm::alloc_host() {
 
 
   for (int i = 0; i < flush_batch_count; i++) {
-    ptr_host_a[i] = malloc(get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, false));
-    ptr_host_b[i] = malloc(get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, false));
-    ptr_host_c[i] = malloc(get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, false));
+    ptr_host_a[i] = malloc(get_malloc_size(a_type, rows_mem_a, cols_mem_a, batch_count, stride_a, a_props.skip_convert));
+    ptr_host_b[i] = malloc(get_malloc_size(b_type, rows_mem_b, cols_mem_b, batch_count, stride_b, b_props.skip_convert));
+    ptr_host_c[i] = malloc(get_malloc_size(c_type, rows_mem_c, cols_mem_c, batch_count, stride_c, c_props.skip_convert));
     if (!inplace) {
-      ptr_host_d[i] = malloc(get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d, false));
+      ptr_host_d[i] = malloc(get_malloc_size(d_type, rows_mem_d, cols_mem_d, batch_count, stride_d, d_props.skip_convert));
     }
   }
   
