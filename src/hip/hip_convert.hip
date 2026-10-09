@@ -110,10 +110,17 @@ __global__ void float_to_ue5m3(float *input, size_t num_elements,
 // }
 
 void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x, long y,
-                      int batchsz, long long stride)
+                      int batchsz, long long stride, bool skip_convert)
 {
   if (batchsz * x * y == 0)
   {
+    return;
+  }
+  if (skip_convert)
+  {
+    check_hip(hipMemcpy(devA, hostA,
+                        get_malloc_size(precision, x, y, batchsz, stride, true),
+                        hipMemcpyHostToDevice));
     return;
   }
   long long base = x * y;
@@ -123,7 +130,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
-    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMalloc(&tmpA, get_malloc_size(precision, x, y, batchsz, stride, false)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz, hipMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
@@ -136,7 +143,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
-    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMalloc(&tmpA, get_malloc_size(precision, x, y, batchsz, stride, false)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz, hipMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
@@ -153,7 +160,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
-    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMalloc(&tmpA, get_malloc_size(precision, x, y, batchsz, stride, false)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz, hipMemcpyHostToDevice));
     long long num_elements = total_elements;
     long long block_size = 256;
@@ -185,7 +192,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
-    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMalloc(&tmpA, get_malloc_size(precision, x, y, batchsz, stride, false)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
                          hipMemcpyHostToDevice));
     long long num_elements = ceil_division(total_elements, 2ll);
@@ -201,7 +208,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
-    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMalloc(&tmpA, get_malloc_size(precision, x, y, batchsz, stride, false)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
                          hipMemcpyHostToDevice));
     long long num_elements = total_elements;
@@ -226,7 +233,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
-    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMalloc(&tmpA, get_malloc_size(precision, x, y, batchsz, stride, false)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
                          hipMemcpyHostToDevice));
     long long num_elements = total_elements;
@@ -241,7 +248,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   {
     // Allocate memory in the device for host precision (float)
     void *tmpA;
-    check_hip(hipMalloc(&tmpA, get_malloc_size_host(precision, x, y, batchsz, stride)));
+    check_hip(hipMalloc(&tmpA, get_malloc_size(precision, x, y, batchsz, stride, false)));
     check_hip(hipMemcpy(tmpA, hostA, total_elements * hostsz,
                          hipMemcpyHostToDevice));
     long long num_elements = total_elements;
@@ -256,7 +263,7 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   else 
   {
     check_hip(hipMemcpy(devA, hostA,
-                        get_malloc_size_host(precision, x, y, batchsz, stride),
+                        get_malloc_size(precision, x, y, batchsz, stride, false),
                         hipMemcpyHostToDevice));
   }
 }

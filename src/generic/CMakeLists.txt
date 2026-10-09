@@ -9,10 +9,11 @@ add_library(mblasgeneric STATIC
 )
 find_package(OpenMP REQUIRED)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -g")
-
 set_target_properties(mblasgeneric PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# Not CMAKE_BUILD_TYPE=Release: its -DNDEBUG would disable the assert() calls
+# that the error-check helpers depend on.
+target_compile_options(mblasgeneric PRIVATE $<$<NOT:$<CONFIG:Debug>>:-O3> -g)
 
 target_include_directories(mblasgeneric PRIVATE
     .

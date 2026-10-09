@@ -80,8 +80,12 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_120,code=sm_120"
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -gencode=arch=compute_120,code=compute_120")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -g")
+# Not CMAKE_BUILD_TYPE=Release: its -DNDEBUG would disable the assert() calls
+# that the error-check helpers depend on.
+target_compile_options(mblascuda PRIVATE
+    $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CONFIG:Debug>>>:-O3>
+    $<$<COMPILE_LANGUAGE:CXX>:-g>
+)
 
 if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.8.0)
     add_definitions(-DENABLE_CUDA_FP4)

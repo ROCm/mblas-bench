@@ -22,10 +22,8 @@
 // void *allocate_dev_array(mblas_data_type type, long x, long y, int batch = 1);
 // void *allocate_host_dev_array(mblas_data_type type, long x, long y, int batch = 1);
 
-long long get_malloc_size_host(mblas_data_type type, long x, long y, int batch,
-                               long long stride);
-long long get_malloc_size_dev(mblas_data_type type, long x, long y, int batch,
-                              long long stride);
+long long get_malloc_size(mblas_data_type type, long x, long y, int batch,
+                          long long stride, bool use_dev_type);
 
 // void initHostH(mblas_data_type precision, std::string initialization, void *ptr,
 //                int rows_A, int cols_A, int ld, int batch, long long int stride,
@@ -60,8 +58,7 @@ struct set_scalar {
 };
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args)
-    -> std::invoke_result_t<tFunc<double>, Args...>;
+auto type_call_host(mblas_data_type type, Args... args);
 
 template <template <typename> class tFunc, class... Args>
 auto type_call_dev(mblas_data_type type, Args... args)
@@ -184,52 +181,60 @@ void batchedPtrMagic<T>::operator()(void **hptr, void **dptr, void *dAr,
 //                              long long int stride);
 
 template <template <typename> class tFunc, class... Args>
-auto type_call_host(mblas_data_type type, Args... args)
-    -> std::invoke_result_t<tFunc<double>, Args...> {
+auto type_call_host(mblas_data_type type, Args... args) {
+  // The pointer argument only carries the element type; it is always null.
+  auto call = [&](auto *tag) {
+    using F = tFunc<std::remove_pointer_t<decltype(tag)>>;
+    if constexpr (std::is_invocable_v<F, mblas_data_type, Args...>) {
+      return F()(type, args...);
+    } else {
+      return F()(args...);
+    }
+  };
   // At runtime, determine which typed implementation to use and call it
   switch (type) {
     case MBLAS_R_64F:
-      return tFunc<double>()(args...);
+      return call(static_cast<double *>(nullptr));
     case MBLAS_C_64F:
-      return tFunc<std::complex<double>>()(args...);
+      return call(static_cast<std::complex<double> *>(nullptr));
     case MBLAS_R_32F:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case MBLAS_C_32F:
-      return tFunc<std::complex<float>>()(args...);
+      return call(static_cast<std::complex<float> *>(nullptr));
     case MBLAS_R_16BF:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case MBLAS_R_16F:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_E4M3:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_E5M2:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_E4M3_FNUZ:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_E5M2_FNUZ:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
 #if HIP_VERSION >= 70000000
     case mblas_data_type::MBLAS_R_8F_UE8M0:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_UE4M3:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_8F_UE5M3:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_6F_E2M3:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_6F_E3M2:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
     case mblas_data_type::MBLAS_R_4F_E2M1:
-      return tFunc<float>()(args...);
+      return call(static_cast<float *>(nullptr));
 #endif
     case MBLAS_R_8I:
-      return tFunc<__int8_t>()(args...);
+      return call(static_cast<__int8_t *>(nullptr));
     case MBLAS_R_8U:
-      return tFunc<__uint8_t>()(args...);
+      return call(static_cast<__uint8_t *>(nullptr));
     case MBLAS_R_32I:
-      return tFunc<__int32_t>()(args...);
+      return call(static_cast<__int32_t *>(nullptr));
     default:
-      return tFunc<double>()(args...);
+      return call(static_cast<double *>(nullptr));
   }
 }
 
