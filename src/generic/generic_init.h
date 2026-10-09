@@ -1,10 +1,12 @@
 #pragma once
 
 #include <complex>
+#include <cstdint>
 #include <iostream>
 #include <random>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 #include <string>
 #include <cmath>
@@ -154,9 +156,11 @@ void fill_rand_host_uniform(void **ptr_array, long rows_A, long cols_A, long ld,
   }
 }
 
+// Reference implementation of pow2_binomial, kept for validation. Not called.
 template <typename T>
-void fill_rand_host_pow2_binomial(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
-                                   long long int stride, int flush_batch_count, int n = 10, int center = 0) {
+void fill_rand_host_pow2_binomial_reference(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
+                                            long long int stride, int flush_batch_count, int n = 10,
+                                            int center = 0) {
   std::random_device r;
   int random_dev_seed = r();
   #pragma omp parallel
@@ -173,6 +177,54 @@ void fill_rand_host_pow2_binomial(void **ptr_array, long rows_A, long cols_A, lo
             int binomial_value = binomial_dist(gen);
             int offset_value = binomial_value - (n + 1) + center;
             A[i + j * ld + i_batch * stride] = T(std::ldexp(T(1), offset_value));
+          }
+        }
+      }
+    }
+  }
+}
+
+// Binomial(trials, 0.5) sample: the number of set bits in `trials` fair random bits.
+// Exact, and much cheaper than std::binomial_distribution, which uses a
+// log/exp rejection sampler when trials * p >= 8.
+inline int binomial_half(std::mt19937 &gen, int trials) {
+  int count = 0;
+  for (; trials >= 32; trials -= 32) {
+    count += __builtin_popcount(static_cast<uint32_t>(gen()));
+  }
+  if (trials > 0) {
+    count += __builtin_popcount(static_cast<uint32_t>(gen()) & ((1u << trials) - 1u));
+  }
+  return count;
+}
+
+// Same distribution as fill_rand_host_pow2_binomial_reference, but samples with
+// binomial_half and a lookup table of the 2n+2 possible values. For a given seed
+// the random sequence differs from the reference.
+template <typename T>
+void fill_rand_host_pow2_binomial(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
+                                   long long int stride, int flush_batch_count, int n = 10, int center = 0) {
+  const int trials = 2 * n + 1;
+  if (trials < 0) {
+    throw std::invalid_argument("Error: pow2_binomial requires n >= 0");
+  }
+  std::vector<T> pow2_values(trials + 1);
+  for (int k = 0; k <= trials; k++) {
+    pow2_values[k] = T(std::ldexp(T(1), k - (n + 1) + center));
+  }
+  std::random_device r;
+  int random_dev_seed = r();
+  #pragma omp parallel
+  {
+    std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
+    std::mt19937 gen(seed);
+    #pragma omp for collapse(4) 
+    for (int flush_idx = 0; flush_idx < flush_batch_count; flush_idx++) {
+      for (size_t i_batch = 0; i_batch < batch; i_batch++) {
+        for (size_t j = 0; j < cols_A; ++j) {
+          for (size_t i = 0; i < rows_A; ++i) {
+            T *A = (T *)ptr_array[flush_idx];
+            A[i + j * ld + i_batch * stride] = pow2_values[binomial_half(gen, trials)];
           }
         }
       }
