@@ -398,10 +398,10 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
   use_scaling = a_type.is_mx_possible() || b_type.is_mx_possible() || 
                 c_type.is_mx_possible() || d_type.is_mx_possible();
   if (use_scaling) {
-    std::tie(a_scale_type, a_scale_mode, a_scale_size) = configure_scaling(a_props, a_type, "A");
-    std::tie(b_scale_type, b_scale_mode, b_scale_size) = configure_scaling(b_props, b_type, "B");
-    std::tie(c_scale_type, c_scale_mode, c_scale_size) = configure_scaling(c_props, c_type, "C");
-    std::tie(d_scale_type, d_scale_mode, d_scale_size) = configure_scaling(d_props, d_type, "D");
+    std::tie(a_scale_type, hipblaslt_scale_mode_a, a_scale_size) = configure_scaling(a_props, a_type, "A");
+    std::tie(b_scale_type, hipblaslt_scale_mode_b, b_scale_size) = configure_scaling(b_props, b_type, "B");
+    std::tie(c_scale_type, hipblaslt_scale_mode_c, c_scale_size) = configure_scaling(c_props, c_type, "C");
+    std::tie(d_scale_type, hipblaslt_scale_mode_d, d_scale_size) = configure_scaling(d_props, d_type, "D");
   }
 #endif
   
@@ -501,7 +501,7 @@ string hipblaslt_gemm::prepare_array() {
     ossHeader << "batch_count,";
   }
   //ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,";
-  ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
+  ossHeader << "scale_mode_a,scale_mode_b,scale_mode_c,scale_mode_d,";
   ossHeader << "solution_index,";
   ossHeader << "hipBLASLt-Gflops,hipBLASLt-GB/s,hipBLASLt-us," << endl;
   return ossHeader.str();
@@ -736,13 +736,13 @@ void hipblaslt_gemm::prepare_matrix(hipblaslt_gemm_inst *mat) {
 #if HIP_VERSION >= 70000000
     if (a_props.scale_mode != scaling_type::None) {
       check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
-          HIPBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
+          HIPBLASLT_MATMUL_DESC_A_SCALE_MODE, &hipblaslt_scale_mode_a, sizeof(hipblaslt_scale_mode_a)));
       check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
           HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a[i], sizeof(void*)));
     }
     if (b_props.scale_mode != scaling_type::None) {
       check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
-          HIPBLASLT_MATMUL_DESC_B_SCALE_MODE, &b_scale_mode, sizeof(b_scale_mode)));
+          HIPBLASLT_MATMUL_DESC_B_SCALE_MODE, &hipblaslt_scale_mode_b, sizeof(hipblaslt_scale_mode_b)));
       check_hipblas(hipblasLtMatmulDescSetAttribute(mat->desc_ops[i],
           HIPBLASLT_MATMUL_DESC_B_SCALE_POINTER, &mat->scale_dev_b[i], sizeof(void*)));
     }
