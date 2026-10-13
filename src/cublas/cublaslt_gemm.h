@@ -40,6 +40,7 @@ struct cublaslt_gemm_inst {
   double gbytes = 0;
   double time_us = 0;
   int device_sm_count = 0;
+  std::string device_uuid;
   int actual_cotenant_occupancy = 0;
   std::size_t cotenant_shared_bytes_per_block = 0;
   std::size_t shared_bytes_per_sm = 0;

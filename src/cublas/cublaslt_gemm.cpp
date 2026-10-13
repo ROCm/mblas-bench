@@ -51,6 +51,19 @@ Value get_algo_config_attribute(
   return value;
 }
 
+std::string format_cuda_uuid(const cudaUUID_t& uuid) {
+  std::ostringstream output;
+  output << "GPU-" << std::hex << std::setfill('0');
+  for (int index = 0; index < 16; ++index) {
+    if (index == 4 || index == 6 || index == 8 || index == 10)
+      output << '-';
+    output << std::setw(2)
+           << static_cast<unsigned int>(
+                  static_cast<unsigned char>(uuid.bytes[index]));
+  }
+  return output.str();
+}
+
 // cuBLASLt doc: FP8 matmul expects TN (transA=T, transB=N) on Ada (8.9), Hopper (9.0),
 // and Blackwell GeForce (12.x). CC is from the runtime device; "GeForce" is inferred from name
 // https://docs.nvidia.com/cuda/cublas/index.html#cublasltmatmul
@@ -499,6 +512,7 @@ string cublaslt_gemm::prepare_array() {
     cudaDeviceProp properties{};
     check_cuda(cudaGetDeviceProperties(&properties, instance.devIDX));
     instance.device_sm_count = properties.multiProcessorCount;
+    instance.device_uuid = format_cuda_uuid(properties.uuid);
     instance.shared_bytes_per_sm = properties.sharedMemPerMultiprocessor;
     if (cublaslt_sm_count_target > properties.multiProcessorCount) {
       throw std::invalid_argument(
@@ -550,7 +564,7 @@ string cublaslt_gemm::prepare_array() {
   ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
   ossHeader << "cotenant_workgroups,cotenant_max_occupancy,cublaslt_sm_count_target,";
-  ossHeader << "device_sm_count,actual_cotenant_occupancy,";
+  ossHeader << "device_sm_count,device_uuid,actual_cotenant_occupancy,";
   ossHeader << "cotenant_shared_bytes_per_block,shared_bytes_per_sm,";
   ossHeader << "solution_index,";
   ossHeader << "heuristic_results_returned,cublaslt_version,";
@@ -1061,6 +1075,7 @@ std::string cublaslt_gemm::get_result_string() {
   assert(!mat_ptrs.empty());
   const auto& result_instance = mat_ptrs.front();
   ossValues << result_instance.device_sm_count << ',';
+  ossValues << result_instance.device_uuid << ',';
   ossValues << result_instance.actual_cotenant_occupancy << ',';
   ossValues << result_instance.cotenant_shared_bytes_per_block << ',';
   ossValues << result_instance.shared_bytes_per_sm << ',';

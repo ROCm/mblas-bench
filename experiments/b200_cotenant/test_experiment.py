@@ -69,6 +69,7 @@ class ParsingTest(unittest.TestCase):
             "cotenant_max_occupancy": "1",
             "cublaslt_sm_count_target": "128",
             "device_sm_count": "148",
+            "device_uuid": "GPU-00000000-0000-0000-0000-000000000001",
             "actual_cotenant_occupancy": "1",
             "cotenant_shared_bytes_per_block": "232448",
             "heuristic_results_returned": "1",

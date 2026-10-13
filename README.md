@@ -133,7 +133,8 @@ optional persistent kernel starts. With multiple unique devices, the same
 requested configuration is applied independently to each device. Duplicate
 device IDs are rejected while cotenant mode is enabled.
 
-The CSV output includes requested pressure and SM target, device and cotenant
+The CSV output includes requested pressure and SM target, device SM count and
+UUID, and cotenant
 resource measurements, the heuristic wave count, and the selected algorithm's
 runtime library version, result state, required workspace, ID, tile, stages,
 split-K, reduction, swizzle, custom option, inner shape, and cluster shape. Set

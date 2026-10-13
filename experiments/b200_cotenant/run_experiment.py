@@ -143,6 +143,8 @@ def validate_result(point: Point, row: dict[str, str]) -> None:
             raise ValueError(f"benchmark output is missing {field}")
         if int(row[field]) != value:
             raise ValueError(f"{field}={row[field]}, expected {value}")
+    if not row.get("device_uuid", "").startswith("GPU-"):
+        raise ValueError("benchmark output is missing a CUDA device UUID")
     if point.cotenant_workgroups and int(row["cotenant_shared_bytes_per_block"]) <= 0:
         raise ValueError("contended result reports no shared-memory reservation")
     for field in (
@@ -362,6 +364,9 @@ def main(argv: list[str] | None = None) -> int:
             "completed_rows": len(successful),
             "failed_points": len(pending),
             "failure_attempts": len(failures),
+            "selected_gpu_uuids": sorted(
+                {row["device_uuid"] for row in successful.values()}
+            ),
         }
     )
     meta_path.write_text(json.dumps(meta, indent=2) + "\n")

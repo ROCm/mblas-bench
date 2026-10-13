@@ -120,9 +120,9 @@ def validate(rows: list[dict[str, str]], metadata: dict[str, object]) -> None:
             f"incomplete matrix: duplicates={duplicates}, missing={len(missing)}, "
             f"unexpected={len(unexpected)}"
         )
-    uuids = {row["gpu_uuid"] for row in rows if row.get("gpu_uuid")}
-    if len(uuids) > 1:
-        raise ValueError(f"results contain multiple GPU UUIDs: {sorted(uuids)}")
+    uuids = {row["device_uuid"] for row in rows if row.get("device_uuid")}
+    if any(not row.get("device_uuid") for row in rows) or len(uuids) != 1:
+        raise ValueError(f"results contain invalid or multiple GPU UUIDs: {sorted(uuids)}")
     versions = {row["cublaslt_version"] for row in rows}
     if "" in versions or len(versions) != 1:
         raise ValueError(f"results contain invalid or mixed cuBLASLt versions: {sorted(versions)}")
