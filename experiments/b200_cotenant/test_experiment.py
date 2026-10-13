@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+import pathlib
+import tempfile
 
 from experiments.b200_cotenant.analyze_experiment import mean_ci95, paired_ratios
 from experiments.b200_cotenant.run_experiment import (
@@ -12,6 +14,7 @@ from experiments.b200_cotenant.run_experiment import (
     generate_matrix,
     parse_benchmark_csv,
     validate_result,
+    write_csv,
 )
 
 
@@ -40,6 +43,13 @@ class MatrixTest(unittest.TestCase):
 
 
 class ParsingTest(unittest.TestCase):
+    def test_empty_csv_replaces_stale_results(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "raw.csv"
+            path.write_text("stale,data\n1,2\n")
+            write_csv(path, [])
+            self.assertEqual(path.read_text(), "")
+
     def test_parses_trailing_comma_csv_amid_logs(self) -> None:
         output = "note\ntransA_option,cublaslt_sm_count_target,cuBLAS-us,\nN,148,10.5,\n"
         self.assertEqual(

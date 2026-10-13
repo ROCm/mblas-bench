@@ -283,6 +283,7 @@ def run_point(
 
 def write_csv(path: pathlib.Path, rows: list[dict[str, object]]) -> None:
     if not rows:
+        path.write_text("")
         return
     fields: list[str] = []
     for row in rows:
