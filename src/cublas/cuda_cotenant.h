@@ -3,12 +3,18 @@
 #include <cuda_runtime.h>
 
 #include <chrono>
+#include <cstddef>
 #include <memory>
 
 struct cuda_cotenant_config {
   int workgroups = 0;
   int max_occupancy = 1;
   std::chrono::milliseconds ready_timeout{30000};
+};
+
+struct cuda_cotenant_info {
+  int blocks_per_sm = 0;
+  std::size_t shared_bytes_per_block = 0;
 };
 
 // Owns a persistent shared-memory cotenant kernel for one CUDA device.
@@ -21,6 +27,8 @@ class scoped_cuda_cotenant {
 
   scoped_cuda_cotenant(const scoped_cuda_cotenant&) = delete;
   scoped_cuda_cotenant& operator=(const scoped_cuda_cotenant&) = delete;
+
+  cuda_cotenant_info info() const noexcept;
 
  private:
   class impl;

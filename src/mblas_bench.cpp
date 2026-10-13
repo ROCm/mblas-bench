@@ -232,6 +232,9 @@ int main(int argc, char **argv) try {
   opp_adder("cotenant_max_occupancy",
             "Shared-memory-based maximum cotenant blocks per SM (1-64)",
             cxxopts::value<int>()->default_value("1"));
+  opp_adder("cublaslt_sm_count_target",
+            "Explicit cuBLASLt SM-count target; 0 preserves library default",
+            cxxopts::value<int>()->default_value("0"));
   opp_adder("initialization",
             "Initialize with random integers, trig functions sin and cos, or "
             "hpl-like input. Options: rand_int, trig_float, normal_float, "
@@ -371,6 +374,8 @@ int main(int argc, char **argv) try {
     const int cotenant_workgroups = result["cotenant_workgroups"].as<int>();
     const int cotenant_max_occupancy =
         result["cotenant_max_occupancy"].as<int>();
+    const int cublaslt_sm_count_target =
+        result["cublaslt_sm_count_target"].as<int>();
     if (cotenant_workgroups < 0) {
       cerr << "cotenant_workgroups must be >= 0" << endl;
       return 1;
@@ -379,11 +384,20 @@ int main(int argc, char **argv) try {
       cerr << "cotenant_max_occupancy must be in [1, 64]" << endl;
       return 1;
     }
+    if (cublaslt_sm_count_target < 0) {
+      cerr << "cublaslt_sm_count_target must be >= 0" << endl;
+      return 1;
+    }
 
     const bool uses_cublaslt =
         driver == "cublaslt" || (driver == "cublas" && function == "matmul");
     if (cotenant_workgroups > 0 && !uses_cublaslt) {
       cerr << "cotenant_workgroups is supported only by the cuBLASLt backend"
+           << endl;
+      return 1;
+    }
+    if (cublaslt_sm_count_target > 0 && !uses_cublaslt) {
+      cerr << "cublaslt_sm_count_target is supported only by the cuBLASLt backend"
            << endl;
       return 1;
     }

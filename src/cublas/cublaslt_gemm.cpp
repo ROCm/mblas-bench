@@ -36,6 +36,21 @@ using std::vector;
 
 namespace {
 
+template <typename Value>
+Value get_algo_config_attribute(
+    const cublasLtMatmulAlgo_t& algo,
+    cublasLtMatmulAlgoConfigAttributes_t attribute) {
+  Value value{};
+  std::size_t written = 0;
+  check_cublas(cublasLtMatmulAlgoConfigGetAttribute(
+      &algo, attribute, &value, sizeof(value), &written));
+  if (written != sizeof(value)) {
+    throw std::runtime_error(
+        "cuBLASLt returned an unexpected algorithm attribute size");
+  }
+  return value;
+}
+
 // cuBLASLt doc: FP8 matmul expects TN (transA=T, transB=N) on Ada (8.9), Hopper (9.0),
 // and Blackwell GeForce (12.x). CC is from the runtime device; "GeForce" is inferred from name
 // https://docs.nvidia.com/cuda/cublas/index.html#cublasltmatmul
@@ -369,10 +384,14 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
 
   cotenant_workgroups = result["cotenant_workgroups"].as<int>();
   cotenant_max_occupancy = result["cotenant_max_occupancy"].as<int>();
+  cublaslt_sm_count_target =
+      result["cublaslt_sm_count_target"].as<int>();
   if (cotenant_workgroups < 0)
     throw std::invalid_argument("cotenant_workgroups must be >= 0");
   if (cotenant_max_occupancy < 1 || cotenant_max_occupancy > 64)
     throw std::invalid_argument("cotenant_max_occupancy must be in [1, 64]");
+  if (cublaslt_sm_count_target < 0)
+    throw std::invalid_argument("cublaslt_sm_count_target must be >= 0");
 
   parse_dev_iters(result["device"].as<string>());
   if (cotenant_workgroups > 0) {
@@ -477,9 +496,17 @@ string cublaslt_gemm::prepare_array() {
     if (instance.devIDX < 0)
       throw std::invalid_argument("Invalid device id: " +
                                   std::to_string(instance.devIDX));
+    cudaDeviceProp properties{};
+    check_cuda(cudaGetDeviceProperties(&properties, instance.devIDX));
+    instance.device_sm_count = properties.multiProcessorCount;
+    instance.shared_bytes_per_sm = properties.sharedMemPerMultiprocessor;
+    if (cublaslt_sm_count_target > properties.multiProcessorCount) {
+      throw std::invalid_argument(
+          "cublaslt_sm_count_target must not exceed device " +
+          std::to_string(instance.devIDX) + " SM count (" +
+          std::to_string(properties.multiProcessorCount) + ")");
+    }
     if (cotenant_workgroups > 0) {
-      cudaDeviceProp properties{};
-      check_cuda(cudaGetDeviceProperties(&properties, instance.devIDX));
       if (cotenant_workgroups >= properties.multiProcessorCount) {
         throw std::invalid_argument(
             "cotenant_workgroups must be less than device " +
@@ -522,8 +549,15 @@ string cublaslt_gemm::prepare_array() {
   ossHeader << "bias_type,";
   ossHeader << "a_scale_mode,b_scale_mode,c_scale_mode,d_scale_mode,";
   ossHeader << "rotating_buffer,";
-  ossHeader << "cotenant_workgroups,cotenant_max_occupancy,";
+  ossHeader << "cotenant_workgroups,cotenant_max_occupancy,cublaslt_sm_count_target,";
+  ossHeader << "device_sm_count,actual_cotenant_occupancy,";
+  ossHeader << "cotenant_shared_bytes_per_block,shared_bytes_per_sm,";
   ossHeader << "solution_index,";
+  ossHeader << "heuristic_results_returned,cublaslt_version,";
+  ossHeader << "heuristic_state,heuristic_workspace_bytes,heuristic_waves_count,";
+  ossHeader << "algo_id,algo_tile_id,algo_stages_id,algo_splitk_num,";
+  ossHeader << "algo_reduction_scheme,algo_cta_swizzle,algo_custom_option,";
+  ossHeader << "algo_inner_shape_id,algo_cluster_shape_id,";
   ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us,";
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
   if (use_f64_emulation) {
@@ -532,6 +566,8 @@ string cublaslt_gemm::prepare_array() {
 #endif
   if (cuda_monitor::monitor::enabled()) {
     ossHeader << "avg_sysclk_mhz,med_sysclk_mhz,avg_memclk_mhz,med_memclk_mhz,";
+    ossHeader << "avg_temperature_c,min_temperature_c,max_temperature_c,";
+    ossHeader << "avg_power_w,min_power_w,max_power_w,";
   }
   ossHeader << endl;
   return ossHeader.str();
@@ -539,11 +575,22 @@ string cublaslt_gemm::prepare_array() {
 
 void cublaslt_gemm::run_threaded(void (cublaslt_gemm::*func)(cublaslt_gemm_inst *)) {
   vector<thread> threads;
-  for (auto &instance : mat_ptrs) {
-    threads.push_back(thread(func, this, &instance));
+  std::vector<std::exception_ptr> errors(mat_ptrs.size());
+  for (std::size_t i = 0; i < mat_ptrs.size(); ++i) {
+    threads.emplace_back([this, func, &instance = mat_ptrs[i], &error = errors[i]] {
+      try {
+        (this->*func)(&instance);
+      } catch (...) {
+        error = std::current_exception();
+      }
+    });
   }
   for (auto &thread : threads) {
     thread.join();
+  }
+  for (const auto& error : errors) {
+    if (error)
+      std::rethrow_exception(error);
   }
 }
 
@@ -738,6 +785,11 @@ void cublaslt_gemm::prepare_matrix(cublaslt_gemm_inst *mat) {
         mat->desc_ops[i], CUBLASLT_MATMUL_DESC_TRANSA, &transACU, sizeof(transACU)));
     check_cublas(cublasLtMatmulDescSetAttribute(
         mat->desc_ops[i], CUBLASLT_MATMUL_DESC_TRANSB, &transBCU, sizeof(transBCU)));
+    if (cublaslt_sm_count_target > 0) {
+      check_cublas(cublasLtMatmulDescSetAttribute(
+          mat->desc_ops[i], CUBLASLT_MATMUL_DESC_SM_COUNT_TARGET,
+          &cublaslt_sm_count_target, sizeof(cublaslt_sm_count_target)));
+    }
     if (a_props.scale_mode != scaling_type::None) {
       check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_ops[i], CUBLASLT_MATMUL_DESC_A_SCALE_MODE, &a_scale_mode, sizeof(a_scale_mode)));
       check_cublas(cublasLtMatmulDescSetAttribute(mat->desc_ops[i], CUBLASLT_MATMUL_DESC_A_SCALE_POINTER, &mat->scale_dev_a[i], sizeof(void*)));
@@ -825,6 +877,12 @@ void cublaslt_gemm::no_tuning(cublaslt_gemm_inst *mat) {
     check_cublas(CUBLAS_STATUS_NOT_SUPPORTED);
   }
   heuristicResults.resize(retResults);
+  for (const auto& result : heuristicResults) {
+    if (result.state != CUBLAS_STATUS_SUCCESS) {
+      throw std::runtime_error(
+          "cuBLASLt returned an unsuccessful heuristic result");
+    }
+  }
   mat->algos = std::move(heuristicResults);
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
   if (use_f64_emulation) {
@@ -999,7 +1057,50 @@ std::string cublaslt_gemm::get_result_string() {
   ossValues << flush_memory_size << ','; // rotating buffer size
   ossValues << cotenant_workgroups << ',';
   ossValues << cotenant_max_occupancy << ',';
+  ossValues << cublaslt_sm_count_target << ',';
+  assert(!mat_ptrs.empty());
+  const auto& result_instance = mat_ptrs.front();
+  ossValues << result_instance.device_sm_count << ',';
+  ossValues << result_instance.actual_cotenant_occupancy << ',';
+  ossValues << result_instance.cotenant_shared_bytes_per_block << ',';
+  ossValues << result_instance.shared_bytes_per_sm << ',';
   ossValues << current_solution_index << ',';
+  const auto& heuristic = result_instance.algos[current_solution_index];
+  ossValues << result_instance.algos.size() << ',';
+  ossValues << cublasLtGetVersion() << ',';
+  ossValues << static_cast<int>(heuristic.state) << ',';
+  ossValues << heuristic.workspaceSize << ',';
+  ossValues << heuristic.wavesCount << ',';
+  ossValues << get_algo_config_attribute<int32_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_ID) << ',';
+  ossValues << get_algo_config_attribute<uint32_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_TILE_ID) << ',';
+#if defined(HAS_CUBLASLT_ALGO_STAGES_ID)
+  ossValues << get_algo_config_attribute<uint32_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_STAGES_ID) << ',';
+#else
+  ossValues << -1 << ',';
+#endif
+  ossValues << get_algo_config_attribute<uint32_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_SPLITK_NUM) << ',';
+  ossValues << get_algo_config_attribute<uint32_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME) << ',';
+  ossValues << get_algo_config_attribute<uint32_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING) << ',';
+  ossValues << get_algo_config_attribute<uint32_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION) << ',';
+#if defined(HAS_CUBLASLT_ALGO_INNER_SHAPE)
+  ossValues << get_algo_config_attribute<uint16_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_INNER_SHAPE_ID) << ',';
+#else
+  ossValues << -1 << ',';
+#endif
+#if defined(HAS_CUBLASLT_ALGO_CLUSTER_SHAPE)
+  ossValues << get_algo_config_attribute<uint16_t>(
+      heuristic.algo, CUBLASLT_ALGO_CONFIG_CLUSTER_SHAPE_ID) << ',';
+#else
+  ossValues << -1 << ',';
+#endif
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
@@ -1019,6 +1120,12 @@ std::string cublaslt_gemm::get_result_string() {
     ossValues << med_sysclk_mhz << ',';
     ossValues << avg_memclk_mhz << ',';
     ossValues << med_memclk_mhz << ',';
+    ossValues << avg_temperature_c << ',';
+    ossValues << min_temperature_c << ',';
+    ossValues << max_temperature_c << ',';
+    ossValues << avg_power_w << ',';
+    ossValues << min_power_w << ',';
+    ossValues << max_power_w << ',';
   }
   ossValues << endl;
   return ossValues.str();
@@ -1086,26 +1193,28 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat, int ith_solution) {
     check_cuda(cudaEventCreate(&stop));
 
     float elapsedTime_ms = 0.0F;
-    if (cotenant_workgroups > 0) {
-      // cuBLASLt may lazily load or initialize the selected algorithm on its
-      // first launch. Complete that setup before starting a persistent kernel,
-      // then run the normal cold and timed iterations under contention.
-      stat = cublasLtMatmul(handle, mat->desc_ops[0], alpha,
-                           mat->ptr_dev_a[0], mat->desc_a,
-                           mat->ptr_dev_b[0], mat->desc_b, beta,
-                           mat->ptr_dev_c[0], mat->desc_c,
-                           mat->ptr_dev_d[0], mat->desc_d,
-                           &mat->algos[ith_solution].algo, mat->devWork,
-                           mat->wSZ, stream);
-      check_cublas(stat);
-      check_cuda(cudaGetLastError());
-      check_cuda(cudaStreamSynchronize(stream));
-    }
+    // Prime every configuration identically before optional cotenant launch.
+    // This keeps lazy cuBLASLt initialization out of both the contention and
+    // event-timed regions.
+    stat = cublasLtMatmul(handle, mat->desc_ops[0], alpha,
+                         mat->ptr_dev_a[0], mat->desc_a,
+                         mat->ptr_dev_b[0], mat->desc_b, beta,
+                         mat->ptr_dev_c[0], mat->desc_c,
+                         mat->ptr_dev_d[0], mat->desc_d,
+                         &mat->algos[ith_solution].algo, mat->devWork,
+                         mat->wSZ, stream);
+    check_cublas(stat);
+    check_cuda(cudaGetLastError());
+    check_cuda(cudaStreamSynchronize(stream));
     {
       const cuda_cotenant_config cotenant_config{
           cotenant_workgroups, cotenant_max_occupancy,
           std::chrono::milliseconds(30000)};
       scoped_cuda_cotenant cotenant(cotenant_config, stream);
+      const cuda_cotenant_info cotenant_info = cotenant.info();
+      mat->actual_cotenant_occupancy = cotenant_info.blocks_per_sm;
+      mat->cotenant_shared_bytes_per_block =
+          cotenant_info.shared_bytes_per_block;
 
       // Cold iters
       for (int rep = 0; rep < cold_iters; rep++) {
@@ -1155,6 +1264,12 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat, int ith_solution) {
         med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
         avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
         med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
+        avg_temperature_c = freq_monitor.get_avg_temperature_c();
+        min_temperature_c = freq_monitor.get_min_temperature_c();
+        max_temperature_c = freq_monitor.get_max_temperature_c();
+        avg_power_w = freq_monitor.get_avg_power_w();
+        min_power_w = freq_monitor.get_min_power_w();
+        max_power_w = freq_monitor.get_max_power_w();
       }
     }
 

@@ -39,6 +39,10 @@ struct cublaslt_gemm_inst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
+  int device_sm_count = 0;
+  int actual_cotenant_occupancy = 0;
+  std::size_t cotenant_shared_bytes_per_block = 0;
+  std::size_t shared_bytes_per_sm = 0;
   //void *dataDev;
   //void **devA;
   //void **devB;
@@ -142,6 +146,7 @@ class cublaslt_gemm : public generic_gemm {
 
   int cotenant_workgroups = 0;
   int cotenant_max_occupancy = 1;
+  int cublaslt_sm_count_target = 0;
 
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
     // Emulated FP64 configuration

@@ -222,6 +222,10 @@ class scoped_cuda_cotenant::impl {
     stop(false);
   }
 
+  cuda_cotenant_info info() const noexcept {
+    return {blocks_per_sm_, shared_bytes_};
+  }
+
  private:
   void start() {
     if (config_.workgroups < 1)
@@ -248,6 +252,7 @@ class scoped_cuda_cotenant::impl {
     const reservation selected =
         choose_reservation(properties, config_.max_occupancy);
     shared_bytes_ = selected.bytes;
+    blocks_per_sm_ = selected.blocks_per_sm;
 
     check_cuda(cudaStreamSynchronize(gemm_stream_),
                "synchronizing GEMM setup before cotenant launch");
@@ -350,6 +355,7 @@ class scoped_cuda_cotenant::impl {
   unsigned int* ready_ = nullptr;
   unsigned int* stop_ = nullptr;
   std::size_t shared_bytes_ = 0;
+  int blocks_per_sm_ = 0;
   int device_ = 0;
   bool launched_ = false;
   bool stopped_ = false;
@@ -362,3 +368,7 @@ scoped_cuda_cotenant::scoped_cuda_cotenant(cuda_cotenant_config config,
 }
 
 scoped_cuda_cotenant::~scoped_cuda_cotenant() noexcept = default;
+
+cuda_cotenant_info scoped_cuda_cotenant::info() const noexcept {
+  return impl_ ? impl_->info() : cuda_cotenant_info{};
+}

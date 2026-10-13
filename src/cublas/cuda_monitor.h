@@ -47,8 +47,12 @@ private:
     // Frequency data storage
     std::vector<uint64_t> gpu_frequencies;  // in Hz
     std::vector<uint64_t> mem_frequencies;  // in Hz
+    std::vector<unsigned int> temperatures;  // Celsius
+    std::vector<unsigned int> power_milliwatts;
     uint64_t gpu_freq_sum = 0;
     uint64_t mem_freq_sum = 0;
+    uint64_t temperature_sum = 0;
+    uint64_t power_milliwatts_sum = 0;
 
     bool monitoring_active = false;
 
@@ -137,6 +141,45 @@ public:
         return static_cast<float>(median_hz * Hz_TO_MHz);
     }
 
+    float get_avg_temperature_c() const {
+        return temperatures.empty()
+            ? 0.0F
+            : static_cast<float>(temperature_sum) / temperatures.size();
+    }
+
+    float get_min_temperature_c() const {
+        return temperatures.empty()
+            ? 0.0F
+            : static_cast<float>(*std::min_element(temperatures.begin(), temperatures.end()));
+    }
+
+    float get_max_temperature_c() const {
+        return temperatures.empty()
+            ? 0.0F
+            : static_cast<float>(*std::max_element(temperatures.begin(), temperatures.end()));
+    }
+
+    float get_avg_power_w() const {
+        return power_milliwatts.empty()
+            ? 0.0F
+            : static_cast<float>(power_milliwatts_sum) /
+                  static_cast<float>(power_milliwatts.size()) / 1000.0F;
+    }
+
+    float get_min_power_w() const {
+        return power_milliwatts.empty()
+            ? 0.0F
+            : static_cast<float>(*std::min_element(
+                  power_milliwatts.begin(), power_milliwatts.end())) / 1000.0F;
+    }
+
+    float get_max_power_w() const {
+        return power_milliwatts.empty()
+            ? 0.0F
+            : static_cast<float>(*std::max_element(
+                  power_milliwatts.begin(), power_milliwatts.end())) / 1000.0F;
+    }
+
 private:
 
     void init_nvml() {
@@ -183,7 +226,7 @@ private:
 
     void collect() {
         while (!should_stop && !should_exit) {
-            unsigned int gpu_clock, mem_clock;
+            unsigned int gpu_clock, mem_clock, temperature, power;
             
             // Sample GPU core frequency
             nvmlReturn_t gpu_result = nvmlDeviceGetClockInfo(nvml_device, NVML_CLOCK_GRAPHICS, &gpu_clock);
@@ -201,6 +244,17 @@ private:
                 mem_freq_sum += mem_hz;
             }
 
+            if (nvmlDeviceGetTemperature(
+                    nvml_device, NVML_TEMPERATURE_GPU, &temperature) == NVML_SUCCESS) {
+                temperatures.push_back(temperature);
+                temperature_sum += temperature;
+            }
+
+            if (nvmlDeviceGetPowerUsage(nvml_device, &power) == NVML_SUCCESS) {
+                power_milliwatts.push_back(power);
+                power_milliwatts_sum += power;
+            }
+
             // Wait before next sample
             std::this_thread::sleep_for(std::chrono::milliseconds(SAMPLING_INTERVAL_MS));
         }
@@ -209,8 +263,12 @@ private:
     void clear() {
         gpu_frequencies.clear();
         mem_frequencies.clear();
+        temperatures.clear();
+        power_milliwatts.clear();
         gpu_freq_sum = 0;
         mem_freq_sum = 0;
+        temperature_sum = 0;
+        power_milliwatts_sum = 0;
     }
 
     void wait() {

@@ -120,6 +120,12 @@ class generic_gemm {
   float med_sysclk_mhz = 0;
   float avg_memclk_mhz = 0;
   float med_memclk_mhz = 0;
+  float avg_temperature_c = 0;
+  float min_temperature_c = 0;
+  float max_temperature_c = 0;
+  float avg_power_w = 0;
+  float min_power_w = 0;
+  float max_power_w = 0;
 
   std::string function;
 
@@ -154,4 +160,3 @@ class generic_gemm {
                         bool inplace);
 
 };
-

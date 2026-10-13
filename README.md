@@ -95,6 +95,13 @@ build/mblas-bench -m 4096 -n 4096 -k 4096 \
   --a_type f16_r --b_type f16_r --c_type f16_r --d_type f16_r \
   --compute_type f32_r --function matmul --driver cublaslt \
   --cotenant_workgroups 32 --cotenant_max_occupancy 2
+
+# Independent actual pressure and cuBLASLt SM-count information
+build/mblas-bench -m 4096 -n 4096 -k 4096 \
+  --a_type bf16_r --b_type bf16_r --c_type bf16_r --d_type bf16_r \
+  --compute_type f32_r --function matmul --driver cublaslt \
+  --cotenant_workgroups 20 --cotenant_max_occupancy 1 \
+  --cublaslt_sm_count_target 128
 ```
 
 `--cotenant_workgroups` defaults to 0, which disables the feature. When enabled,
@@ -105,6 +112,13 @@ the shared memory per SM, while 4 reserves about one quarter. CUDA's occupancy
 API verifies the actual maximum resident blocks per SM, and the selected byte
 count and actual occupancy are logged.
 
+`--cublaslt_sm_count_target` defaults to 0, which leaves cuBLASLt's native
+SM-target behavior unchanged. A positive value is applied to every rotation
+descriptor before heuristic selection and must not exceed any selected device's
+SM count. The option is rejected for non-cuBLASLt backends. Cotenant pressure
+and the SM-count target are independent; the benchmark never derives one from
+the other. CLI and YAML inputs use the same option name and validation path.
+
 The workgroup count is not guaranteed to equal the number of distinct occupied
 SMs when max occupancy is greater than 1. These options model shared-memory
 residency contention; they do not reproduce a complete tenant's compute, cache,
@@ -113,11 +127,30 @@ memory-bandwidth, or power behavior.
 For every requested cuBLASLt solution, the cotenant starts after setup, waits up
 to 30 seconds for all workgroups to report residency, remains active for cold
 and timed iterations, and stops after the timed CUDA event completes. Startup
-and shutdown are outside the reported GEMM time. When cotenant mode is enabled,
-one untimed priming matmul completes any lazy cuBLASLt algorithm setup before the
-persistent kernel starts. With multiple unique devices, the same requested
-configuration is applied independently to each device. Duplicate device IDs are
-rejected while cotenant mode is enabled.
+and shutdown are outside the reported GEMM time. Every configuration runs one
+untimed priming matmul to complete lazy cuBLASLt algorithm setup before the
+optional persistent kernel starts. With multiple unique devices, the same
+requested configuration is applied independently to each device. Duplicate
+device IDs are rejected while cotenant mode is enabled.
+
+The CSV output includes requested pressure and SM target, device and cotenant
+resource measurements, the heuristic wave count, and the selected algorithm's
+runtime library version, result state, required workspace, ID, tile, stages,
+split-K, reduction, swizzle, custom option, inner shape, and cluster shape. Set
+`CUBLAS_BENCH_FREQ=1` to also record clock, temperature, and power summaries.
+
+The B200 experiment runner creates the independently randomized 2,100-process
+primary matrix, records reproducibility metadata, retries failed points, and
+refuses to mark an incomplete run complete:
+
+```bash
+python3 experiments/b200_cotenant/run_experiment.py \
+  --binary build/mblas-bench --output-dir results/b200-cotenant-sm-target
+python3 experiments/b200_cotenant/analyze_experiment.py \
+  results/b200-cotenant-sm-target
+```
+
+Use `--dry-run` to inspect the matrix without launching the benchmark.
 
 #### Running gemms from a YAML file
 Instead of specifying all parameters on the command line, you can use the `--yaml` argument to provide a configuration file that defines one or more GEMM operations. This is especially useful for running benchmarks across multiple matrix sizes, data types, or configurations.

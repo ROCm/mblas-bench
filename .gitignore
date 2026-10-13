@@ -3,3 +3,6 @@ build/
 *.o
 *.d
 scripts/
+docs/
+__pycache__/
+*.pyc
