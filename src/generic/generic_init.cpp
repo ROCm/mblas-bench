@@ -57,7 +57,8 @@ code_table native_code_table(const mblas_data_type &type) {
       return {fp4_codes.data(), static_cast<int>(fp4_codes.size())};
     default:
       throw std::invalid_argument("Error: uniform_native not supported for " + type.to_string() +
-                                  "; supported types are OCP E4M3, E5M2, E3M2, E2M3, and E2M1");
+                                  "; supported types are OCP E4M3, E5M2, E3M2, E2M3, and E2M1."
+                                  " For mixed types, try --mx_init uniform_native instead");
   }
 }
 
