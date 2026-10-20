@@ -120,10 +120,10 @@ class cublaslt_gemm : public generic_gemm {
   scale_size d_scale_size;
 
 #if (ENABLE_CUDA_FP4)
-  cublasLtMatmulMatrixScale_t a_scale_mode;
-  cublasLtMatmulMatrixScale_t b_scale_mode;
-  cublasLtMatmulMatrixScale_t c_scale_mode;
-  cublasLtMatmulMatrixScale_t d_scale_mode;
+  cublasLtMatmulMatrixScale_t cublaslt_scale_mode_a;
+  cublasLtMatmulMatrixScale_t cublaslt_scale_mode_b;
+  cublasLtMatmulMatrixScale_t cublaslt_scale_mode_c;
+  cublasLtMatmulMatrixScale_t cublaslt_scale_mode_d;
 #endif
   uint64_t a_offset_host;
   uint64_t b_offset_host;

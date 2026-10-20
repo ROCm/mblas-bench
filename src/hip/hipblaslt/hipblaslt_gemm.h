@@ -130,10 +130,10 @@ class hipblaslt_gemm : public generic_gemm {
   scale_size c_scale_size;
   scale_size d_scale_size;
   
-  hipblasLtMatmulMatrixScale_t a_scale_mode;
-  hipblasLtMatmulMatrixScale_t b_scale_mode;
-  hipblasLtMatmulMatrixScale_t c_scale_mode;
-  hipblasLtMatmulMatrixScale_t d_scale_mode;
+  hipblasLtMatmulMatrixScale_t hipblaslt_scale_mode_a;
+  hipblasLtMatmulMatrixScale_t hipblaslt_scale_mode_b;
+  hipblasLtMatmulMatrixScale_t hipblaslt_scale_mode_c;
+  hipblasLtMatmulMatrixScale_t hipblaslt_scale_mode_d;
 #endif
 
   void **scale_host_a;

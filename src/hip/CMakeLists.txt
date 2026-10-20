@@ -65,6 +65,11 @@ endif()
 
 add_library(mblaship SHARED ${ROCM_SOURCES})
 target_compile_options(mblaship PRIVATE -Wno-unused-result)
+# Not CMAKE_BUILD_TYPE=Release: its -DNDEBUG would disable the assert() calls
+# in check_hip and friends. The link flag matters because -fgpu-rdc defers
+# device code optimization to link time.
+target_compile_options(mblaship PRIVATE $<$<NOT:$<CONFIG:Debug>>:-O3>)
+target_link_options(mblaship PRIVATE $<$<NOT:$<CONFIG:Debug>>:-O3>)
 
 set_target_properties(mblaship PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

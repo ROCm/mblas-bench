@@ -26,7 +26,7 @@ __global__ void float_to_ue5m3(float *input, size_t num_elements, __hip_fp8_stor
 #endif
 
 void copy_and_convert(mblas_data_type precision, void *host_a, void *devA, long x,
-                    long y, int batchsz, long long stride);
+                    long y, int batchsz, long long stride, bool skip_convert = false);
 //void copy_and_convert(hipblasDatatype_t precision, void *host_a, void *devA, int x,
 //                    int y, int batchsz);
 void *convert_scalar(mblas_data_type precision, void *scalar);
