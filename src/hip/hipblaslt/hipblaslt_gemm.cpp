@@ -15,6 +15,7 @@
 #include "hip_create_allocate.h"
 #include "hip_datatype_utils.h"
 #include "hip_error.h"
+#include "hip_measure.h"
 #include "hip_preswizzle.h"
 #include "cxxopts.hpp"
 #include "generic_setup.h"
@@ -448,6 +449,10 @@ hipblaslt_gemm::hipblaslt_gemm(cxxopts::ParseResult result) : generic_gemm(resul
       d_type.get_packing_count(),
       a_scale_bytes, b_scale_bytes, c_scale_bytes, d_scale_bytes,
       inplace);
+  set_fom_sizes(type_call_dev<sizeofCUDT>(a_type), a_type.get_packing_count(),
+                type_call_dev<sizeofCUDT>(b_type), b_type.get_packing_count(),
+                type_call_dev<sizeofCUDT>(d_type), d_type.get_packing_count(),
+                precision.is_real());
 }
 
 string hipblaslt_gemm::prepare_array() {
@@ -503,7 +508,7 @@ string hipblaslt_gemm::prepare_array() {
   //ossHeader << "a_scale_type,b_scale_type,c_scale_type,d_scale_type,";
   ossHeader << "scale_mode_a,scale_mode_b,scale_mode_c,scale_mode_d,";
   ossHeader << "solution_index,";
-  ossHeader << "hipBLASLt-Gflops,hipBLASLt-GB/s,hipBLASLt-us," << endl;
+  ossHeader << "hipBLASLt-Gflops,hipBLASLt-GB/s,hipBLASLt-us," << timing_header() << endl;
   return ossHeader.str();
 }
 
@@ -890,6 +895,7 @@ double hipblaslt_gemm::test(const int &ith_solution) {
                                    return o.time_us + i;
                                  }) /
                  mat_ptrs.size();
+  aggregate_timing(mat_ptrs);
 
   return gflop_per_second;
 }
@@ -918,103 +924,30 @@ std::string hipblaslt_gemm::get_result_string() {
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
+  ossValues << timing_values();
   ossValues << endl;
   return ossValues.str();
 }
 
-std::tuple<double, double, double> hipblaslt_gemm::calculate_figure_of_merit(
-    double totalTime_ms) {
-  double avgTime_ms = totalTime_ms / iters;
-  double avgTime_s = avgTime_ms / 1000.0f;
-  double avgTime_us = avgTime_ms * 1000.0f;
-
-  int a_sz = type_call_dev<sizeofCUDT>(a_type);
-  int b_sz = type_call_dev<sizeofCUDT>(b_type);
-  int d_sz = type_call_dev<sizeofCUDT>(d_type);
-  int a_pack = a_type.get_packing_count();
-  int b_pack = b_type.get_packing_count();
-  int d_pack = d_type.get_packing_count();
-
-  int flopPerSize = 2;
-  if (!precision.is_real()) {
-    flopPerSize = 8;
-  }
-  double gbytes = (((static_cast<double>(a_sz) / static_cast<double>(a_pack)) *
-                    static_cast<double>(m) * static_cast<double>(k)) +
-                   ((static_cast<double>(b_sz) / static_cast<double>(b_pack)) *
-                    static_cast<double>(k) * static_cast<double>(n)) +
-                   ((static_cast<double>(d_sz) / static_cast<double>(d_pack)) *
-                    static_cast<double>(n) * static_cast<double>(m))) /
-                  1e9;
-  double gflops = static_cast<double>(flopPerSize) *
-                  (static_cast<double>(m) * static_cast<double>(n) *
-                   static_cast<double>(k)) /
-                  1e9;
-
-  double gflopPerSec = gflops * static_cast<double>(batch_count) / avgTime_s;
-  double gbytePerSec = gbytes * batch_count / avgTime_s;
-
-  return std::tuple<double, double, double>(gflopPerSec, gbytePerSec,
-                                            avgTime_us);
-}
-
 void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
-  hipblasStatus_t stat;
   hipblasLtHandle_t handle;
   hipStream_t stream;
   check_hip(hipSetDevice(mat->devIDX));
   check_hipblas(hipblasLtCreate(&handle));
   check_hip(hipStreamCreate(&stream));
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = hipblasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
-                          mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
-                          mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algos[ith_solution].algo, 
-                          mat->devWork, mat->wSZ, stream);
-    // Check for errors during the gemm run
-    check_hipblas(stat);
-    check_hip(hipGetLastError());
-  }
-  check_hip(hipStreamSynchronize(stream));
 
-  hipEvent_t start, stop;
-  check_hip(hipEventCreate(&start));
-  check_hip(hipEventCreate(&stop));
+  hip_measure([&](int64_t i) {
+    int f = i % flush_batch_count;
+    check_hipblas(hipblasLtMatmul(handle, mat->desc_ops[f], alpha,
+                                  mat->ptr_dev_a[f], mat->desc_a,
+                                  mat->ptr_dev_b[f], mat->desc_b, beta,
+                                  mat->ptr_dev_c[f], mat->desc_c,
+                                  mat->ptr_dev_d[f], mat->desc_d,
+                                  &mat->algos[ith_solution].algo,
+                                  mat->devWork, mat->wSZ, stream));
+  }, stream, timing_cfg, mat->timing);
+  std::tie(mat->gflops, mat->gbytes, mat->time_us) = figure_of_merit(mat->timing.median_us);
 
-  /*
-    Run and time the performance test
-  */
-  check_hip(hipEventRecord(start, stream));
-  for (int rep = 0; rep < iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = hipblasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
-                          mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
-                          mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algos[ith_solution].algo,
-                          mat->devWork, mat->wSZ, stream);
-  }
-  check_hip(hipEventRecord(stop, stream));
-  check_hip(hipEventSynchronize(stop));
-
-  // Check for errors during the performance test
-  check_hipblas(stat);
-  check_hip(hipGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  check_hip(hipEventElapsedTime(&elapsedTime_ms, start, stop));
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
-  
-  // Cleanup
-  check_hip(hipEventDestroy(start));
-  check_hip(hipEventDestroy(stop));
   check_hip(hipStreamDestroy(stream));
   check_hipblas(hipblasLtDestroy(handle));
 }

@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
+#include <limits>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -54,8 +57,7 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   batched = false;
   function = result["function"].as<string>();
 
-  iters = result["iters"].as<int>();
-  cold_iters = result["cold_iters"].as<int>();
+  set_timing_config(result);
 
   batch_count = result["batch_count"].as<int>();
   if (function.find("Batched") != string::npos || function.find("batched") != string::npos || batch_count > 1 ) {
@@ -221,13 +223,18 @@ void generic_gemm::set_flush_batch_count(
   // Ceil division matches hipblaslt-bench so that a partial fit still
   // yields at least one rotating block instead of rounding down to zero.
   uint64_t new_flush_batch_count = ceil_division(flush_memory_size_bytes, single_block_size);
-  int max_iters = std::max(cold_iters, iters);
+  // Blocks past the iteration count go unused. Adaptive mode has no fixed count,
+  // so it caps on adaptive_max_iters instead (0 => uncapped).
+  int max_iters = std::max({1, timing_cfg.cold_iters, timing_cfg.iters});
+  if (timing_cfg.adaptive) {
+    max_iters = timing_cfg.max_iters > 0 ? timing_cfg.max_iters : std::numeric_limits<int>::max();
+  }
 
   if (flush_memory_size_bytes < single_block_size) {
     std::cerr << "Note: Problem does not fit into memory size of "
               << flush_memory_size << "MiB; clamping flush_batch_count to 1" << std::endl;
     flush_batch_count = 1;
-  } else if ((int64_t)new_flush_batch_count > max_iters) {
+  } else if (new_flush_batch_count > (uint64_t)max_iters) {
     flush_batch_count = max_iters;
     std::cout << "Note: flush_batch_count reduced from " << new_flush_batch_count
               << " to " << flush_batch_count
@@ -309,7 +316,86 @@ std::string generic_gemm::set_init(matrix_desc desc, std::string init, std::stri
 //  }
 //}
 
+void generic_gemm::set_timing_config(const cxxopts::ParseResult &result) {
+  timing_cfg.adaptive = result["adaptive"].as<bool>();
+  timing_cfg.iters = result["iters"].as<int>();
+  timing_cfg.cold_iters = result["cold_iters"].as<int>();
+
+  if (!timing_cfg.adaptive) {
+    for (const char *opt : {"adaptive_warmup_time", "adaptive_sample_time",
+                            "adaptive_measure_time", "adaptive_max_measure_time",
+                            "adaptive_min_iters", "adaptive_max_iters",
+                            "adaptive_noise_threshold", "adaptive_stability_threshold",
+                            "adaptive_stability_window", "adaptive_stability_interval"}) {
+      if (result.count(opt)) {
+        throw std::invalid_argument(string("--") + opt + " requires --adaptive");
+      }
+    }
+    return;
+  }
+
+  // Warmup and batch size are sized adaptively, so a fixed count would be ignored.
+  for (const char *opt : {"iters", "cold_iters"}) {
+    if (result.count(opt)) {
+      throw std::invalid_argument(string("--") + opt +
+                                  " cannot be used with --adaptive (use --adaptive_* options)");
+    }
+  }
+  timing_cfg.warmup_time = result["adaptive_warmup_time"].as<float>();
+  timing_cfg.sample_time = result["adaptive_sample_time"].as<float>();
+  timing_cfg.measure_time = result["adaptive_measure_time"].as<float>();
+  timing_cfg.max_measure_time = result["adaptive_max_measure_time"].as<float>();
+  timing_cfg.min_iters = result["adaptive_min_iters"].as<int>();
+  timing_cfg.max_iters = result["adaptive_max_iters"].as<int>();
+  timing_cfg.noise_threshold = result["adaptive_noise_threshold"].as<float>();
+  timing_cfg.stability_threshold = result["adaptive_stability_threshold"].as<float>();
+  timing_cfg.stability_window = result["adaptive_stability_window"].as<int>();
+  timing_cfg.stability_interval = result["adaptive_stability_interval"].as<int>();
+  if (const auto err = validate_adaptive_config(timing_cfg); !err.empty()) {
+    throw std::invalid_argument("Invalid adaptive timing config: " + err);
+  }
+}
+
+void generic_gemm::set_fom_sizes(int a_type_size, int a_type_packing, int b_type_size,
+                                 int b_type_packing, int d_type_size, int d_type_packing,
+                                 bool is_real) {
+  elem_bytes_a = static_cast<double>(a_type_size) / static_cast<double>(a_type_packing);
+  elem_bytes_b = static_cast<double>(b_type_size) / static_cast<double>(b_type_packing);
+  elem_bytes_d = static_cast<double>(d_type_size) / static_cast<double>(d_type_packing);
+  flop_per_mac = is_real ? 2 : 8;
+}
+
+std::tuple<double, double, double> generic_gemm::figure_of_merit(double time_us) const {
+  const double dm = m, dn = n, dk = k;
+  const double gbytes = (elem_bytes_a * dm * dk + elem_bytes_b * dk * dn + elem_bytes_d * dn * dm) / 1e9;
+  const double gflops = static_cast<double>(flop_per_mac) * (dm * dn * dk) / 1e9;
+  // A non-positive time would divide into inf/nan; report zero throughput instead.
+  if (time_us <= 0.0) {
+    return {0.0, 0.0, time_us};
+  }
+  const double time_s = time_us / 1e6;
+  return {gflops * batch_count / time_s, gbytes * batch_count / time_s, time_us};
+}
+
+std::string generic_gemm::timing_header() const {
+  if (!timing_cfg.adaptive) return "";
+  return "batch,samples,hot_iters,mean_us,min_us,cv,rel_iqr,status,";
+}
+
+std::string generic_gemm::timing_values() const {
+  if (!timing_cfg.adaptive) return "";
+  std::ostringstream oss;
+  oss << std::setprecision(7);
+  oss << timing.batch << ',' << timing.samples << ',' << timing.hot_iters << ','
+      << timing.mean_us << ',' << timing.min_us << ',' << timing.cv << ','
+      << timing.rel_iqr << ',' << timing_status(timing) << ',';
+  return oss.str();
+}
+
 void generic_gemm::run_solutions() {
+  if (timing_cfg.adaptive) {
+    std::cout << format_adaptive_timing_summary(timing_cfg) << std::endl;
+  }
   string header = prepare_array();
   std::cout << header << std::flush;
   for (int i = 0; i < total_solution_count; i++) {

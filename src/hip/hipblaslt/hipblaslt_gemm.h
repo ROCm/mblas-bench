@@ -59,6 +59,7 @@ struct hipblaslt_gemm_inst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
+  timing_result timing;
   //void *devA;
   //void *devB;
   //void *devC;
@@ -167,7 +168,6 @@ class hipblaslt_gemm : public generic_gemm {
   void no_tuning(hipblaslt_gemm_inst *);
   void auto_tuning(hipblaslt_gemm_inst *);
   void run_threaded(void (hipblaslt_gemm::*func)(hipblaslt_gemm_inst *));
-  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
   void test_matmul(hipblaslt_gemm_inst *mat, int ith_solution);
 #if HIP_VERSION >= 70000000
   std::tuple<mblas_hip_data_type, hipblasLtMatmulMatrixScale_t, scale_size> 
