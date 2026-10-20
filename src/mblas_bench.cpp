@@ -61,9 +61,15 @@ std::vector<cxxopts::ParseResult> parse_yaml_file(const std::string& filename, c
                     key = "k";
                 }
 
-                const std::string arg_key = key.size() == 1 ? "-" + key : "--" + key;
-                args.push_back(arg_key);
-                args.push_back(value);
+                // Long keys use --key=value: cxxopts never consumes a separate
+                // argument for bool options such as adaptive, so "adaptive: false"
+                // would otherwise turn the option on.
+                if (key.size() == 1) {
+                    args.push_back("-" + key);
+                    args.push_back(value);
+                } else {
+                    args.push_back("--" + key + "=" + value);
+                }
             }
             std::vector<const char*> cstr_args;
             for (const auto& arg: args) {
