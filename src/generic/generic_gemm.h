@@ -1,8 +1,11 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <utility>
+#include <vector>
 
+#include "adaptive_timing.h"
 #include "cxxopts.hpp"
 enum class scaling_type {
   None, Scalar, Vector, Block,
@@ -72,8 +75,16 @@ class generic_gemm {
   bool batched = false;
   bool pure_batched = false;
 
-  int iters;
-  int cold_iters;
+  timing_config timing_cfg;
+  // Timing statistics for the current result row, aggregated across devices.
+  timing_result timing;
+
+  // Bytes per element (size / packing) and flops per multiply-add, used by
+  // figure_of_merit. Set by each backend once its types are known.
+  double elem_bytes_a = 0;
+  double elem_bytes_b = 0;
+  double elem_bytes_d = 0;
+  int flop_per_mac = 2;
 
   int batch_count;
   int flush_batch_count;
@@ -153,6 +164,22 @@ class generic_gemm {
                         uint64_t a_scale_bytes, uint64_t b_scale_bytes,
                         uint64_t c_scale_bytes, uint64_t d_scale_bytes,
                         bool inplace);
+
+  void set_timing_config(const cxxopts::ParseResult &result);
+  void set_fom_sizes(int a_type_size, int a_type_packing, int b_type_size, int b_type_packing,
+                     int d_type_size, int d_type_packing, bool is_real);
+  // {GFLOP/s, GB/s, us} for one iteration taking time_us.
+  std::tuple<double, double, double> figure_of_merit(double time_us) const;
+
+  template <typename Inst>
+  void aggregate_timing(const std::vector<Inst> &insts) {
+    std::vector<timing_result> results;
+    for (const auto &inst : insts) results.push_back(inst.timing);
+    timing = aggregate(results);
+  }
+  // Adaptive-only CSV columns; empty in fixed-count mode.
+  std::string timing_header() const;
+  std::string timing_values() const;
 
 };
 

@@ -6,6 +6,7 @@
 #include <cctype>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 
 //#include "generic_gemm.h"
@@ -13,6 +14,7 @@
 //#include "hipblaslt_gemm.h"
 //#include "cublas_gemm.h"
 //#include "cublaslt_gemm.h"
+#include <adaptive_timing.h>
 #include <generic_gemm_factory.h>
 #include <rocblas_gemm_factory.h>
 #include <hipblaslt_gemm_factory.h>
@@ -117,6 +119,11 @@ int main(int argc, char **argv) {
   // parse input arguments
   cxxopts::Options options("rocblas_bench", "Benchmark rocBLAS");
   string supPrec = "h,s,d,c,z,f16_r,f32_r,f64_r,bf16_r,f32_c,f64_c,i8_r,i32_r";
+  auto num = [](auto value) {
+    std::ostringstream oss;
+    oss << value;
+    return oss.str();
+  };
   auto opp_adder = options.add_options();
   opp_adder("m,sizem", "Specific matrix size",
             cxxopts::value<int>()->default_value("128"));
@@ -312,6 +319,48 @@ int main(int argc, char **argv) {
   opp_adder("j,cold_iters",
             " Cold Iterations to run before entering the timing loop ",
             cxxopts::value<int>()->default_value("2"));
+  opp_adder("adaptive",
+            "Enable adaptive timing: collect timed samples until the mean converges, and "
+            "report the median with distribution columns (batch, samples, hot_iters, mean_us, "
+            "min_us, cv, rel_iqr, status). Tune with the --adaptive_* options. Not compatible "
+            "with --iters/--cold_iters",
+            cxxopts::value<bool>()->default_value("false"));
+  opp_adder("adaptive_warmup_time",
+            "Adaptive timing: warmup budget (ms) used to reach steady clocks and size the batch",
+            cxxopts::value<float>()->default_value(num(adaptive_defaults::warmup_time)));
+  opp_adder("adaptive_sample_time",
+            "Adaptive timing: target span of one timed sample (ms); sets the per-sample batch size",
+            cxxopts::value<float>()->default_value(num(adaptive_defaults::sample_time)));
+  opp_adder("adaptive_measure_time",
+            "Adaptive timing: minimum total measure time (ms) before the run may stop",
+            cxxopts::value<float>()->default_value(num(adaptive_defaults::measure_time)));
+  opp_adder("adaptive_max_measure_time",
+            "Adaptive timing: measure ceiling (ms); 0 = unbounded. A ceiling (this or "
+            "adaptive_max_iters) is required",
+            cxxopts::value<float>()->default_value(num(adaptive_defaults::max_measure_time)));
+  opp_adder("adaptive_min_iters",
+            "Adaptive timing: floor on total timed iterations (with adaptive_measure_time, the "
+            "floor that must be met before stopping)",
+            cxxopts::value<int>()->default_value(num(adaptive_defaults::min_iters)));
+  opp_adder("adaptive_max_iters",
+            "Adaptive timing: ceiling on total timed iterations; 0 = unbounded. Also caps the "
+            "rotating buffer block count",
+            cxxopts::value<int>()->default_value(num(adaptive_defaults::max_iters)));
+  opp_adder("adaptive_noise_threshold",
+            "Adaptive timing: convergence target. Past the floor the run stops when the mean's "
+            "relative standard error falls below this (status converged), or when the spread "
+            "plateaus (status stable), else at the ceiling (status noisy). 0 disables both checks",
+            cxxopts::value<float>()->default_value(num(adaptive_defaults::noise_threshold)));
+  opp_adder("adaptive_stability_threshold",
+            "Adaptive timing: stability fallback. Stop when the last adaptive_stability_window "
+            "rel_iqr readings vary by less than this fraction. 0 disables the fallback",
+            cxxopts::value<float>()->default_value(num(adaptive_defaults::stability_threshold)));
+  opp_adder("adaptive_stability_window",
+            "Adaptive timing: number of rel_iqr readings tested for a plateau (>= 2)",
+            cxxopts::value<int>()->default_value(num(adaptive_defaults::stability_window)));
+  opp_adder("adaptive_stability_interval",
+            "Adaptive timing: record a rel_iqr reading every N samples (>= 1)",
+            cxxopts::value<int>()->default_value(num(adaptive_defaults::stability_interval)));
   opp_adder("driver", "Backend to run the GEMM test with",
             cxxopts::value<string>()->default_value("rocblas"));
   opp_adder("yaml",

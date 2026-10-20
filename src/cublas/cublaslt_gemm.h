@@ -39,6 +39,7 @@ struct cublaslt_gemm_inst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
+  timing_result timing;
   //void *dataDev;
   //void **devA;
   //void **devB;
@@ -169,7 +170,6 @@ class cublaslt_gemm : public generic_gemm {
   void no_tuning(cublaslt_gemm_inst *);
   void auto_tuning(cublaslt_gemm_inst *);
   void run_threaded(void (cublaslt_gemm::*func)(cublaslt_gemm_inst *));
-  std::tuple<double, double, double> calculate_figure_of_merit(double total_time_ms);
   void test_matmul(cublaslt_gemm_inst *mat, int ith_solution);
   std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc &desc, mblas_cuda_data_type type, std::string matrix_id);
   //static std::tuple<mblas_cuda_data_type, cublasLtMatmulMatrixScale_t, scale_size> configure_scaling(matrix_desc desc, mblas_cuda_data_type type, std::string matrix_id);
