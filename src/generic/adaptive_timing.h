@@ -2,9 +2,9 @@
 // Adaptive, distribution-based timing. Ported from hipBLASLt-bench
 // (ROCm/rocm-libraries#8337, clients/common/include/benchmark_{stats,timing}.hpp).
 //
-// A *sample* is one timed span over `batch` back-to-back enqueues, yielding one
-// per-iteration time. The batch is sized from a warmup so each sample spans
-// ~sample_time. Samples are collected for at least the floor (min_iters and
+// A *sample* is one timed span over `iters_per_sample` back-to-back enqueues,
+// yielding one per-iteration time. iters_per_sample is sized from a warmup so each
+// sample spans ~sample_time. Samples are collected for at least the floor (min_iters and
 // measure_time); past the floor the run stops when either (a) the mean's relative
 // standard error drops below noise_threshold (converged), or (b) the robust spread
 // (rel_iqr) has plateaued (stable) -- a fallback for heavy-tailed/unlocked-clock
@@ -13,7 +13,7 @@
 // checks. The median is the headline statistic.
 //
 // This header has no vendor dependencies: the caller supplies
-//   double time_batch(int64_t first_index, int32_t count)
+//   double time_iters(int64_t first_index, int32_t count)
 // which runs `count` back-to-back enqueues for global indices
 // [first_index, first_index + count) and returns the elapsed microseconds.
 
@@ -70,9 +70,9 @@ struct timing_result {
   double mean_us = 0.0;
   double cv = 0.0;       // stddev / mean across samples (n-1)
   double rel_iqr = 0.0;  // interquartile range / median
-  int32_t batch = 0;     // enqueues per sample
-  int32_t samples = 0;   // number of samples collected
-  int64_t hot_iters = 0; // total timed enqueues (batch * samples)
+  int32_t iters_per_sample = 0;  // enqueues per sample
+  int32_t samples = 0;           // number of samples collected
+  int64_t hot_iters = 0;         // total timed enqueues (iters_per_sample * samples)
   bool adaptive = false;
   bool noise_active = false;  // convergence checking was enabled (noise_threshold > 0)
   bool converged = false;     // precision target met
@@ -162,7 +162,7 @@ inline timing_result aggregate(const std::vector<timing_result> &results) {
     min += r.min_us;
     out.cv = std::max(out.cv, r.cv);
     out.rel_iqr = std::max(out.rel_iqr, r.rel_iqr);
-    out.batch = std::min(out.batch, r.batch);
+    out.iters_per_sample = std::min(out.iters_per_sample, r.iters_per_sample);
     out.samples = std::min(out.samples, r.samples);
     out.hot_iters = std::min(out.hot_iters, r.hot_iters);
     out.converged = out.converged && r.converged;
@@ -239,13 +239,13 @@ inline bool noise_plateaued(const std::vector<double> &iqr_history, int window, 
 }
 
 // Keep room for at least two samples within max_iters; unbounded when unset.
-inline int64_t max_batch_size(const timing_config &cfg) {
+inline int64_t max_iters_per_sample(const timing_config &cfg) {
   return cfg.max_iters > 0 ? std::max<int64_t>(1, cfg.max_iters / 2)
                            : std::numeric_limits<int32_t>::max();
 }
 
 // Enqueues per sample so that one sample spans ~sample_time. In [1, cap].
-inline int32_t batch_size(const timing_config &cfg, double per_iter_us, int64_t cap) {
+inline int32_t iters_per_sample(const timing_config &cfg, double per_iter_us, int64_t cap) {
   if (cfg.sample_time <= 0.0f || per_iter_us <= 0.0) return 1;
   const double want = std::ceil(static_cast<double>(cfg.sample_time) * 1000.0 / per_iter_us);
   return static_cast<int32_t>(
@@ -299,25 +299,25 @@ inline bool reached_target(const timing_config &cfg, std::vector<double> &sample
 
 }  // namespace timing_detail
 
-// Fixed-count mode discards one batch of cfg.cold_iters, then times one batch of
-// cfg.iters. Adaptive mode self-sizes the batch and collects samples until the mean
-// converges, the robust spread plateaus, or a ceiling is hit.
-template <typename TimeBatch>
-void run_measurement(TimeBatch &&time_batch, const timing_config &cfg, timing_result &out) {
+// Fixed-count mode discards one span of cfg.cold_iters, then times one span of
+// cfg.iters. Adaptive mode self-sizes iters_per_sample and collects samples until the
+// mean converges, the robust spread plateaus, or a ceiling is hit.
+template <typename TimeIters>
+void run_measurement(TimeIters &&time_iters, const timing_config &cfg, timing_result &out) {
   out = timing_result{};
   
 
   // Traditional fixed iteration mode
   if (!cfg.adaptive) {
     if (cfg.cold_iters > 0) {
-      time_batch(0, cfg.cold_iters);
+      time_iters(0, cfg.cold_iters);
     }
     const int32_t iters = cfg.iters > 0 ? cfg.iters : 1;
-    const double per_iter = time_batch(0, iters) / iters;
+    const double per_iter = time_iters(0, iters) / iters;
     out.mean_us = per_iter;
     out.median_us = per_iter;
     out.min_us = per_iter;
-    out.batch = iters;
+    out.iters_per_sample = iters;
     out.samples = 1;
     out.hot_iters = iters;
     return;
@@ -328,24 +328,24 @@ void run_measurement(TimeBatch &&time_batch, const timing_config &cfg, timing_re
     throw std::invalid_argument("Invalid adaptive timing config: " + err);
   }
 
-  // Warmup: one cold probe seeds the batch size, then warm up in self-sized chunks
+  // Warmup: one cold probe seeds iters_per_sample, then warm up in self-sized chunks
   // until warmup_time, refining the per-iteration estimate.
   int64_t rotating_index = 0;
-  const int64_t cap = timing_detail::max_batch_size(cfg);
-  double per_iter_est = time_batch(rotating_index++, 1);
+  const int64_t cap = timing_detail::max_iters_per_sample(cfg);
+  double per_iter_est = time_iters(rotating_index++, 1);
   {
     const double warm_min_us = static_cast<double>(cfg.warmup_time) * 1000.0;
     double warm_us = 0.0;
-    int32_t chunk = timing_detail::batch_size(cfg, per_iter_est, cap);
+    int32_t chunk = timing_detail::iters_per_sample(cfg, per_iter_est, cap);
     while (warm_us < warm_min_us) {
-      const double chunk_us = time_batch(rotating_index, chunk);
+      const double chunk_us = time_iters(rotating_index, chunk);
       rotating_index += chunk;
       warm_us += chunk_us;
-      // A chunk below timer resolution can't advance warm_us, so grow the batch
-      // instead; give up if even the max batch still reads as zero.
+      // A chunk below timer resolution can't advance warm_us, so grow the chunk
+      // instead; give up if even the max chunk still reads as zero.
       if (chunk_us > 0.0) {
         per_iter_est = chunk_us / chunk;
-        chunk = timing_detail::batch_size(cfg, per_iter_est, cap);
+        chunk = timing_detail::iters_per_sample(cfg, per_iter_est, cap);
       } else if (chunk < cap) {
         chunk = static_cast<int32_t>(std::min<int64_t>(cap, int64_t{chunk} * 2));
       } else {
@@ -354,7 +354,7 @@ void run_measurement(TimeBatch &&time_batch, const timing_config &cfg, timing_re
     }
   }
 
-  const int32_t batch = timing_detail::batch_size(cfg, per_iter_est, cap);
+  const int32_t iters_per_sample = timing_detail::iters_per_sample(cfg, per_iter_est, cap);
   const timing_detail::measure_bounds bounds{std::max<int64_t>(1, cfg.min_iters),
                                              static_cast<double>(cfg.measure_time) * 1000.0,
                                              static_cast<double>(cfg.max_measure_time) * 1000.0};
@@ -369,13 +369,13 @@ void run_measurement(TimeBatch &&time_batch, const timing_config &cfg, timing_re
 
   rotating_index = 0;  // restart rotation for the timed phase
   while (true) {
-    const double batch_us = time_batch(rotating_index, batch);
-    rotating_index += batch;
-    const double per_iter = batch_us / batch;
+    const double sample_us = time_iters(rotating_index, iters_per_sample);
+    rotating_index += iters_per_sample;
+    const double per_iter = sample_us / iters_per_sample;
     samples.push_back(per_iter);
     stats.add(per_iter);
-    total_us += batch_us;
-    total_iters += batch;
+    total_us += sample_us;
+    total_iters += iters_per_sample;
     if (timing_detail::reached_target(cfg, samples, stats, iqr_history, total_iters, total_us,
                                       bounds, converged, stable)) {
       break;
@@ -383,7 +383,7 @@ void run_measurement(TimeBatch &&time_batch, const timing_config &cfg, timing_re
   }
 
   timing_detail::fill_distribution(samples, out);
-  out.batch = batch;
+  out.iters_per_sample = iters_per_sample;
   out.hot_iters = total_iters;
   out.adaptive = true;
   out.noise_active = cfg.noise_threshold > 0.0f;

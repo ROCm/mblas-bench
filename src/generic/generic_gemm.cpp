@@ -335,7 +335,7 @@ void generic_gemm::set_timing_config(const cxxopts::ParseResult &result) {
     return;
   }
 
-  // Warmup and batch size are sized adaptively, so a fixed count would be ignored.
+  // Warmup and iters_per_sample are sized adaptively, so a fixed count would be ignored.
   for (const char *opt : {"iters", "cold_iters"}) {
     if (result.count(opt)) {
       throw std::invalid_argument(string("--") + opt +
@@ -380,14 +380,14 @@ std::tuple<double, double, double> generic_gemm::figure_of_merit(double time_us)
 
 std::string generic_gemm::timing_header() const {
   if (!timing_cfg.adaptive) return "";
-  return "batch,samples,hot_iters,mean_us,min_us,cv,rel_iqr,status,";
+  return "iters_per_sample,samples,hot_iters,mean_us,min_us,cv,rel_iqr,status,";
 }
 
 std::string generic_gemm::timing_values() const {
   if (!timing_cfg.adaptive) return "";
   std::ostringstream oss;
   oss << std::setprecision(7);
-  oss << timing.batch << ',' << timing.samples << ',' << timing.hot_iters << ','
+  oss << timing.iters_per_sample << ',' << timing.samples << ',' << timing.hot_iters << ','
       << timing.mean_us << ',' << timing.min_us << ',' << timing.cv << ','
       << timing.rel_iqr << ',' << timing_status(timing) << ',';
   return oss.str();

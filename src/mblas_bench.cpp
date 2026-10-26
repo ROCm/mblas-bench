@@ -325,15 +325,15 @@ int main(int argc, char **argv) {
             cxxopts::value<int>()->default_value("2"));
   opp_adder("adaptive",
             "Enable adaptive timing: collect timed samples until the mean converges, and "
-            "report the median with distribution columns (batch, samples, hot_iters, mean_us, "
+            "report the median with distribution columns (iters_per_sample, samples, hot_iters, mean_us, "
             "min_us, cv, rel_iqr, status). Tune with the --adaptive_* options. Not compatible "
             "with --iters/--cold_iters",
             cxxopts::value<bool>()->default_value("false"));
   opp_adder("adaptive_warmup_time",
-            "Adaptive timing: warmup budget (ms) used to reach steady clocks and size the batch",
+            "Adaptive timing: warmup budget (ms) used to reach steady clocks and size iters_per_sample",
             cxxopts::value<float>()->default_value(num(adaptive_defaults::warmup_time)));
   opp_adder("adaptive_sample_time",
-            "Adaptive timing: target span of one timed sample (ms); sets the per-sample batch size",
+            "Adaptive timing: target span of one timed sample (ms); sets iters_per_sample",
             cxxopts::value<float>()->default_value(num(adaptive_defaults::sample_time)));
   opp_adder("adaptive_measure_time",
             "Adaptive timing: minimum total measure time (ms) before the run may stop",
