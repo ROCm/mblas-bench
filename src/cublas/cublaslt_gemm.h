@@ -40,6 +40,10 @@ struct cublaslt_gemm_inst {
   double gbytes = 0;
   double time_us = 0;
   timing_result timing;
+  float avg_sysclk_mhz = 0;
+  float med_sysclk_mhz = 0;
+  float avg_memclk_mhz = 0;
+  float med_memclk_mhz = 0;
   //void *dataDev;
   //void **devA;
   //void **devB;

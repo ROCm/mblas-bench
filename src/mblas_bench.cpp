@@ -235,6 +235,10 @@ int main(int argc, char **argv) {
   //           cxxopts::value<int>()->default_value("1"));
   opp_adder("device", "GPU device(s) to run on",
             cxxopts::value<string>()->default_value("0"));
+  opp_adder("sum_devices",
+            "With more than one --device, report the sum of Gflops and GB/s across devices "
+            "instead of the mean. Time and timing columns are not changed",
+            cxxopts::value<bool>()->default_value("false"));
   opp_adder("instances", "Number of instances to run on each GPU",
             cxxopts::value<int>()->default_value("1"));
   opp_adder("initialization",

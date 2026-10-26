@@ -346,7 +346,6 @@ void rocblas_gemm::free_mem() {
 double rocblas_gemm::test(const int &ith_solution) {
   assert(ith_solution == 0);
   vector<thread> threads;
-  double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
     // Tgemm
     if ((function == "rocblas_dgemm" && precision == rocblas_datatype_f64_r) ||
@@ -452,21 +451,7 @@ double rocblas_gemm::test(const int &ith_solution) {
     thread.join();
   }
 
-  // Sum all gflops
-  gflop_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const rocblas_gemm_inst &o) { return o.gflops + i; });
-
-  gbyte_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const rocblas_gemm_inst &o) { return o.gbytes + i; });
-
-  iter_time_us = std::accumulate(begin(mat_ptrs), end(mat_ptrs), 0.0,
-                                 [](double i, const rocblas_gemm_inst &o) {
-                                   return o.time_us + i;
-                                 }) /
-                 mat_ptrs.size();
-  aggregate_timing(mat_ptrs);
+  aggregate_results(mat_ptrs);
 
   return gflop_per_second;
 }

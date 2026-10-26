@@ -370,7 +370,6 @@ void cublas_gemm::free_mem() {
 double cublas_gemm::test(const int &ith_solution) {
   assert(ith_solution == 0);
   vector<thread> threads;
-  double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
     // TgemmBatched
     if (match_gemm_type(precision, function, mblas_data_type::MBLAS_R_64F, {"cublasDgemm", "dgemm", "gemm"})) {
@@ -493,21 +492,7 @@ double cublas_gemm::test(const int &ith_solution) {
     thread.join();
   }
 
-  // Sum all gflops
-  gflop_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublasgemmInst &o) { return o.gflops + i; });
-
-  gbyte_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublasgemmInst &o) { return o.gbytes + i; });
-
-  iter_time_us = std::accumulate(begin(mat_ptrs), end(mat_ptrs), 0.0,
-                                 [](double i, const cublasgemmInst &o) {
-                                   return o.time_us + i;
-                                 }) /
-                 mat_ptrs.size();
-  aggregate_timing(mat_ptrs);
+  aggregate_results(mat_ptrs);
 
   return gflop_per_second;
 }

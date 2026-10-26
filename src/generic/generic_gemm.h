@@ -78,6 +78,8 @@ class generic_gemm {
   timing_config timing_cfg;
   // Timing statistics for the current result row, aggregated across devices.
   timing_result timing;
+  // Report summed instead of mean Gflops and GB/s across devices.
+  bool sum_devices = false;
 
   // Bytes per element (size / packing) and flops per multiply-add, used by
   // figure_of_merit. Set by each backend once its types are known.
@@ -176,6 +178,22 @@ class generic_gemm {
     std::vector<timing_result> results;
     for (const auto &inst : insts) results.push_back(inst.timing);
     timing = aggregate(results);
+  }
+
+  // Reduce per-device results into the reported row. Time is always a mean.
+  template <typename Inst>
+  void aggregate_results(const std::vector<Inst> &insts) {
+    double flops = 0, bytes = 0, time = 0;
+    for (const auto &inst : insts) {
+      flops += inst.gflops;
+      bytes += inst.gbytes;
+      time += inst.time_us;
+    }
+    const double n = static_cast<double>(insts.size());
+    gflop_per_second = sum_devices ? flops : flops / n;
+    gbyte_per_second = sum_devices ? bytes : bytes / n;
+    iter_time_us = time / n;
+    aggregate_timing(insts);
   }
   // Adaptive-only CSV columns; empty in fixed-count mode.
   std::string timing_header() const;

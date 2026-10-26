@@ -902,7 +902,6 @@ void cublaslt_gemm::free_mem() {
 
 double cublaslt_gemm::test(const int &ith_solution) {
   vector<thread> threads;
-  double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
     threads.push_back(thread(&cublaslt_gemm::test_matmul, this, &mat, ith_solution));
   }
@@ -911,21 +910,17 @@ double cublaslt_gemm::test(const int &ith_solution) {
     thread.join();
   }
 
-  // Sum all gflops
-  gflop_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublaslt_gemm_inst &o) { return o.gflops + i; });
-
-  gbyte_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublaslt_gemm_inst &o) { return o.gbytes + i; });
-
-  iter_time_us = std::accumulate(begin(mat_ptrs), end(mat_ptrs), 0.0,
-                                 [](double i, const cublaslt_gemm_inst &o) {
-                                   return o.time_us + i;
-                                 }) /
-                 mat_ptrs.size();
-  aggregate_timing(mat_ptrs);
+  aggregate_results(mat_ptrs);
+  if (cuda_monitor::monitor::enabled()) {
+    const float n = static_cast<float>(mat_ptrs.size());
+    avg_sysclk_mhz = med_sysclk_mhz = avg_memclk_mhz = med_memclk_mhz = 0;
+    for (const auto &mat : mat_ptrs) {
+      avg_sysclk_mhz += mat.avg_sysclk_mhz / n;
+      med_sysclk_mhz += mat.med_sysclk_mhz / n;
+      avg_memclk_mhz += mat.avg_memclk_mhz / n;
+      med_memclk_mhz += mat.med_memclk_mhz / n;
+    }
+  }
 
   return gflop_per_second;
 }
@@ -1010,10 +1005,10 @@ void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat, int ith_solution) {
   std::tie(mat->gflops, mat->gbytes, mat->time_us) = figure_of_merit(mat->timing.median_us);
 
   if (cuda_monitor::monitor::enabled()) {
-    avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
-    med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
-    avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
-    med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
+    mat->avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
+    mat->med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
+    mat->avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
+    mat->med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
   }
 
   check_cuda(cudaStreamDestroy(stream));

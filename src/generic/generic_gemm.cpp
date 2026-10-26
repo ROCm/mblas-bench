@@ -58,6 +58,7 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   function = result["function"].as<string>();
 
   set_timing_config(result);
+  sum_devices = result["sum_devices"].as<bool>();
 
   batch_count = result["batch_count"].as<int>();
   if (function.find("Batched") != string::npos || function.find("batched") != string::npos || batch_count > 1 ) {
