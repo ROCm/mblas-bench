@@ -305,34 +305,41 @@ inline bool reached_target(const timing_config &cfg, std::vector<double> &sample
 template <typename TimeBatch>
 void run_measurement(TimeBatch &&time_batch, const timing_config &cfg, timing_result &out) {
   out = timing_result{};
+  
 
+  // Traditional fixed iteration mode
   if (!cfg.adaptive) {
-    if (cfg.cold_iters > 0) time_batch(0, cfg.cold_iters);
+    if (cfg.cold_iters > 0) {
+      time_batch(0, cfg.cold_iters);
+    }
     const int32_t iters = cfg.iters > 0 ? cfg.iters : 1;
     const double per_iter = time_batch(0, iters) / iters;
-    out.mean_us = out.median_us = out.min_us = per_iter;
+    out.mean_us = per_iter;
+    out.median_us = per_iter;
+    out.min_us = per_iter;
     out.batch = iters;
     out.samples = 1;
     out.hot_iters = iters;
     return;
   }
 
+  // Adaptive timing mode from here on out
   if (const auto err = validate_adaptive_config(cfg); !err.empty()) {
     throw std::invalid_argument("Invalid adaptive timing config: " + err);
   }
 
   // Warmup: one cold probe seeds the batch size, then warm up in self-sized chunks
   // until warmup_time, refining the per-iteration estimate.
-  int64_t global_index = 0;
+  int64_t rotating_index = 0;
   const int64_t cap = timing_detail::max_batch_size(cfg);
-  double per_iter_est = time_batch(global_index++, 1);
+  double per_iter_est = time_batch(rotating_index++, 1);
   {
     const double warm_min_us = static_cast<double>(cfg.warmup_time) * 1000.0;
     double warm_us = 0.0;
     int32_t chunk = timing_detail::batch_size(cfg, per_iter_est, cap);
     while (warm_us < warm_min_us) {
-      const double chunk_us = time_batch(global_index, chunk);
-      global_index += chunk;
+      const double chunk_us = time_batch(rotating_index, chunk);
+      rotating_index += chunk;
       warm_us += chunk_us;
       // A chunk below timer resolution can't advance warm_us, so grow the batch
       // instead; give up if even the max batch still reads as zero.
@@ -360,10 +367,10 @@ void run_measurement(TimeBatch &&time_batch, const timing_config &cfg, timing_re
   bool converged = false;
   bool stable = false;
 
-  global_index = 0;  // restart rotation for the timed phase
+  rotating_index = 0;  // restart rotation for the timed phase
   while (true) {
-    const double batch_us = time_batch(global_index, batch);
-    global_index += batch;
+    const double batch_us = time_batch(rotating_index, batch);
+    rotating_index += batch;
     const double per_iter = batch_us / batch;
     samples.push_back(per_iter);
     stats.add(per_iter);
