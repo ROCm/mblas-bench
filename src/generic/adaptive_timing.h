@@ -12,10 +12,17 @@
 // max_measure_time / max_iters ceiling (noisy). noise_threshold <= 0 disables both
 // checks. The median is the headline statistic.
 //
-// This header has no vendor dependencies: the caller supplies
-//   double time_iters(int64_t first_index, int32_t count)
-// which runs `count` back-to-back enqueues for global indices
-// [first_index, first_index + count) and returns the elapsed microseconds.
+// Measure-phase samples are pipelined: pipeline_depth samples stay queued on the
+// stream, and consecutive samples share a boundary event, so the GPU runs them back
+// to back while the host processes results. Every timed span starts behind untimed
+// queued work (cold iters, or a primer sample) rather than on an idle GPU.
+//
+// This header has no vendor dependencies: the caller supplies a timer with
+//   void enqueue(int64_t first, int32_t count)  // enqueue [first, first + count), untimed
+//   void restart()                              // record a new chain-start event
+//   void submit(int64_t first, int32_t count)   // enqueue, then record the next boundary
+//   double wait()                               // block on the oldest pending sample; us
+// holding at least timing_pipeline_depth(cfg) pending samples.
 
 #include <algorithm>
 #include <cmath>
@@ -44,6 +51,7 @@ struct timing_config {
   float stability_threshold = 0.0f;  // max rel. spread of recent rel_iqr readings
   int32_t stability_window = 0;      // rel_iqr readings tested for the plateau (>= 2)
   int32_t stability_interval = 0;    // record a rel_iqr reading every N samples (>= 1)
+  int32_t pipeline_depth = 1;        // measure samples kept in flight (>= 1)
 };
 
 // Defaults for the --adaptive preset; used as the CLI defaults so they appear in --help.
@@ -61,7 +69,13 @@ constexpr float noise_threshold = 0.01f;
 constexpr float stability_threshold = 0.05f;
 constexpr int32_t stability_window = 32;
 constexpr int32_t stability_interval = 16;
+constexpr int32_t pipeline_depth = 2;
 }  // namespace adaptive_defaults
+
+// Pending samples the timer must hold. Fixed-count mode never pipelines.
+inline int32_t timing_pipeline_depth(const timing_config &cfg) {
+  return cfg.adaptive ? std::max<int32_t>(1, cfg.pipeline_depth) : 1;
+}
 
 // Per-iteration statistics, in microseconds.
 struct timing_result {
@@ -114,6 +128,8 @@ inline std::string validate_adaptive_config(const timing_config &cfg) {
     return "adaptive timing requires a ceiling: set max_measure_time or max_iters > 0";
   if (cfg.stability_threshold > 0.0f && (cfg.stability_window < 2 || cfg.stability_interval < 1))
     return "stability_threshold > 0 requires stability_window >= 2 and stability_interval >= 1";
+  if (cfg.pipeline_depth < 1)
+    return "pipeline_depth (" + std::to_string(cfg.pipeline_depth) + ") must be >= 1";
   return {};
 }
 
@@ -145,7 +161,7 @@ inline std::string format_adaptive_timing_summary(const timing_config &cfg) {
   else
     oss << " (stability " << cfg.stability_threshold * 100 << "%, window "
         << cfg.stability_window << ", interval " << cfg.stability_interval << ")";
-  oss << ".";
+  oss << ". Pipeline depth " << cfg.pipeline_depth << ".";
   return oss.str();
 }
 
@@ -299,21 +315,24 @@ inline bool reached_target(const timing_config &cfg, std::vector<double> &sample
 
 }  // namespace timing_detail
 
-// Fixed-count mode discards one span of cfg.cold_iters, then times one span of
-// cfg.iters. Adaptive mode self-sizes iters_per_sample and collects samples until the
-// mean converges, the robust spread plateaus, or a ceiling is hit.
-template <typename TimeIters>
-void run_measurement(TimeIters &&time_iters, const timing_config &cfg, timing_result &out) {
+// Fixed-count mode queues cfg.cold_iters untimed, then times one span of cfg.iters.
+// Adaptive mode self-sizes iters_per_sample and collects samples until the mean
+// converges, the robust spread plateaus, or a ceiling is hit.
+template <typename Timer>
+void run_measurement(Timer &timer, const timing_config &cfg, timing_result &out) {
   out = timing_result{};
-  
 
   // Traditional fixed iteration mode
   if (!cfg.adaptive) {
     if (cfg.cold_iters > 0) {
-      time_iters(0, cfg.cold_iters);
+      // Warmup iters 
+      timer.enqueue(0, cfg.cold_iters);
     }
     const int32_t iters = cfg.iters > 0 ? cfg.iters : 1;
-    const double per_iter = time_iters(0, iters) / iters;
+    timer.restart();
+    // Benchmark iterations
+    timer.submit(0, iters);
+    const double per_iter = timer.wait() / iters;
     out.mean_us = per_iter;
     out.median_us = per_iter;
     out.min_us = per_iter;
@@ -329,7 +348,13 @@ void run_measurement(TimeIters &&time_iters, const timing_config &cfg, timing_re
   }
 
   // Warmup: one cold probe seeds iters_per_sample, then warm up in self-sized chunks
-  // until warmup_time, refining the per-iteration estimate.
+  // until warmup_time, refining the per-iteration estimate. Each chunk's time is
+  // needed before sizing the next, so warmup is synchronous.
+  const auto time_iters = [&timer](int64_t first, int32_t count) {
+    timer.restart();
+    timer.submit(first, count);
+    return timer.wait();
+  };
   int64_t rotating_index = 0;
   const int64_t cap = timing_detail::max_iters_per_sample(cfg);
   double per_iter_est = time_iters(rotating_index++, 1);
@@ -367,10 +392,17 @@ void run_measurement(TimeIters &&time_iters, const timing_config &cfg, timing_re
   bool converged = false;
   bool stable = false;
 
+  // The untimed primer keeps the GPU busy while the first timed samples are queued.
+  const int32_t depth = timing_pipeline_depth(cfg);
+  timer.enqueue(rotating_index, iters_per_sample);
   rotating_index = 0;  // restart rotation for the timed phase
-  while (true) {
-    const double sample_us = time_iters(rotating_index, iters_per_sample);
+  timer.restart();
+  for (int32_t d = 0; d < depth; ++d) {
+    timer.submit(rotating_index, iters_per_sample);
     rotating_index += iters_per_sample;
+  }
+  while (true) {
+    const double sample_us = timer.wait();
     const double per_iter = sample_us / iters_per_sample;
     samples.push_back(per_iter);
     stats.add(per_iter);
@@ -380,6 +412,12 @@ void run_measurement(TimeIters &&time_iters, const timing_config &cfg, timing_re
                                       bounds, converged, stable)) {
       break;
     }
+    timer.submit(rotating_index, iters_per_sample);
+    rotating_index += iters_per_sample;
+  }
+  // Samples still in flight overshoot the stop decision; drain and discard them.
+  for (int32_t d = 1; d < depth; ++d) {
+    timer.wait();
   }
 
   timing_detail::fill_distribution(samples, out);

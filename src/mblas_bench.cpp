@@ -365,6 +365,10 @@ int main(int argc, char **argv) {
   opp_adder("adaptive_stability_interval",
             "Adaptive timing: record a rel_iqr reading every N samples (>= 1)",
             cxxopts::value<int>()->default_value(num(adaptive_defaults::stability_interval)));
+  opp_adder("adaptive_pipeline_depth",
+            "Adaptive timing: timed samples kept queued on the stream so the GPU runs them "
+            "back to back (>= 1; 1 = wait on each sample before queuing the next)",
+            cxxopts::value<int>()->default_value(num(adaptive_defaults::pipeline_depth)));
   opp_adder("driver", "Backend to run the GEMM test with",
             cxxopts::value<string>()->default_value("rocblas"));
   opp_adder("yaml",

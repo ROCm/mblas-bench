@@ -327,7 +327,8 @@ void generic_gemm::set_timing_config(const cxxopts::ParseResult &result) {
                             "adaptive_measure_time", "adaptive_max_measure_time",
                             "adaptive_min_iters", "adaptive_max_iters",
                             "adaptive_noise_threshold", "adaptive_stability_threshold",
-                            "adaptive_stability_window", "adaptive_stability_interval"}) {
+                            "adaptive_stability_window", "adaptive_stability_interval",
+                            "adaptive_pipeline_depth"}) {
       if (result.count(opt)) {
         throw std::invalid_argument(string("--") + opt + " requires --adaptive");
       }
@@ -352,6 +353,7 @@ void generic_gemm::set_timing_config(const cxxopts::ParseResult &result) {
   timing_cfg.stability_threshold = result["adaptive_stability_threshold"].as<float>();
   timing_cfg.stability_window = result["adaptive_stability_window"].as<int>();
   timing_cfg.stability_interval = result["adaptive_stability_interval"].as<int>();
+  timing_cfg.pipeline_depth = result["adaptive_pipeline_depth"].as<int>();
   if (const auto err = validate_adaptive_config(timing_cfg); !err.empty()) {
     throw std::invalid_argument("Invalid adaptive timing config: " + err);
   }
