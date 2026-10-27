@@ -19,7 +19,7 @@ class cuda_sample_timer {
     for (auto &e : events_) check_cuda(cudaEventCreate(&e));
   }
   ~cuda_sample_timer() {
-    for (auto e : events_) cudaEventDestroy(e);
+    for (auto e : events_) (void)cudaEventDestroy(e);
   }
   cuda_sample_timer(const cuda_sample_timer &) = delete;
   cuda_sample_timer &operator=(const cuda_sample_timer &) = delete;

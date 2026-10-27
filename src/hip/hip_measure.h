@@ -9,6 +9,14 @@
 #include "adaptive_timing.h"
 #include "hip_error.h"
 
+// Timing-only events: skip the system-scope cache writeback/invalidate that
+// otherwise stalls the next kernel at every sample boundary.
+#ifdef hipEventDisableSystemFence
+inline constexpr unsigned timing_event_flags = hipEventDisableSystemFence;
+#else
+inline constexpr unsigned timing_event_flags = hipEventDefault;
+#endif
+
 // Ring of chained boundary events: sample k spans events[k] to events[k + 1], so
 // back-to-back samples share an event and nothing is enqueued between them.
 template <typename Launch>
@@ -16,10 +24,10 @@ class hip_sample_timer {
  public:
   hip_sample_timer(Launch &launch, hipStream_t stream, int32_t depth)
       : launch_(launch), stream_(stream), events_(depth + 1) {
-    for (auto &e : events_) check_hip(hipEventCreate(&e));
+    for (auto &e : events_) check_hip(hipEventCreateWithFlags(&e, timing_event_flags));
   }
   ~hip_sample_timer() {
-    for (auto e : events_) hipEventDestroy(e);
+    for (auto e : events_) (void)hipEventDestroy(e);
   }
   hip_sample_timer(const hip_sample_timer &) = delete;
   hip_sample_timer &operator=(const hip_sample_timer &) = delete;
@@ -68,5 +76,7 @@ void hip_measure(Launch &&launch, hipStream_t stream, const timing_config &cfg,
   hip_sample_timer<std::remove_reference_t<Launch>> timer(launch, stream,
                                                           timing_pipeline_depth(cfg));
   run_measurement(timer, cfg, out);
+  // The timing events carry no system fence, so they don't make results host-visible.
+  check_hip(hipStreamSynchronize(stream));
   check_hip(hipGetLastError());
 }
