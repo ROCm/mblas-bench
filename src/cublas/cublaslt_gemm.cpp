@@ -19,6 +19,7 @@
 #include "cublas_create_allocate.h"
 #include "cublas_datatype_utils.h"
 #include "cuda_error.h"
+#include "cuda_measure.h"
 #include "cxxopts.hpp"
 #include "cuda_monitor.h"
 
@@ -432,6 +433,10 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
       d_type.get_packing_count(),
       a_scale_bytes, b_scale_bytes, c_scale_bytes, d_scale_bytes,
       inplace);
+  set_fom_sizes(type_call_dev<sizeofCUDT>(a_type), a_type.get_packing_count(),
+                type_call_dev<sizeofCUDT>(b_type), b_type.get_packing_count(),
+                type_call_dev<sizeofCUDT>(d_type), d_type.get_packing_count(),
+                precision.is_real());
 }
 
 string cublaslt_gemm::prepare_array() {
@@ -499,6 +504,7 @@ string cublaslt_gemm::prepare_array() {
   if (cuda_monitor::monitor::enabled()) {
     ossHeader << "avg_sysclk_mhz,med_sysclk_mhz,avg_memclk_mhz,med_memclk_mhz,";
   }
+  ossHeader << timing_header();
   ossHeader << endl;
   return ossHeader.str();
 }
@@ -896,7 +902,6 @@ void cublaslt_gemm::free_mem() {
 
 double cublaslt_gemm::test(const int &ith_solution) {
   vector<thread> threads;
-  double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
     threads.push_back(thread(&cublaslt_gemm::test_matmul, this, &mat, ith_solution));
   }
@@ -905,20 +910,17 @@ double cublaslt_gemm::test(const int &ith_solution) {
     thread.join();
   }
 
-  // Sum all gflops
-  gflop_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublaslt_gemm_inst &o) { return o.gflops + i; });
-
-  gbyte_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublaslt_gemm_inst &o) { return o.gbytes + i; });
-
-  iter_time_us = std::accumulate(begin(mat_ptrs), end(mat_ptrs), 0.0,
-                                 [](double i, const cublaslt_gemm_inst &o) {
-                                   return o.time_us + i;
-                                 }) /
-                 mat_ptrs.size();
+  aggregate_results(mat_ptrs);
+  if (cuda_monitor::monitor::enabled()) {
+    const float n = static_cast<float>(mat_ptrs.size());
+    avg_sysclk_mhz = med_sysclk_mhz = avg_memclk_mhz = med_memclk_mhz = 0;
+    for (const auto &mat : mat_ptrs) {
+      avg_sysclk_mhz += mat.avg_sysclk_mhz / n;
+      med_sysclk_mhz += mat.med_sysclk_mhz / n;
+      avg_memclk_mhz += mat.avg_memclk_mhz / n;
+      med_memclk_mhz += mat.med_memclk_mhz / n;
+    }
+  }
 
   return gflop_per_second;
 }
@@ -974,108 +976,41 @@ std::string cublaslt_gemm::get_result_string() {
     ossValues << avg_memclk_mhz << ',';
     ossValues << med_memclk_mhz << ',';
   }
+  ossValues << timing_values();
   ossValues << endl;
   return ossValues.str();
 }
 
-std::tuple<double, double, double> cublaslt_gemm::calculate_figure_of_merit(
-    double totalTime_ms) {
-  double avgTime_ms = totalTime_ms / iters;
-  double avgTime_s = avgTime_ms / 1000.0f;
-  double avgTime_us = avgTime_ms * 1000.0f;
-
-  int a_sz = type_call_dev<sizeofCUDT>(a_type);
-  int b_sz = type_call_dev<sizeofCUDT>(b_type);
-  int d_sz = type_call_dev<sizeofCUDT>(d_type);
-  int a_pack = a_type.get_packing_count();
-  int b_pack = b_type.get_packing_count();
-  int d_pack = d_type.get_packing_count();
-
-  int flopPerSize = 2;
-  if (!precision.is_real()) {
-    flopPerSize = 8;
-  }
-  double gbytes = (((static_cast<double>(a_sz) / static_cast<double>(a_pack)) *
-                    static_cast<double>(m) * static_cast<double>(k)) +
-                   ((static_cast<double>(b_sz) / static_cast<double>(b_pack)) *
-                    static_cast<double>(k) * static_cast<double>(n)) +
-                   ((static_cast<double>(d_sz) / static_cast<double>(d_pack)) *
-                    static_cast<double>(n) * static_cast<double>(m))) /
-                  1e9;
-  double gflops = static_cast<double>(flopPerSize) *
-                  (static_cast<double>(m) * static_cast<double>(n) *
-                   static_cast<double>(k)) /
-                  1e9;
-
-  double gflopPerSec = gflops * static_cast<double>(batch_count) / avgTime_s;
-  double gbytePerSec = gbytes * batch_count / avgTime_s;
-
-  return std::tuple<double, double, double>(gflopPerSec, gbytePerSec,
-                                            avgTime_us);
-}
-
 void cublaslt_gemm::test_matmul(cublaslt_gemm_inst *mat, int ith_solution) {
-  cublasStatus_t stat;
   cublasLtHandle_t handle;
   cudaStream_t stream;
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasLtCreate(&handle));
   check_cuda(cudaStreamCreate(&stream));
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = cublasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
-                          mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
-                          mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algos[ith_solution].algo, mat->devWork, mat->wSZ, stream);
-    // Check for errors during the gemm run
-    check_cublas(stat);
-    check_cuda(cudaGetLastError());
-  }
-  check_cuda(cudaStreamSynchronize(stream));
 
-  cudaEvent_t start, stop;
-  check_cuda(cudaEventCreate(&start));
-  check_cuda(cudaEventCreate(&stop));
-
-  /*
-    Run and time the performance test
-  */
   auto freq_monitor = cuda_monitor::monitor();
   freq_monitor.set_device_id(mat->devIDX);
 
   freq_monitor.start();
-  cudaEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = cublasLtMatmul(handle, mat->desc_ops[flush_index], alpha,
-                          mat->ptr_dev_a[flush_index], mat->desc_a,
-                          mat->ptr_dev_b[flush_index], mat->desc_b, beta,
-                          mat->ptr_dev_c[flush_index], mat->desc_c,
-                          mat->ptr_dev_d[flush_index], mat->desc_d,
-                          &mat->algos[ith_solution].algo, mat->devWork, mat->wSZ, stream);
-  }
-  cudaEventRecord(stop, stream);
-  cudaEventSynchronize(stop);
+  cuda_measure([&](int64_t i) {
+    int f = i % flush_batch_count;
+    check_cublas(cublasLtMatmul(handle, mat->desc_ops[f], alpha,
+                                mat->ptr_dev_a[f], mat->desc_a,
+                                mat->ptr_dev_b[f], mat->desc_b, beta,
+                                mat->ptr_dev_c[f], mat->desc_c,
+                                mat->ptr_dev_d[f], mat->desc_d,
+                                &mat->algos[ith_solution].algo, mat->devWork, mat->wSZ, stream));
+  }, stream, timing_cfg, mat->timing);
   freq_monitor.stop();
-
-  // Check for errors during the performance test
-  check_cublas(stat);
-  check_cuda(cudaGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  cudaEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+  std::tie(mat->gflops, mat->gbytes, mat->time_us) = figure_of_merit(mat->timing.median_us);
 
   if (cuda_monitor::monitor::enabled()) {
-    avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
-    med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
-    avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
-    med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
+    mat->avg_sysclk_mhz = freq_monitor.get_avg_sysclk_mhz();
+    mat->med_sysclk_mhz = freq_monitor.get_med_sysclk_mhz();
+    mat->avg_memclk_mhz = freq_monitor.get_avg_memclk_mhz();
+    mat->med_memclk_mhz = freq_monitor.get_med_memclk_mhz();
   }
 
+  check_cuda(cudaStreamDestroy(stream));
+  check_cublas(cublasLtDestroy(handle));
 }

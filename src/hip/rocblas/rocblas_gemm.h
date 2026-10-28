@@ -35,6 +35,7 @@ struct rocblas_gemm_inst {
   double gflops = 0;
   double gbytes = 0;
   double time_us = 0;
+  timing_result timing;
   void *alpha;
   void *beta;
   /*
@@ -119,7 +120,6 @@ class rocblas_gemm : public generic_gemm {
   void fill_host();
   void copy_host_to_dev(rocblas_gemm_inst *);
   void run_threaded(void (rocblas_gemm::*func)(rocblas_gemm_inst *));
-  std::tuple<double, double, double> calculate_figure_of_merit(double totalTime_ms);
 
 
 
