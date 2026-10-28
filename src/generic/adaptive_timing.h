@@ -12,10 +12,11 @@
 // max_measure_time / max_iters ceiling (noisy). noise_threshold <= 0 disables both
 // checks. The median is the headline statistic.
 //
-// Measure-phase samples are pipelined: pipeline_depth samples stay queued on the
-// stream, and consecutive samples share a boundary event, so the GPU runs them back
-// to back while the host processes results. Every timed span starts behind untimed
-// queued work (cold iters, or a primer sample) rather than on an idle GPU.
+// Warmup chunks and measure samples are pipelined on one event chain:
+// pipeline_depth spans stay queued on the stream, and consecutive spans share a
+// boundary event, so the GPU runs them back to back while the host processes
+// results. With pipeline_depth >= 2, every measure sample starts behind queued work
+// (warmup chunks or earlier samples) rather than on an idle GPU.
 //
 // This header has no vendor dependencies: the caller supplies a timer with
 //   void enqueue(int64_t first, int32_t count)  // enqueue [first, first + count), untimed
@@ -347,33 +348,48 @@ void run_measurement(Timer &timer, const timing_config &cfg, timing_result &out)
     throw std::invalid_argument("Invalid adaptive timing config: " + err);
   }
 
-  // Warmup: one cold probe seeds iters_per_sample, then warm up in self-sized chunks
-  // until warmup_time, refining the per-iteration estimate. Each chunk's time is
-  // needed before sizing the next, so warmup is synchronous.
-  const auto time_iters = [&timer](int64_t first, int32_t count) {
-    timer.restart();
-    timer.submit(first, count);
-    return timer.wait();
-  };
+  // Warmup: a synchronous cold probe seeds the chunk size, then self-sized chunks run
+  // pipelined until warmup_time. Each completed chunk refines the per-iteration
+  // estimate that sizes the next submit, so sizing lags by depth - 1 chunks.
   int64_t rotating_index = 0;
   const int64_t cap = timing_detail::max_iters_per_sample(cfg);
-  double per_iter_est = time_iters(rotating_index++, 1);
+  const int32_t depth = timing_pipeline_depth(cfg);
+  timer.restart();
+  timer.submit(rotating_index++, 1);
+  double per_iter_est = timer.wait();
   {
+    // Sizes of in-flight chunks, which differ from `chunk` once it is resized.
+    std::vector<int32_t> pending(depth);
+    int64_t submitted = 0;
+    int64_t completed = 0;
+    int32_t chunk = timing_detail::iters_per_sample(cfg, per_iter_est, cap);
+    const auto submit_chunk = [&]() {
+      timer.submit(rotating_index, chunk);
+      rotating_index += chunk;
+      pending[submitted++ % depth] = chunk;
+    };
+    timer.restart();
+    for (int32_t d = 0; d < depth; ++d) {
+      submit_chunk();
+    }
     const double warm_min_us = static_cast<double>(cfg.warmup_time) * 1000.0;
     double warm_us = 0.0;
-    int32_t chunk = timing_detail::iters_per_sample(cfg, per_iter_est, cap);
     while (warm_us < warm_min_us) {
-      const double chunk_us = time_iters(rotating_index, chunk);
-      rotating_index += chunk;
+      const double chunk_us = timer.wait();
+      const int32_t done = pending[completed++ % depth];
       warm_us += chunk_us;
       // A chunk below timer resolution can't advance warm_us, so grow the chunk
       // instead; give up if even the max chunk still reads as zero.
+      const bool unresolvable = chunk_us <= 0.0 && done >= cap;
       if (chunk_us > 0.0) {
-        per_iter_est = chunk_us / chunk;
+        per_iter_est = chunk_us / done;
         chunk = timing_detail::iters_per_sample(cfg, per_iter_est, cap);
-      } else if (chunk < cap) {
-        chunk = static_cast<int32_t>(std::min<int64_t>(cap, int64_t{chunk} * 2));
-      } else {
+      } else if (!unresolvable) {
+        chunk = static_cast<int32_t>(std::min<int64_t>(cap, int64_t{std::max(chunk, done)} * 2));
+      }
+      // The measure phase expects depth chunks still in flight.
+      submit_chunk();
+      if (unresolvable) {
         break;
       }
     }
@@ -392,17 +408,18 @@ void run_measurement(Timer &timer, const timing_config &cfg, timing_result &out)
   bool converged = false;
   bool stable = false;
 
-  // The untimed primer keeps the GPU busy while the first timed samples are queued.
-  const int32_t depth = timing_pipeline_depth(cfg);
-  timer.enqueue(rotating_index, iters_per_sample);
+  // The warmup chunks still in flight keep the GPU busy while the first timed samples
+  // are queued; discard each as its replacement goes in.
   rotating_index = 0;  // restart rotation for the timed phase
-  timer.restart();
   for (int32_t d = 0; d < depth; ++d) {
+    timer.wait();
     timer.submit(rotating_index, iters_per_sample);
     rotating_index += iters_per_sample;
   }
   while (true) {
     const double sample_us = timer.wait();
+    timer.submit(rotating_index, iters_per_sample);
+    rotating_index += iters_per_sample;
     const double per_iter = sample_us / iters_per_sample;
     samples.push_back(per_iter);
     stats.add(per_iter);
@@ -412,11 +429,9 @@ void run_measurement(Timer &timer, const timing_config &cfg, timing_result &out)
                                       bounds, converged, stable)) {
       break;
     }
-    timer.submit(rotating_index, iters_per_sample);
-    rotating_index += iters_per_sample;
   }
   // Samples still in flight overshoot the stop decision; drain and discard them.
-  for (int32_t d = 1; d < depth; ++d) {
+  for (int32_t d = 0; d < depth; ++d) {
     timer.wait();
   }
 
