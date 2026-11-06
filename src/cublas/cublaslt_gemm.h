@@ -96,6 +96,7 @@ class cublaslt_gemm : public generic_gemm {
   void *beta;
 
   bool inplace = false;
+  bool query_mode = false;
   bool use_scaling = false;
   mblas_cuda_operation transA;
   mblas_cuda_operation transB;
@@ -180,6 +181,7 @@ class cublaslt_gemm : public generic_gemm {
  public:
   cublaslt_gemm(cxxopts::ParseResult result);
   std::string prepare_array();
+  void query_only() override;
   double test(const int &ith_solution) override;
   std::string get_result_string();
   virtual void free_mem();

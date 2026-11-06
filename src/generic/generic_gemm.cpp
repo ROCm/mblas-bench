@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -319,6 +320,10 @@ void generic_gemm::run_solutions() {
     std::string results = get_result_string();
     std::cout << results << std::flush;
   }
+}
+
+void generic_gemm::query_only() {
+  throw std::invalid_argument("--query_only is only supported by the cublaslt driver");
 }
 
 std::string scaling_string(scaling_type input){

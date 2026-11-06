@@ -74,6 +74,16 @@ build/mblas-bench -m 4096 -n 4096 -k 4096 --a_type f16_r --b_type f16_r --c_type
 
 When multiple solutions are requested, a `solution_index` column is added to the CSV output. This option can also be specified per-problem in YAML files using the `requested_solution` field.
 
+For cuBLASLt, use `--query_only` to check whether the heuristic returns a solution without allocating matrices or launching a GEMM. Block scaled formats allocate small scale pointer placeholders for descriptor validation:
+
+```
+build/mblas-bench --driver cublaslt --function matmul -m 128 -n 128 -k 128 \
+  --a_type f8_r --b_type f8_r --c_type bf16_r --d_type bf16_r \
+  --compute_type f32_r --query_only
+```
+
+Each result is a CSV line beginning with `query_only` and ending with `solution_count,status`. Status is `found`, `no_solution`, or an API error. `--requested_solution_num` controls the maximum number of solutions returned. Query mode also works with `--yaml`; an invalid problem produces an error row and the next problem is queried. A heuristic result indicates only that cuBLASLt proposed an algorithm; it does not guarantee that execution succeeds.
+
 > **Note:** cuBLAS and rocBLAS backends do not support multiple solutions. If `--requested_solution_num` is not equal to 1 with these backends, a warning is printed and the single available solution is benchmarked.
 
 #### Running gemms from a YAML file

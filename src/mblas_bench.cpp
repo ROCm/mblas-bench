@@ -332,6 +332,8 @@ int main(int argc, char **argv) {
   opp_adder("requested_solution_num,requested_solution",
             "Number of solutions to request from heuristic. Default 1, use -1 for all solutions.",
             cxxopts::value<int>()->default_value("1"));
+  opp_adder("query_only", "cuBLASLt only: report heuristic solution count without allocating matrices or launching GEMM",
+            cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
   opp_adder("h,help", "Print Usage");
 
   cxxopts::ParseResult result = options.parse(argc, argv);
@@ -379,9 +381,35 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    gemm->create_gemm(result);
-    gemm->run_solutions();
-    gemm->free_mem();
+    const bool query_only = result["query_only"].as<bool>();
+    if (query_only && driver != "cublaslt" && !(driver == "cublas" && function == "matmul")) {
+      cerr << "--query_only requires --driver cublaslt" << endl;
+      delete gemm;
+      return 1;
+    }
+    try {
+      gemm->create_gemm(result);
+      if (query_only) {
+        gemm->query_only();
+      } else {
+        gemm->run_solutions();
+      }
+      gemm->free_mem();
+    } catch (const std::exception& error) {
+      if (!query_only) throw;
+      std::cout << "query_only," << result["device"].as<string>() << ','
+                << result["m"].as<int>() << ',' << result["n"].as<int>() << ','
+                << result["k"].as<int>() << ',' << result["batch_count"].as<int>() << ','
+                << result["transposeA"].as<string>() << ','
+                << result["transposeB"].as<string>() << ','
+                << result["a_type"].as<string>() << ','
+                << result["b_type"].as<string>() << ','
+                << result["c_type"].as<string>() << ','
+                << result["d_type"].as<string>() << ','
+                << result["scale_mode_a"].as<string>() << ','
+                << result["scale_mode_b"].as<string>() << ",0,error" << endl;
+      cerr << "query_only error: " << error.what() << endl;
+    }
     delete gemm;
   }
 

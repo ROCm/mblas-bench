@@ -129,6 +129,7 @@ class generic_gemm {
 
  public:
   generic_gemm(cxxopts::ParseResult);
+  virtual ~generic_gemm() = default;
 
   // virtual void setSize();
   // virtual void setTypes();
@@ -139,6 +140,7 @@ class generic_gemm {
 
   virtual double test(const int &ith_solution) = 0;
   void run_solutions();
+  virtual void query_only();
 
   virtual std::string get_result_string() = 0;
   virtual void free_mem() = 0;
@@ -155,4 +157,3 @@ class generic_gemm {
                         bool inplace);
 
 };
-

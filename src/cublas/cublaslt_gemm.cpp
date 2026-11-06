@@ -352,6 +352,7 @@ void cublaslt_gemm::validate_parameters() {
 }
 
 cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
+  query_mode = result["query_only"].as<bool>();
   // Grab precision from command line
   precision = mblas_cuda_data_type(result["precision"].as<string>());
   // Grab compute type from command line
@@ -369,6 +370,8 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
   transA = mblas_cuda_operation(result["transposeA"].as<std::string>());
   transB = mblas_cuda_operation(result["transposeB"].as<std::string>());
   validate_parameters();
+
+  if (query_mode) return;
 
 #if defined(HAS_CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT)
   // Parse emulation parameters for CUBLAS_COMPUTE_64F_EMULATED_FIXEDPOINT matmuls
@@ -432,6 +435,141 @@ cublaslt_gemm::cublaslt_gemm(cxxopts::ParseResult result) : generic_gemm(result)
       d_type.get_packing_count(),
       a_scale_bytes, b_scale_bytes, c_scale_bytes, d_scale_bytes,
       inplace);
+}
+
+void cublaslt_gemm::query_only() {
+  struct Resources {
+    cublasLtHandle_t handle = nullptr;
+    cublasLtMatmulDesc_t operation = nullptr;
+    cublasLtMatrixLayout_t a = nullptr, b = nullptr, c = nullptr, d = nullptr;
+    cublasLtMatmulPreference_t preference = nullptr;
+    void *scale_a = nullptr, *scale_b = nullptr, *scale_c = nullptr, *scale_d = nullptr;
+    ~Resources() {
+      if (scale_a) cudaFree(scale_a);
+      if (scale_b) cudaFree(scale_b);
+      if (scale_c) cudaFree(scale_c);
+      if (scale_d) cudaFree(scale_d);
+      if (preference) cublasLtMatmulPreferenceDestroy(preference);
+      if (operation) cublasLtMatmulDescDestroy(operation);
+      if (d) cublasLtMatrixLayoutDestroy(d);
+      if (c) cublasLtMatrixLayoutDestroy(c);
+      if (b) cublasLtMatrixLayoutDestroy(b);
+      if (a) cublasLtMatrixLayoutDestroy(a);
+      if (handle) cublasLtDestroy(handle);
+    }
+  };
+
+  for (const auto& device : mat_ptrs) {
+    [&]() {
+    Resources resources;
+    auto emit = [&](int count, const char* status) {
+      cout << "query_only," << device.devIDX << ',' << m << ',' << n << ',' << k << ','
+           << batch_count << ',' << transA.to_string_short() << ','
+           << transB.to_string_short() << ',' << a_type.to_string() << ','
+           << b_type.to_string() << ',' << c_type.to_string() << ','
+           << d_type.to_string() << ',' << scaling_string(scale_mode_a) << ','
+           << scaling_string(scale_mode_b) << ',' << count << ',' << status << endl;
+    };
+    const cudaError_t device_status = cudaSetDevice(device.devIDX);
+    if (device_status != cudaSuccess) {
+      emit(0, cudaGetErrorString(device_status));
+      return;
+    }
+
+    // All descriptors contain shape, type, layout, scale mode, and workspace
+    // information. Heuristic lookup does not need operand or scale buffers.
+#define QUERY_CHECK(expression)                                      \
+    do {                                                              \
+      const cublasStatus_t status = (expression);                      \
+      if (status != CUBLAS_STATUS_SUCCESS) {                           \
+        emit(0, cublas_get_error_string(status));                     \
+        return;                                                        \
+      }                                                               \
+    } while (false)
+    QUERY_CHECK(cublasLtCreate(&resources.handle));
+    QUERY_CHECK(cublasLtMatrixLayoutCreate(&resources.a, a_type, rows_a, cols_a, lda));
+    QUERY_CHECK(cublasLtMatrixLayoutCreate(&resources.b, b_type, rows_b, cols_b, ldb));
+    QUERY_CHECK(cublasLtMatrixLayoutCreate(&resources.c, c_type, rows_c, cols_c, ldc));
+    QUERY_CHECK(cublasLtMatrixLayoutCreate(&resources.d, d_type, rows_d, cols_d, ldd));
+    if (batch_count > 1) {
+      auto set_batch = [&](cublasLtMatrixLayout_t layout, long long stride) {
+        cublasStatus_t status = cublasLtMatrixLayoutSetAttribute(
+            layout, CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT, &batch_count, sizeof(batch_count));
+        if (status != CUBLAS_STATUS_SUCCESS) return status;
+        return cublasLtMatrixLayoutSetAttribute(
+            layout, CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET, &stride, sizeof(stride));
+      };
+      QUERY_CHECK(set_batch(resources.a, stride_a));
+      QUERY_CHECK(set_batch(resources.b, stride_b));
+      QUERY_CHECK(set_batch(resources.c, stride_c));
+      QUERY_CHECK(set_batch(resources.d, stride_d));
+    }
+    QUERY_CHECK(cublasLtMatmulPreferenceCreate(&resources.preference));
+    QUERY_CHECK(cublasLtMatmulPreferenceSetAttribute(
+        resources.preference, CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+        &workspace_size, sizeof(workspace_size)));
+    QUERY_CHECK(cublasLtMatmulDescCreate(&resources.operation, compute, scalar));
+    const cublasOperation_t op_a = transA.convert_to_cuda();
+    const cublasOperation_t op_b = transB.convert_to_cuda();
+    QUERY_CHECK(cublasLtMatmulDescSetAttribute(
+        resources.operation, CUBLASLT_MATMUL_DESC_TRANSA, &op_a, sizeof(op_a)));
+    QUERY_CHECK(cublasLtMatmulDescSetAttribute(
+        resources.operation, CUBLASLT_MATMUL_DESC_TRANSB, &op_b, sizeof(op_b)));
+#if (ENABLE_CUDA_FP4)
+    // The heuristic validates scale pointer attributes for block scaled types.
+    // These small placeholders are never read because no matmul is launched.
+    auto scale_placeholder = [&](void** pointer) {
+      const cudaError_t status = cudaMalloc(pointer, 16);
+      if (status != cudaSuccess) emit(0, cudaGetErrorString(status));
+      return status == cudaSuccess;
+    };
+    if (scale_mode_a != scaling_type::None) {
+      if (!scale_placeholder(&resources.scale_a)) return;
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_A_SCALE_MODE, &cublaslt_scale_mode_a, sizeof(cublaslt_scale_mode_a)));
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_A_SCALE_POINTER, &resources.scale_a, sizeof(void*)));
+    }
+    if (scale_mode_b != scaling_type::None) {
+      if (!scale_placeholder(&resources.scale_b)) return;
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_B_SCALE_MODE, &cublaslt_scale_mode_b, sizeof(cublaslt_scale_mode_b)));
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_B_SCALE_POINTER, &resources.scale_b, sizeof(void*)));
+    }
+    if (scale_mode_c != scaling_type::None) {
+      if (!scale_placeholder(&resources.scale_c)) return;
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_C_SCALE_MODE, &cublaslt_scale_mode_c, sizeof(cublaslt_scale_mode_c)));
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_C_SCALE_POINTER, &resources.scale_c, sizeof(void*)));
+    }
+    if (scale_mode_d != scaling_type::None) {
+      if (!scale_placeholder(&resources.scale_d)) return;
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_D_OUT_SCALE_MODE, &cublaslt_scale_mode_d, sizeof(cublaslt_scale_mode_d)));
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_D_OUT_SCALE_POINTER, &resources.scale_d, sizeof(void*)));
+    }
+#endif
+    if (a_type.is_fp8() || b_type.is_fp8() || c_type.is_fp8() || d_type.is_fp8()) {
+      int8_t fast_accum = 1;
+      QUERY_CHECK(cublasLtMatmulDescSetAttribute(resources.operation,
+          CUBLASLT_MATMUL_DESC_FAST_ACCUM, &fast_accum, sizeof(fast_accum)));
+    }
+    const int request_count = requested_solution_num == -1 ? 65536 : requested_solution_num;
+    std::vector<cublasLtMatmulHeuristicResult_t> results(request_count);
+    int count = 0;
+    const cublasStatus_t status = cublasLtMatmulAlgoGetHeuristic(
+        resources.handle, resources.operation, resources.a, resources.b,
+        resources.c, resources.d, resources.preference, request_count,
+        results.data(), &count);
+    emit(count, status == CUBLAS_STATUS_SUCCESS
+                    ? (count ? "found" : "no_solution")
+                    : cublas_get_error_string(status));
+#undef QUERY_CHECK
+    }();
+  }
 }
 
 string cublaslt_gemm::prepare_array() {
@@ -813,6 +951,7 @@ void cublaslt_gemm::auto_tuning(cublaslt_gemm_inst *mat) {
 }
 
 void cublaslt_gemm::free_mem() {
+  if (query_mode) return;
   free(alpha);
   free(beta);
   for (int i = 0; i < flush_batch_count; i++) {
