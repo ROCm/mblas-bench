@@ -16,6 +16,7 @@
 #include "cublas_create_allocate.h"
 #include "cublas_datatype_utils.h"
 #include "cuda_error.h"
+#include "cuda_measure.h"
 #include "cxxopts.hpp"
 #include "generic_init.h"
 #include "mblas_cuda_data_type.h"
@@ -199,6 +200,10 @@ cublas_gemm::cublas_gemm(cxxopts::ParseResult result) : generic_gemm(result) {
       c_type.get_packing_count(),
       0, 0, 0, 0,
       true);
+  set_fom_sizes(type_call_dev<sizeofCUDT>(a_type), a_type.get_packing_count(),
+                type_call_dev<sizeofCUDT>(b_type), b_type.get_packing_count(),
+                type_call_dev<sizeofCUDT>(c_type), c_type.get_packing_count(),
+                precision.is_real());
 }
 
 string cublas_gemm::prepare_array() {
@@ -234,7 +239,7 @@ string cublas_gemm::prepare_array() {
   if (batched) {
     ossHeader << "batch_count,";
   }
-  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us," << endl;
+  ossHeader << "cuBLAS-Gflops,cuBLAS-GB/s,cuBLAS-us," << timing_header() << endl;
   if (requested_solution_num > 1 || requested_solution_num == -1) {
     std::cerr << "Warning: Multi-solution is not supported for cuBLAS backend. Running 1 solution." << std::endl;
   }
@@ -365,7 +370,6 @@ void cublas_gemm::free_mem() {
 double cublas_gemm::test(const int &ith_solution) {
   assert(ith_solution == 0);
   vector<thread> threads;
-  double gflops = 0.0;
   for (auto &mat : mat_ptrs) {
     // TgemmBatched
     if (match_gemm_type(precision, function, mblas_data_type::MBLAS_R_64F, {"cublasDgemm", "dgemm", "gemm"})) {
@@ -488,20 +492,7 @@ double cublas_gemm::test(const int &ith_solution) {
     thread.join();
   }
 
-  // Sum all gflops
-  gflop_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublasgemmInst &o) { return o.gflops + i; });
-
-  gbyte_per_second = std::accumulate(
-      begin(mat_ptrs), end(mat_ptrs), 0.0,
-      [](double i, const cublasgemmInst &o) { return o.gbytes + i; });
-
-  iter_time_us = std::accumulate(begin(mat_ptrs), end(mat_ptrs), 0.0,
-                                 [](double i, const cublasgemmInst &o) {
-                                   return o.time_us + i;
-                                 }) /
-                 mat_ptrs.size();
+  aggregate_results(mat_ptrs);
 
   return gflop_per_second;
 }
@@ -518,44 +509,9 @@ std::string cublas_gemm::get_result_string() {
   ossValues << gflop_per_second << ',';
   ossValues << gbyte_per_second << ',';
   ossValues << iter_time_us << ',';
+  ossValues << timing_values();
   ossValues << endl;
   return ossValues.str();
-}
-
-std::tuple<double, double, double> cublas_gemm::calculate_figure_of_merit(
-    double totalTime_ms) {
-  double avgTime_ms = totalTime_ms / iters;
-  double avgTime_s = avgTime_ms / 1000.0f;
-  double avgTime_us = avgTime_ms * 1000.0f;
-
-  int a_sz = type_call_dev<sizeofCUDT>(a_type);
-  int b_sz = type_call_dev<sizeofCUDT>(b_type);
-  int c_sz = type_call_dev<sizeofCUDT>(c_type);
-  int a_pack = a_type.get_packing_count();
-  int b_pack = b_type.get_packing_count();
-  int c_pack = c_type.get_packing_count();
-
-  int flopPerSize = 2;
-  if (!precision.is_real()) {
-    flopPerSize = 8;
-  }
-  double gbytes = (((static_cast<double>(a_sz) / static_cast<double>(a_pack)) *
-                    static_cast<double>(m) * static_cast<double>(k)) +
-                   ((static_cast<double>(b_sz) / static_cast<double>(b_pack)) *
-                    static_cast<double>(k) * static_cast<double>(n)) +
-                   ((static_cast<double>(c_sz) / static_cast<double>(c_pack)) *
-                    static_cast<double>(n) * static_cast<double>(m))) /
-                  1e9;
-  double gflops = static_cast<double>(flopPerSize) *
-                  (static_cast<double>(m) * static_cast<double>(n) *
-                   static_cast<double>(k)) /
-                  1e9;
-
-  double gflopPerSec = gflops * static_cast<double>(batch_count) / avgTime_s;
-  double gbytePerSec = gbytes * batch_count / avgTime_s;
-
-  return std::tuple<double, double, double>(gflopPerSec, gbytePerSec,
-                                            avgTime_us);
 }
 
 template <typename T>
@@ -565,52 +521,23 @@ void cublas_gemm::test_Tgemm(
         const T *, const T *, int, const T *, int, const T *, T *, int)>
         func,
     cublasgemmInst *mat) {
-  cublasStatus_t stat;
   cublasHandle_t handle;
   cudaStream_t stream;
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasCreate(&handle));
   check_cuda(cudaStreamCreate(&stream));
   check_cublas(cublasSetStream(handle, stream));
-  // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
 
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, (T *) mat->ptr_dev_b[flush_index], ldb,
-                (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc);
+  cuda_measure([&](int64_t i) {
+    int f = i % flush_batch_count;
+    check_cublas(func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha,
+                      (T *) mat->ptr_dev_a[f], lda, (T *) mat->ptr_dev_b[f], ldb,
+                      (T *) beta, (T *) mat->ptr_dev_c[f], ldc));
+  }, stream, timing_cfg, mat->timing);
+  std::tie(mat->gflops, mat->gbytes, mat->time_us) = figure_of_merit(mat->timing.median_us);
 
-    // Check for errors during the gemm run
-    check_cublas(stat);
-    check_cuda(cudaGetLastError());
-  }
-  cudaStreamSynchronize(stream);
-
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-
-  /*
-    Run and time the performance test
-  */
-  cudaEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, (T *) mat->ptr_dev_b[flush_index], ldb,
-                (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc);
-  }
-  cudaEventRecord(stop, stream);
-  cudaEventSynchronize(stop);
-
-  // Check for errors during the performance test
-  check_cublas(stat);
-  check_cuda(cudaGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  cudaEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+  check_cuda(cudaStreamDestroy(stream));
+  check_cublas(cublasDestroy(handle));
 }
 
 // Disabled due to batched & rotating tensors not being implemented at the same time
@@ -682,52 +609,24 @@ void cublas_gemm::testTgemmStridedBatched(
         T const *, T *, int, long long, int)>
         func,
     cublasgemmInst *mat) {
-  cublasStatus_t stat;
   cublasHandle_t handle;
   cudaStream_t stream;
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasCreate(&handle));
   check_cuda(cudaStreamCreate(&stream));
   check_cublas(cublasSetStream(handle, stream));
-  // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
 
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, stride_a,
-                (T *) mat->ptr_dev_b[flush_index], ldb, stride_b, (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc, stride_c, batch_count);
+  cuda_measure([&](int64_t i) {
+    int f = i % flush_batch_count;
+    check_cublas(func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha,
+                      (T *) mat->ptr_dev_a[f], lda, stride_a,
+                      (T *) mat->ptr_dev_b[f], ldb, stride_b, (T *) beta,
+                      (T *) mat->ptr_dev_c[f], ldc, stride_c, batch_count));
+  }, stream, timing_cfg, mat->timing);
+  std::tie(mat->gflops, mat->gbytes, mat->time_us) = figure_of_merit(mat->timing.median_us);
 
-    // Check for errors during the gemm run
-    check_cublas(stat);
-    check_cuda(cudaGetLastError());
-  }
-  cudaStreamSynchronize(stream);
-
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-
-  /*
-    Run and time the performance test
-  */
-  cudaEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, (T *) mat->ptr_dev_a[flush_index], lda, stride_a,
-                (T *) mat->ptr_dev_b[flush_index], ldb, stride_b, (T *) beta, (T *) mat->ptr_dev_c[flush_index], ldc, stride_c, batch_count);
-  }
-  cudaEventRecord(stop, stream);
-  cudaEventSynchronize(stop);
-
-  // Check for errors during the performance test
-  check_cublas(stat);
-  check_cuda(cudaGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  cudaEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+  check_cuda(cudaStreamDestroy(stream));
+  check_cublas(cublasDestroy(handle));
 }
 
 template <typename T>
@@ -738,56 +637,27 @@ void cublas_gemm::testTGemmEx(
         cudaDataType_t, int, T const *, void *, cudaDataType_t, int)>
         func,
     cublasgemmInst *mat) {
-  cublasStatus_t stat;
   cublasHandle_t handle;
   cudaStream_t stream;
   check_cuda(cudaSetDevice(mat->devIDX));
   check_cublas(cublasCreate(&handle));
   check_cuda(cudaStreamCreate(&stream));
   check_cublas(cublasSetStream(handle, stream));
-  // check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
 
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, mat->ptr_dev_a[flush_index], a_type, lda,
-                mat->ptr_dev_b[flush_index], b_type, ldb, (T *) beta, mat->ptr_dev_c[flush_index], c_type, ldc);
+  cuda_measure([&](int64_t i) {
+    int f = i % flush_batch_count;
+    check_cublas(func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha,
+                      mat->ptr_dev_a[f], a_type, lda,
+                      mat->ptr_dev_b[f], b_type, ldb, (T *) beta,
+                      mat->ptr_dev_c[f], c_type, ldc));
+  }, stream, timing_cfg, mat->timing);
+  std::tie(mat->gflops, mat->gbytes, mat->time_us) = figure_of_merit(mat->timing.median_us);
 
-    // Check for errors during the gemm run
-    check_cublas(stat);
-    check_cuda(cudaGetLastError());
-  }
-  cudaStreamSynchronize(stream);
-
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-
-  /*
-    Run and time the performance test
-  */
-  cudaEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = func(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, (T *) alpha, mat->ptr_dev_a[flush_index], a_type, lda,
-                mat->ptr_dev_b[flush_index], b_type, ldb, (T *) beta, mat->ptr_dev_c[flush_index], c_type, ldc);
-  }
-  cudaEventRecord(stop, stream);
-  cudaEventSynchronize(stop);
-
-  // Check for errors during the performance test
-  check_cublas(stat);
-  check_cuda(cudaGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  cudaEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+  check_cuda(cudaStreamDestroy(stream));
+  check_cublas(cublasDestroy(handle));
 }
 
 void cublas_gemm::testGemmEx(cublasgemmInst *mat) {
-  cublasStatus_t stat;
   cublasHandle_t handle;
   cudaStream_t stream;
   check_cuda(cudaSetDevice(mat->devIDX));
@@ -796,43 +666,16 @@ void cublas_gemm::testGemmEx(cublasgemmInst *mat) {
   check_cublas(cublasSetStream(handle, stream));
   check_cublas(cublasSetWorkspace(handle, mat->devWork, mat->wSZ));
   // cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH);
-  // Cold iters
-  for (int rep = 0; rep < cold_iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = cublasGemmEx(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alpha, mat->ptr_dev_a[flush_index],
-                        a_type, lda, mat->ptr_dev_b[flush_index], b_type, ldb, beta, mat->ptr_dev_c[flush_index],
-                        c_type, ldc, compute, CUBLAS_GEMM_DEFAULT);
 
-    // Check for errors during the gemm run
-    check_cublas(stat);
-    check_cuda(cudaGetLastError());
-  }
-  cudaStreamSynchronize(stream);
+  cuda_measure([&](int64_t i) {
+    int f = i % flush_batch_count;
+    check_cublas(cublasGemmEx(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alpha,
+                              mat->ptr_dev_a[f], a_type, lda,
+                              mat->ptr_dev_b[f], b_type, ldb, beta,
+                              mat->ptr_dev_c[f], c_type, ldc, compute, CUBLAS_GEMM_DEFAULT));
+  }, stream, timing_cfg, mat->timing);
+  std::tie(mat->gflops, mat->gbytes, mat->time_us) = figure_of_merit(mat->timing.median_us);
 
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-
-  /*
-    Run and time the performance test
-  */
-  cudaEventRecord(start, stream);
-  for (int rep = 0; rep < iters; rep++) {
-    int flush_index = rep % flush_batch_count;
-    stat = cublasGemmEx(handle, transA.convert_to_cuda(), transB.convert_to_cuda(), m, n, k, alpha, mat->ptr_dev_a[flush_index],
-                        a_type, lda, mat->ptr_dev_b[flush_index], b_type, ldb, beta, mat->ptr_dev_c[flush_index],
-                        c_type, ldc, compute, CUBLAS_GEMM_DEFAULT);
-  }
-  cudaEventRecord(stop, stream);
-  cudaEventSynchronize(stop);
-
-  // Check for errors during the performance test
-  check_cublas(stat);
-  check_cuda(cudaGetLastError());
-
-  // Calculate and report GFlops
-  float elapsedTime_ms;
-  cudaEventElapsedTime(&elapsedTime_ms, start, stop);
-  std::tie(mat->gflops, mat->gbytes, mat->time_us) =
-      calculate_figure_of_merit(static_cast<double>(elapsedTime_ms));
+  check_cuda(cudaStreamDestroy(stream));
+  check_cublas(cublasDestroy(handle));
 }
