@@ -679,3 +679,22 @@ void cublas_gemm::testGemmEx(cublasgemmInst *mat) {
   check_cuda(cudaStreamDestroy(stream));
   check_cublas(cublasDestroy(handle));
 }
+
+// --dump_matrix: copy A/B/C (before the GEMM) or D (after it) from device 0 and write them
+// exactly as stored on the GPU. Only the first rotating buffer is dumped.
+void cublas_gemm::dump_device_data(bool after_gemm) {
+  auto &mat = mat_ptrs.front();
+  check_cuda(cudaSetDevice(mat.devIDX));
+  if (!after_gemm) {
+    write_dump('a', a_type, mat.devIDX,
+               copy_raw_from_device(a_type, mat.ptr_dev_a[0], rows_mem_a, cols_mem_a, batch_count, stride_a), false);
+    write_dump('b', b_type, mat.devIDX,
+               copy_raw_from_device(b_type, mat.ptr_dev_b[0], rows_mem_b, cols_mem_b, batch_count, stride_b), false);
+    write_dump('c', c_type, mat.devIDX,
+               copy_raw_from_device(c_type, mat.ptr_dev_c[0], rows_mem_c, cols_mem_c, batch_count, stride_c), false);
+  } else {
+    // Legacy cuBLAS always works in place: D is C, so there is no separate d_type or D buffer.
+    write_dump('d', c_type, mat.devIDX,
+               copy_raw_from_device(c_type, mat.ptr_dev_c[0], rows_mem_c, cols_mem_c, batch_count, stride_c), true);
+  }
+}

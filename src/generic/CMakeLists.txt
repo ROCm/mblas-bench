@@ -3,6 +3,7 @@ add_library(mblasgeneric STATIC
     generic_gemm.cpp
     generic_setup.cpp
     generic_init.cpp
+    generic_dump.cpp
     mblas_data_type.cpp
     mblas_compute_type.cpp
     mblas_operation.cpp

@@ -4,6 +4,8 @@
 #include <hip/hip_fp16.h>
 #include <hip/hip_fp8.h>
 #include <hip/hip_runtime.h>
+#include <cstdint>
+#include <vector>
 #include "mblas_data_type.h"
 
 __global__ void float_to_bf16(float *input, size_t num_elements,
@@ -29,6 +31,10 @@ void copy_and_convert(mblas_data_type precision, void *host_a, void *devA, long 
                     long y, int batchsz, long long stride, bool skip_convert = false);
 //void copy_and_convert(hipblasDatatype_t precision, void *host_a, void *devA, int x,
 //                    int y, int batchsz);
+// Copy a matrix from the device exactly as stored (native type, packed for fp4).
+// Works for every type. Returns an empty vector if the matrix is unused.
+std::vector<uint8_t> copy_raw_from_device(mblas_data_type precision, void *devA, long x,
+                                          long y, int batchsz, long long stride);
 void *convert_scalar(mblas_data_type precision, void *scalar);
 //void *convert_scalar(hipblasDatatype_t precision, void *scalar);
 void copyAndConvertScalar(mblas_data_type scalarPrecision, void *hostScalar,

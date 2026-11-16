@@ -184,6 +184,7 @@ class hipblaslt_gemm : public generic_gemm {
   hipblaslt_gemm(cxxopts::ParseResult result);
   std::string prepare_array() override;
   double test(const int &ith_solution) override;
+  void dump_device_data(bool after_gemm) override;
   std::string get_result_string() override;
   void free_mem() override;
 };

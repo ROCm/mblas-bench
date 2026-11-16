@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "adaptive_timing.h"
+#include "generic_dump.h"
+#include "mblas_data_type.h"
 #include "cxxopts.hpp"
 enum class scaling_type {
   None, Scalar, Vector, Block,
@@ -122,6 +124,10 @@ class generic_gemm {
   std::string filename_c;
   std::string filename_d;
 
+  // --dump_matrix / --dump_only
+  std::string dump_prefix;
+  bool dump_only = false;
+
   double gflop_per_second = 0;
   double gbyte_per_second = 0;
   double iter_time_us = 0;
@@ -149,6 +155,14 @@ class generic_gemm {
   std::pair<int, int> set_row_col(std::string OP, int d1, int d2);
 
   virtual std::string prepare_array() = 0;
+
+  // Copy A/B/C (after_gemm == false) or D (after_gemm == true) from device 0 back to
+  // the host and write them with write_dump(). Backends override this; the default
+  // only warns so the option is never silently ignored.
+  virtual void dump_device_data(bool after_gemm);
+  // Backend-independent part: names the file and writes the sidecar.
+  void write_dump(char matrix, const mblas_data_type &type, int device,
+                  const std::vector<uint8_t> &bytes, bool after_gemm);
 
   virtual double test(const int &ith_solution) = 0;
   void run_solutions();

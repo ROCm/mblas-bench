@@ -1,6 +1,7 @@
 #include "generic_gemm.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
@@ -101,6 +102,11 @@ generic_gemm::generic_gemm(cxxopts::ParseResult result) {
   filename_a = result["filename_a"].as<string>();
   filename_b = result["filename_b"].as<string>();
   filename_c = result["filename_c"].as<string>();
+  dump_prefix = result["dump_matrix"].as<string>();
+  dump_only = result["dump_only"].as<bool>();
+  if (dump_only && dump_prefix.empty()) {
+    throw std::invalid_argument("--dump_only requires --dump_matrix");
+  }
 
   constant_a = result["constant_a"].as<float>();
   constant_b = result["constant_b"].as<float>();
@@ -395,15 +401,63 @@ std::string generic_gemm::timing_values() const {
   return oss.str();
 }
 
+void generic_gemm::dump_device_data(bool) {
+  std::cerr << "Warning: --dump_matrix is not implemented for this backend; nothing written"
+            << std::endl;
+}
+
+void generic_gemm::write_dump(char matrix, const mblas_data_type &type, int device,
+                              const std::vector<uint8_t> &bytes, bool after_gemm) {
+  if (bytes.empty()) {
+    std::cout << "Matrix " << static_cast<char>(std::toupper(matrix))
+              << " is unused; not dumping" << std::endl;
+    return;
+  }
+  const matrix_desc *props = nullptr;
+  long ld = 0;
+  long long stride = 0;
+  switch (matrix) {
+    case 'a': props = &a_props; ld = lda; stride = stride_a; break;
+    case 'b': props = &b_props; ld = ldb; stride = stride_b; break;
+    case 'c': props = &c_props; ld = ldc; stride = stride_c; break;
+    default:  props = &d_props; ld = ldd; stride = stride_d; break;
+  }
+  matrix_dump_info info;
+  info.matrix = matrix;
+  info.type_name = type.to_string();
+  info.packing = type.get_packing_count();
+  info.rows = props->rows;
+  info.cols = props->cols;
+  info.rows_mem = props->rows_mem;
+  info.cols_mem = props->cols_mem;
+  info.ld = ld;
+  info.batch = batch_count;
+  info.stride = stride;
+  info.init = props->init;
+  info.device = device;
+  info.stage = after_gemm ? "after_gemm" : "before_gemm";
+  const std::string path = write_matrix_dump(dump_prefix, info, bytes);
+  std::cout << "Wrote " << bytes.size() << " bytes to " << path << std::endl;
+}
+
 void generic_gemm::run_solutions() {
   if (timing_cfg.adaptive) {
     std::cout << format_adaptive_timing_summary(timing_cfg) << std::endl;
   }
   string header = prepare_array();
+  if (!dump_prefix.empty()) {
+    dump_device_data(/*after_gemm=*/false);
+    if (dump_only) {
+      return;
+    }
+  }
   std::cout << header << std::flush;
   for (int i = 0; i < total_solution_count; i++) {
     current_solution_index = i;
     test(i);
+    if (i == 0 && !dump_prefix.empty()) {
+      dump_device_data(/*after_gemm=*/true);
+    }
     std::cout << std::fixed;
     std::string results = get_result_string();
     std::cout << results << std::flush;
