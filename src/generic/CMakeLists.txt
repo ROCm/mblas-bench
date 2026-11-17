@@ -21,4 +21,7 @@ target_include_directories(mblasgeneric PRIVATE
     ..
 )
 
-target_link_libraries(mblasgeneric PUBLIC OpenMP::OpenMP_CXX)
+# Compile flag only. Do not link OpenMP::OpenMP_CXX here: this static library is linked into
+# every backend, and FindOpenMP (run under g++) would force libgomp onto the clang-built HIP
+# backend. Each backend links the OpenMP runtime of its own compiler instead.
+target_compile_options(mblasgeneric PRIVATE ${OpenMP_CXX_FLAGS})

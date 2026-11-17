@@ -97,7 +97,11 @@ target_include_directories(mblascuda PRIVATE
     ../generic
 )
 
+# OpenMP for this backend comes from its host compiler (g++): libgomp via FindOpenMP.
+find_package(OpenMP REQUIRED)
+
 target_link_libraries(mblascuda PUBLIC 
+    OpenMP::OpenMP_CXX
     CUDA::cudart 
     CUDA::cuda_driver 
     CUDA::cublas 
