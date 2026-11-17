@@ -21,7 +21,6 @@ set(ROCM_ROOT "/opt/rocm" CACHE PATH "Root directory of the ROCm installation")
 find_package(hip REQUIRED)
 find_package(hipblas-common REQUIRED)
 find_package(Threads REQUIRED)
-find_package(OpenMP REQUIRED)
 
 if(WITH_ROCBLAS)
     find_package(rocblas REQUIRED)
@@ -92,11 +91,16 @@ set(ROCM_LINK_LIBS
     hip::host
     roc::hipblas-common
     Threads::Threads
-    OpenMP::OpenMP_CXX
     -lpthread
     -fopenmp
     mblasgeneric
 )
+
+# OpenMP for this backend comes from its own compiler (hipcc/clang): -fopenmp at compile and
+# link time selects LLVM libomp. Do NOT link OpenMP::OpenMP_CXX here. FindOpenMP runs under the
+# top-level g++ and would add libgomp, and omp_get_thread_num() would then bind to libgomp while
+# the parallel regions run on libomp: every thread gets id 0 and random fills are duplicated.
+target_compile_options(mblaship PRIVATE -fopenmp)
 
 target_compile_definitions(mblaship PRIVATE
     MBLAS_WITH_ROCBLAS=$<BOOL:${WITH_ROCBLAS}>

@@ -77,6 +77,7 @@ void fill_host_uniform_native(const mblas_data_type &type, void **ptr_array, lon
 
   std::random_device r;
   int random_dev_seed = r();
+  check_openmp_runtime();
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};

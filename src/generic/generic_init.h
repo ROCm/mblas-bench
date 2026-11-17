@@ -14,6 +14,38 @@
 
 #include "mblas_data_type.h"
 
+// Throws if the OpenMP runtime that runs a parallel region is not the one answering
+// omp_get_thread_num(). That happens when code compiled by one compiler is linked against
+// another compiler's OpenMP runtime (for example clang code on libomp with omp_* bound to
+// libgomp). Every thread then reports id 0, the per-thread generators get identical seeds,
+// and the generated matrix is silently T copies of one block.
+// Check with: readelf -d <lib> | grep NEEDED ; objdump -T <lib> | grep omp_get_thread_num
+// This is `static inline`, not plain `inline`, on purpose: each translation unit must be
+// tested with its own compiler's OpenMP lowering. A plain inline function would let the
+// linker keep a single copy and test the wrong translation unit.
+static inline void check_openmp_runtime() {
+  static bool checked = false;  // once per translation unit
+  if (checked) return;
+  checked = true;
+  long entered = 0;
+  long id_sum = 0;
+  #pragma omp parallel reduction(+ : entered, id_sum)
+  {
+    entered += 1;
+    id_sum += omp_get_thread_num();
+  }
+  // With n threads the ids must be 0..n-1, so they sum to n*(n-1)/2.
+  if (entered > 1 && id_sum != entered * (entered - 1) / 2) {
+    throw std::runtime_error(
+        "OpenMP runtime mismatch: a parallel region ran " + std::to_string(entered) +
+        " threads but omp_get_thread_num() ids summed to " + std::to_string(id_sum) +
+        " (expected " + std::to_string(entered * (entered - 1) / 2) +
+        "). Two OpenMP runtimes (libgomp and libomp) are in use and the omp_* calls are bound "
+        "to a different one than the runtime executing the parallel region. Random "
+        "initialization would produce duplicated data, so this is treated as an error.");
+  }
+}
+
 // Fills each buffer with packed device-format codes of an OCP E4M3, E5M2, E3M2,
 // E2M3, or E2M1 type, every finite encoding equally likely. The buffers must be
 // copied to the device without conversion. Throws for any other type.
@@ -84,6 +116,7 @@ void fill_rand_host_constant(void **ptr_array, long rows_A, long cols_A, long ld
 template <typename T>
 void fill_rand_host_rand_int_alternating(void **ptr_array, long rows_A, long cols_A, long ld, int batch,
                            long long int stride, int flush_batch_count, bool alternating, int random_dev_seed) {
+  check_openmp_runtime();
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
@@ -113,6 +146,7 @@ void fill_rand_host_normal_float(void **ptr_array, long rows_A, long cols_A, lon
                              long long int stride, int flush_batch_count, float mean = 0.0f, float std_dev = 1.0f) {
   std::random_device r;
   int random_dev_seed = r();
+  check_openmp_runtime();
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
@@ -137,6 +171,7 @@ void fill_rand_host_uniform(void **ptr_array, long rows_A, long cols_A, long ld,
                            long long int stride, int flush_batch_count, float min_val = 0.0f, float max_val = 1.0f) {
   std::random_device r;
   int random_dev_seed = r();
+  check_openmp_runtime();
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
@@ -163,6 +198,7 @@ void fill_rand_host_pow2_binomial_reference(void **ptr_array, long rows_A, long 
                                             int center = 0) {
   std::random_device r;
   int random_dev_seed = r();
+  check_openmp_runtime();
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
@@ -214,6 +250,7 @@ void fill_rand_host_pow2_binomial(void **ptr_array, long rows_A, long cols_A, lo
   }
   std::random_device r;
   int random_dev_seed = r();
+  check_openmp_runtime();
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
@@ -269,6 +306,7 @@ void fill_rand_host_uniform_trig(void **ptr_array, long rows_A, long cols_A, lon
   std::random_device r;
   int random_dev_seed = r();
   const long long span = static_cast<long long>(rows_A) * static_cast<long long>(cols_A);
+  check_openmp_runtime();
   #pragma omp parallel
   {
     std::seed_seq seed{random_dev_seed, omp_get_thread_num()};
