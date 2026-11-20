@@ -268,6 +268,20 @@ void copy_and_convert(mblas_data_type precision, void *hostA, void *devA, long x
   }
 }
 
+std::vector<uint8_t> copy_raw_from_device(mblas_data_type precision, void *devA, long x,
+                                          long y, int batchsz, long long stride)
+{
+  if (batchsz * x * y == 0)
+  {
+    // Matrix not used
+    return {};
+  }
+  const size_t nbytes = static_cast<size_t>(get_malloc_size(precision, x, y, batchsz, stride, true));
+  std::vector<uint8_t> out(nbytes);
+  check_hip(hipMemcpy(out.data(), devA, nbytes, hipMemcpyDeviceToHost));
+  return out;
+}
+
 void *convert_scalar(mblas_data_type precision, void *scalar)
 {
   if (precision == mblas_data_type(MBLAS_R_16F))

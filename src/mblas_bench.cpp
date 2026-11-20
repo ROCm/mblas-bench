@@ -265,6 +265,16 @@ int main(int argc, char **argv) {
   opp_adder("filename_c",
             "Initialize matrix C with contents of a csv file",
             cxxopts::value<string>()->default_value(""));
+  opp_adder("dump_matrix",
+            "Write matrices A, B, C (before the GEMM) and D (after it) to files exactly as "
+            "they exist in GPU memory, with a .json description next to each. "
+            "Use as a flag (files are named mblas_dump_{a,b,c,d}.bin) or with a prefix: "
+            "--dump_matrix=/path/prefix. Note the '=': a space-separated value is not consumed. "
+            "Only device 0, first rotating buffer.",
+            cxxopts::value<string>()->default_value("")->implicit_value("mblas_dump"));
+  opp_adder("dump_only",
+            "With --dump_matrix: write A, B and C and exit without running the GEMM.",
+            cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
   opp_adder("constant_a",
             "Constant value used for the A matrix."
             "In constant init mode, this value is used as the value to initialized"

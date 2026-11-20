@@ -165,6 +165,7 @@ class cublas_gemm : public generic_gemm {
   cublas_gemm(cxxopts::ParseResult result);
   std::string prepare_array();
   double test(const int &ith_solution) override;
+  void dump_device_data(bool after_gemm) override;
   std::string get_result_string();
   virtual void free_mem();
 };

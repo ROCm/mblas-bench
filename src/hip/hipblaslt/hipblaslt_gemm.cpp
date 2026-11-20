@@ -956,3 +956,21 @@ void hipblaslt_gemm::test_matmul(hipblaslt_gemm_inst *mat, int ith_solution) {
 //  return std::make_tuple(scale_type, scale_mode, sz);
 //}
 //#endif
+
+// --dump_matrix: copy A/B/C (before the GEMM) or D (after it) from device 0 and write them
+// exactly as stored on the GPU. Only the first rotating buffer is dumped.
+void hipblaslt_gemm::dump_device_data(bool after_gemm) {
+  auto &mat = mat_ptrs.front();
+  check_hip(hipSetDevice(mat.devIDX));
+  if (!after_gemm) {
+    write_dump('a', a_type, mat.devIDX,
+               copy_raw_from_device(a_type, mat.ptr_dev_a[0], rows_mem_a, cols_mem_a, batch_count, stride_a), false);
+    write_dump('b', b_type, mat.devIDX,
+               copy_raw_from_device(b_type, mat.ptr_dev_b[0], rows_mem_b, cols_mem_b, batch_count, stride_b), false);
+    write_dump('c', c_type, mat.devIDX,
+               copy_raw_from_device(c_type, mat.ptr_dev_c[0], rows_mem_c, cols_mem_c, batch_count, stride_c), false);
+  } else {
+    write_dump('d', d_type, mat.devIDX,
+               copy_raw_from_device(d_type, mat.ptr_dev_d[0], rows_mem_d, cols_mem_d, batch_count, stride_d), true);
+  }
+}
